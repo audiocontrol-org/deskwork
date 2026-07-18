@@ -131,6 +131,52 @@ describe('event-log survives a crash mid-append (AUDIT-20260718-16)', () => {
     expect(() => createEventLog(dir)).toThrow(/corrupt line/);
   });
 
+  it('AUDIT-20260718-42: a torn write that removes ONLY the trailing newline (JSON body intact, parseable) does not corrupt the next append', () => {
+    const dir = makeDir();
+
+    // Persist one genuinely durable event through the real `append` path —
+    // `append` always writes `${json}\n`, so this file is currently
+    // newline-terminated.
+    const seed = createEventLog(dir);
+    seed.append(sampleEvent('run-first', 1));
+
+    // Simulate a torn write cut short by EXACTLY the final `\n` byte: the
+    // JSON body is fully intact and parses fine (unlike the other tests in
+    // this suite, which truncate mid-record) — only the terminator byte is
+    // lost. This is the crash timing AUDIT-20260718-42 names: the file's
+    // last line "parses fine", so `replayLog`'s existing branches treat it
+    // as healthy and never re-terminate it on disk.
+    const path = join(dir, LOG_FILE);
+    const durable = readFileSync(path, 'utf8');
+    expect(durable.endsWith('\n')).toBe(true);
+    writeFileSync(path, durable.slice(0, -1));
+
+    // Recovery replays the intact-but-unterminated record without throwing
+    // (its JSON body is genuinely well-formed).
+    const recovered = createEventLog(dir);
+    expect(recovered.replayed).toHaveLength(1);
+    expect(recovered.replayed[0]?.envelope.runId).toBe('run-first');
+
+    // The next durable append must NOT land directly after the
+    // unterminated tail (which would concatenate the two records into one
+    // unparseable line). Pre-fix, `appendDurably` opens in plain append
+    // mode and writes `${json}\n` with no separator logic of its own, so
+    // this call silently corrupts the file on disk.
+    recovered.append(sampleEvent('run-second', 1));
+
+    // A THIRD boot must recover BOTH records — the first (already fsynced
+    // before the torn write) and the second (fsynced by the append above).
+    // Pre-fix, this throws: the on-disk line is now
+    // `{...run-first}{...run-second}\n`, which is found as a NON-trailing
+    // line by `replayLog` (a genuine trailing empty element follows it) and
+    // so is parsed with no crash-recovery fallback — `parseLine` throws
+    // "corrupt line", turning one crash-in-progress append into permanent,
+    // total loss of BOTH the already-fsynced records on the next restart.
+    const rebooted = createEventLog(dir);
+    expect(rebooted.replayed).toHaveLength(2);
+    expect(rebooted.replayed.map((e) => e.envelope.runId)).toEqual(['run-first', 'run-second']);
+  });
+
   it('append is durable: content is visible via an independently-opened read immediately after append returns', () => {
     const dir = makeDir();
     const path = join(dir, LOG_FILE);

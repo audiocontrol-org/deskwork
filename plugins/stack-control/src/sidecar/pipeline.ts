@@ -300,6 +300,16 @@ export function createPipeline(walDir: string, options?: PipelineOptions): Sidec
   // been opened and its durable state recovered via `replay()`.
   let nextInstallationSequence: number | null = null;
 
+  // AUDIT-20260718-44: the single in-flight recovery promise. `null` until
+  // the FIRST caller (across however many concurrent `receive()` calls race
+  // a fresh pipeline) starts recovery; from then on every caller — including
+  // ones that arrive before it resolves — awaits this SAME promise instead of
+  // independently re-running `wal.replay()`. This is what makes
+  // `ensureSequencesRecovered` idempotent/serialized without changing the
+  // recovery logic itself (still exactly one WAL replay -> max
+  // installationSequence + per-invocation max, see below).
+  let recoveryPromise: Promise<void> | null = null;
+
   function nextInvocationSequence(invocationId: string): number {
     const current = invocationSequences.get(invocationId) ?? 0;
     const next = current + 1;
@@ -307,30 +317,51 @@ export function createPipeline(walDir: string, options?: PipelineOptions): Sidec
     return next;
   }
 
-  async function ensureSequencesRecovered(wal: WalHandle): Promise<void> {
-    if (nextInstallationSequence !== null) return;
-    // Recover durably from ONE WAL replay: the WAL reflects every record ever
-    // appended (including across a prior process's restart). Both counters
-    // continue from there rather than resetting to 1.
-    const existing = await wal.replay();
-    let maxSequence = 0;
-    for (const record of existing) {
-      // installationSequence (FR-039): the WAL's own monotonic sequence.
-      if (record.sequence > maxSequence) maxSequence = record.sequence;
-      // invocationSequence (FR-040, AUDIT-20260718-07): the per-invocation
-      // domain-ordering counter lives INSIDE the spooled payload. Seed the map
-      // from the max seen per invocationId so a post-restart event for an
-      // in-flight invocation continues (does not regress below the plane's
-      // already-applied high-water mark and get silently dropped as stale).
-      const recovered = recoverInvocationFromPayload(record.payload);
-      if (recovered !== null) {
-        const current = invocationSequences.get(recovered.invocationId) ?? 0;
-        if (recovered.invocationSequence > current) {
-          invocationSequences.set(recovered.invocationId, recovered.invocationSequence);
+  /**
+   * Ensure `nextInstallationSequence`/`invocationSequences` are recovered
+   * from the WAL, running the recovery AT MOST ONCE for this pipeline
+   * instance's whole lifetime — even when N concurrent `receive()` calls all
+   * observe `nextInstallationSequence === null` at once (AUDIT-20260718-44).
+   * Without this, each racing caller independently re-enters, each redundantly
+   * `await`s its OWN `wal.replay()`, and each redundantly resets
+   * `nextInstallationSequence` from a snapshot that may already be stale by
+   * the time it lands — a hazard whose consequence (a duplicate
+   * installationSequence) is latent rather than provably safe: it depends on
+   * `wal.replay()`/`wal.append()` staying fully synchronous internally, an
+   * implementation detail this function must not rely on. Memoizing the
+   * in-flight promise removes the reentrancy entirely rather than trying to
+   * out-race it.
+   */
+  function ensureSequencesRecovered(wal: WalHandle): Promise<void> {
+    if (nextInstallationSequence !== null) return Promise.resolve();
+    if (recoveryPromise === null) {
+      recoveryPromise = (async () => {
+        // Recover durably from ONE WAL replay: the WAL reflects every record
+        // ever appended (including across a prior process's restart). Both
+        // counters continue from there rather than resetting to 1.
+        const existing = await wal.replay();
+        let maxSequence = 0;
+        for (const record of existing) {
+          // installationSequence (FR-039): the WAL's own monotonic sequence.
+          if (record.sequence > maxSequence) maxSequence = record.sequence;
+          // invocationSequence (FR-040, AUDIT-20260718-07): the per-invocation
+          // domain-ordering counter lives INSIDE the spooled payload. Seed the
+          // map from the max seen per invocationId so a post-restart event
+          // for an in-flight invocation continues (does not regress below the
+          // plane's already-applied high-water mark and get silently dropped
+          // as stale).
+          const recovered = recoverInvocationFromPayload(record.payload);
+          if (recovered !== null) {
+            const current = invocationSequences.get(recovered.invocationId) ?? 0;
+            if (recovered.invocationSequence > current) {
+              invocationSequences.set(recovered.invocationId, recovered.invocationSequence);
+            }
+          }
         }
-      }
+        nextInstallationSequence = maxSequence + 1;
+      })();
     }
-    nextInstallationSequence = maxSequence + 1;
+    return recoveryPromise;
   }
 
   function takeInstallationSequence(): number {

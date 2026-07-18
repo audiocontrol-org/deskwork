@@ -22,11 +22,10 @@
  * Relative `.js` imports under node16 resolution.
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { createPipeline } from '../../src/sidecar/pipeline.js';
 import type { RedactionContext } from '../../src/fleet/redact.js';
 
 const FAKE_CTX: RedactionContext = {
@@ -35,6 +34,37 @@ const FAKE_CTX: RedactionContext = {
   username: 'testuser',
   hostname: 'test-host.local',
 };
+
+/**
+ * AUDIT-20260718-44 test-only observability seam: wrap the REAL
+ * `openWal`/`WalHandle.replay()` (real fs underneath, never mocked — the
+ * project testing rule) to COUNT how many times `replay()` actually executes.
+ * This is the directly-falsifiable signal for "recovery is not serialized":
+ * `ensureSequencesRecovered()` is supposed to run the WAL replay AT MOST ONCE
+ * per pipeline instance, no matter how many concurrent `receive()` calls race
+ * it. `vi.mock` + `importOriginal` delegates every call to the real
+ * implementation; only the call COUNT is observed.
+ */
+let replayCallCount = 0;
+
+vi.mock('../../src/sidecar/spool/wal.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/sidecar/spool/wal.js')>();
+  return {
+    ...actual,
+    openWal: async (dir: string) => {
+      const handle = await actual.openWal(dir);
+      return {
+        ...handle,
+        replay: async () => {
+          replayCallCount += 1;
+          return handle.replay();
+        },
+      };
+    },
+  };
+});
+
+const { createPipeline } = await import('../../src/sidecar/pipeline.js');
 
 describe('pipeline invocationSequence recovery across restart (AUDIT-20260718-07, FR-040)', () => {
   it('a post-restart event for an in-flight invocation CONTINUES its sequence (does not regress to 1)', async () => {
@@ -115,6 +145,88 @@ describe('pipeline invocationSequence recovery across restart (AUDIT-20260718-07
       const p2 = createPipeline(walDir, { redactionContext: FAKE_CTX });
       const fresh = await p2.receive({ installationId: 'i', invocationId: 'brand-new-inv', runId: null, type: 'run.started', classification: 'durable' });
       expect(fresh.envelope.invocationSequence).toBe(1);
+    } finally {
+      rmSync(walDir, { recursive: true });
+    }
+  });
+});
+
+describe('pipeline sequence recovery is serialized under concurrent receive() (AUDIT-20260718-44, FR-039/040)', () => {
+  it('N concurrent receive() calls on a fresh pipeline run WAL replay AT MOST ONCE, and every installationSequence/invocationSequence is distinct and continues from the recovered high-water', async () => {
+    const walDir = mkdtempSync(join(tmpdir(), 'pipeline-recovery-race-'));
+    try {
+      // --- pre-seed the WAL from a PRIOR session (3 events), then drop that
+      // pipeline — the next pipeline instance is genuinely "fresh"
+      // (nextInstallationSequence === null) and must recover from disk, same
+      // as a real restart.
+      const seeder = createPipeline(walDir, { redactionContext: FAKE_CTX });
+      await seeder.receive({ installationId: 'inst-1', invocationId: 'seed-inv', runId: null, type: 'run.started', classification: 'durable' });
+      await seeder.receive({ installationId: 'inst-1', invocationId: 'seed-inv', runId: null, type: 'run.progress', classification: 'durable' });
+      await seeder.receive({ installationId: 'inst-1', invocationId: 'seed-inv', runId: null, type: 'run.progress', classification: 'durable' });
+
+      // --- the fresh pipeline under test. nextInstallationSequence is still
+      // null at this point — no receive() has run on THIS instance yet.
+      const pipeline = createPipeline(walDir, { redactionContext: FAKE_CTX });
+      replayCallCount = 0;
+
+      // Fire N receive() calls CONCURRENTLY, all for the SAME invocationId, so
+      // they race ensureSequencesRecovered() (module header, AUDIT-20260718-44):
+      // every one of them observes nextInstallationSequence === null at the
+      // moment it enters, so pre-fix every one of them independently re-runs
+      // WAL replay (wasteful AND a latent correctness hazard — see the
+      // replayCallCount assertion below, which is the falsifiable pre/post-fix
+      // signal for THIS implementation; see the comment on the sequence
+      // assertions for why they are not, by themselves, discriminating here).
+      const N = 10;
+      const invocationId = 'race-inv';
+      const results = await Promise.all(
+        Array.from({ length: N }, (_unused, i) =>
+          pipeline.receive({
+            installationId: 'inst-1',
+            invocationId,
+            runId: null,
+            type: 'run.progress',
+            classification: 'durable',
+          }),
+        ),
+      );
+
+      // Recovery must run AT MOST ONCE per pipeline instance no matter how many
+      // concurrent receive() calls raced the null nextInstallationSequence
+      // window. This is AUDIT-20260718-44's literal described mechanism
+      // ("BOTH await wal.replay()") made directly observable: PRE-FIX this is
+      // N (one redundant replay per racing caller); POST-FIX (memoized
+      // in-flight recovery promise) it is exactly 1.
+      expect(replayCallCount).toBe(1);
+
+      // installationSequence: every returned value is distinct and continues
+      // from the recovered high-water mark (3 pre-seeded events -> next is 4).
+      // NOTE: for THIS pipeline's fully-synchronous WAL implementation
+      // (Promise.resolve()-wrapped sync fs calls), Node's microtask FIFO
+      // ordering happens to keep same-closure concurrent callers from ever
+      // observing a stale reset AFTER another caller has already taken a
+      // value (verified via instrumented tracing during RED-test
+      // development) — so this invariant does not, by itself, discriminate
+      // pre/post-fix on this exact code path today. It is still asserted
+      // because it is the correctness property AUDIT-20260718-44 exists to
+      // protect (FR-039), and because it is exactly the invariant that WOULD
+      // break the moment `wal.replay()`/`wal.append()` gain any genuine
+      // asynchronous latency (e.g. a future move to `fs.promises`) — at which
+      // point this assertion becomes the discriminating one.
+      const installationSequences = results.map((r) => r.envelope.installationSequence);
+      expect(new Set(installationSequences).size).toBe(N);
+      const sortedInstallationSequences = [...installationSequences].sort((a, b) => a - b);
+      expect(sortedInstallationSequences).toEqual(
+        Array.from({ length: N }, (_unused, i) => 4 + i),
+      );
+
+      // invocationSequence: all N events share the SAME invocationId, so they
+      // must be a distinct, contiguous run starting at 1 (no prior WAL record
+      // exists for 'race-inv').
+      const invocationSequences = results.map((r) => r.envelope.invocationSequence);
+      expect(new Set(invocationSequences).size).toBe(N);
+      const sortedInvocationSequences = [...invocationSequences].sort((a, b) => a - b);
+      expect(sortedInvocationSequences).toEqual(Array.from({ length: N }, (_unused, i) => 1 + i));
     } finally {
       rmSync(walDir, { recursive: true });
     }

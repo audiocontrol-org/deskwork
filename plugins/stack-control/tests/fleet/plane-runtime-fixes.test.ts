@@ -87,6 +87,14 @@ function bearer(token: string): Record<string, string> {
   return { authorization: `Bearer ${token}` };
 }
 
+function livenessBody(installationId: string): string {
+  return JSON.stringify({
+    kind: 'session-liveness',
+    installationId,
+    emittedAt: new Date().toISOString(),
+  });
+}
+
 function runStartedBody(runId: string, installationId: string): string {
   return JSON.stringify({
     envelope: {
@@ -202,6 +210,73 @@ describe('history/timings serve the injected CdnReader archive (AUDIT-20260717-1
       runId,
       phases: { execution: { durationMs: 4200 }, governance: { durationMs: 1500 } },
     });
+  });
+});
+
+describe('sidecar-facing handlers enforce authed installation == body-claimed installation (AUDIT-20260718-45)', () => {
+  it('REFUSES an ingest event whose envelope.installationId is spoofed to another installation (403), leaving the spoofed fleet state untouched', async () => {
+    const plane = await startPlane({ tokens: new Map([[TOKEN_A, INST_A], [TOKEN_B, INST_B]]) });
+    const spoofedRunId = 'run-spoofed-as-b';
+
+    // Installation A's VALID token, but the body claims to be installation B.
+    const spoof = await fetch(`${plane.baseUrl}/v1/ingest`, {
+      method: 'POST',
+      headers: { ...bearer(TOKEN_A), 'content-type': 'application/json' },
+      body: runStartedBody(spoofedRunId, INST_B),
+    });
+    expect(spoof.status).toBe(403);
+
+    // B's fleet state must NOT have been poisoned by A's token.
+    const fleet = await fetch(`${plane.baseUrl}/v1/fleet`, { headers: bearer(TOKEN_B) });
+    expect(fleet.status).toBe(200);
+    const snapshot: unknown = await fleet.json();
+    if (typeof snapshot !== 'object' || snapshot === null || !('entries' in snapshot)) {
+      throw new Error(`expected a FleetSnapshot, got ${JSON.stringify(snapshot)}`);
+    }
+    const { entries } = snapshot as { entries: unknown };
+    if (!Array.isArray(entries)) throw new Error('expected entries array');
+    expect(entries).toHaveLength(0);
+  });
+
+  it('ACCEPTS an ingest event whose envelope.installationId matches the authenticated installation (200)', async () => {
+    const plane = await startPlane({ tokens: new Map([[TOKEN_A, INST_A]]) });
+    const runId = 'run-owned-by-a';
+
+    const accepted = await fetch(`${plane.baseUrl}/v1/ingest`, {
+      method: 'POST',
+      headers: { ...bearer(TOKEN_A), 'content-type': 'application/json' },
+      body: runStartedBody(runId, INST_A),
+    });
+    expect(accepted.status).toBe(200);
+
+    const fleet = await fetch(`${plane.baseUrl}/v1/fleet`, { headers: bearer(TOKEN_A) });
+    const snapshot: unknown = await fleet.json();
+    const { entries } = snapshot as { entries: unknown };
+    if (!Array.isArray(entries)) throw new Error('expected entries array');
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({ runId, installationId: INST_A });
+  });
+
+  it('REFUSES a liveness heartbeat whose installationId is spoofed to another installation (403)', async () => {
+    const plane = await startPlane({ tokens: new Map([[TOKEN_A, INST_A], [TOKEN_B, INST_B]]) });
+
+    const spoof = await fetch(`${plane.baseUrl}/v1/sidecar/liveness`, {
+      method: 'POST',
+      headers: { ...bearer(TOKEN_A), 'content-type': 'application/json' },
+      body: livenessBody(INST_B),
+    });
+    expect(spoof.status).toBe(403);
+  });
+
+  it('ACCEPTS a liveness heartbeat whose installationId matches the authenticated installation (200)', async () => {
+    const plane = await startPlane({ tokens: new Map([[TOKEN_A, INST_A]]) });
+
+    const accepted = await fetch(`${plane.baseUrl}/v1/sidecar/liveness`, {
+      method: 'POST',
+      headers: { ...bearer(TOKEN_A), 'content-type': 'application/json' },
+      body: livenessBody(INST_A),
+    });
+    expect(accepted.status).toBe(200);
   });
 });
 

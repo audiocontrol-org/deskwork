@@ -143,8 +143,17 @@ export function computeFleetTickGuarded(
   }
 }
 
-/** Validate a session-liveness heartbeat body (C3). */
-export function assertSessionLiveness(body: unknown): void {
+/** A validated session-liveness heartbeat body (C3). */
+export interface SessionLivenessHeartbeat {
+  readonly kind: 'session-liveness';
+  readonly installationId: string;
+  readonly emittedAt: string;
+}
+
+/** Validate a session-liveness heartbeat body (C3), narrowing `body` to
+ * {@link SessionLivenessHeartbeat} so the caller can enforce the claimed
+ * `installationId` against the authenticated one (AUDIT-20260718-45). */
+export function assertSessionLiveness(body: unknown): asserts body is SessionLivenessHeartbeat {
   if (
     !isRecord(body) ||
     body.kind !== 'session-liveness' ||
@@ -155,4 +164,51 @@ export function assertSessionLiveness(body: unknown): void {
       'session-liveness heartbeat must carry { kind: "session-liveness", installationId, emittedAt }.',
     );
   }
+}
+
+/**
+ * Refuse a sidecar-facing request 403 when the body-claimed installation
+ * differs from the token's authenticated one (AUDIT-20260718-45), returning
+ * `true` (response written). Returns `false` (no response) when they match, so
+ * the caller proceeds. `surface` names the offending body field for the
+ * operator-facing detail. Enforced at the HTTP boundary so a per-installation
+ * bearer can only act for ITS OWN installation — never a caller-claimed id.
+ */
+export function refuseInstallationMismatch(
+  res: ServerResponse,
+  claimed: string,
+  authed: string,
+  surface: string,
+): boolean {
+  if (claimed === authed) {
+    return false;
+  }
+  respondJson(res, 403, {
+    error: 'forbidden',
+    reason: 'installation-mismatch',
+    detail: `${surface} does not match the authenticated installation; a token may only act for its own installation.`,
+  });
+  return true;
+}
+
+/**
+ * Extract the caller-claimed `installationId` from an ingest event body, or
+ * `undefined` when the body does not carry one as a string in the expected
+ * `{ envelope: { installationId } }` shape. The runtime enforces this equals
+ * the token's authenticated installation BEFORE ingest (AUDIT-20260718-45):
+ * a mismatch is refused 403 so installation A's token cannot POST telemetry
+ * claiming to be installation B. A body with no claimed id (`undefined`) is
+ * left to `ingestEvent`'s envelope validation, which rejects it 400 —
+ * preserving the malformed-body-is-a-client-error posture (AUDIT-20260718-26).
+ */
+export function ingestClaimedInstallationId(body: unknown): string | undefined {
+  if (!isRecord(body)) {
+    return undefined;
+  }
+  const { envelope } = body;
+  if (!isRecord(envelope)) {
+    return undefined;
+  }
+  const { installationId } = envelope;
+  return typeof installationId === 'string' ? installationId : undefined;
 }

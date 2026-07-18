@@ -67,10 +67,12 @@ import { createEventLog, type EventLog } from './event-log.js';
 import {
   assertSessionLiveness,
   computeFleetTickGuarded,
+  ingestClaimedInstallationId,
   installationIdForRun,
   parseCommandKind,
   parseTargets,
   readJsonBody,
+  refuseInstallationMismatch,
   requireParam,
   respondJson,
 } from './runtime-http.js';
@@ -426,6 +428,20 @@ export function createPlaneRuntime(options: PlaneRuntimeOptions): PlaneRuntime {
     let outcome: IngestOutcome;
     try {
       const body = await readJsonBody(ctx.req);
+      // AUTHED-INSTALLATION ENFORCEMENT (AUDIT-20260718-45): the authenticated
+      // installation is the TOKEN's, never the caller-claimed body id — so a valid
+      // installation-A token cannot POST telemetry claiming `installationId: B`
+      // (spoofing B's fleet/host-health state). Refuse 403 BEFORE `ingestEvent`
+      // touches any bookkeeping. A body with NO claimed id (`undefined`) falls
+      // through to envelope validation, which 400s it — malformed-body stays a
+      // client error, not a spoof (AUDIT-20260718-26).
+      const claimed = ingestClaimedInstallationId(body);
+      if (
+        claimed !== undefined &&
+        refuseInstallationMismatch(ctx.res, claimed, requireAuthedInstallation(ctx.req), 'ingest body envelope.installationId')
+      ) {
+        return;
+      }
       outcome = await ingestEvent(ingestState, { durableStore }, body);
     } catch (error) {
       // A body rejected AT THE BOUNDARY (malformed JSON / failed validation) is
@@ -468,6 +484,14 @@ export function createPlaneRuntime(options: PlaneRuntimeOptions): PlaneRuntime {
     try {
       const body = await readJsonBody(ctx.req);
       assertSessionLiveness(body);
+      // AUTHED-INSTALLATION ENFORCEMENT (AUDIT-20260718-45): as with ingest, the
+      // heartbeat's claimed installationId must equal the token's authenticated
+      // one — else installation-A's token could record liveness as installation B.
+      if (
+        refuseInstallationMismatch(ctx.res, body.installationId, requireAuthedInstallation(ctx.req), 'liveness installationId')
+      ) {
+        return;
+      }
       respondJson(ctx.res, 200, { kind: 'session-liveness', accepted: true });
     } catch (error) {
       respondJson(ctx.res, 400, { error: error instanceof Error ? error.message : String(error) });

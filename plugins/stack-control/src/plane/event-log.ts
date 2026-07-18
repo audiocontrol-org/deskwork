@@ -1,8 +1,11 @@
 // specs/036-fleet-control-plane — AUDIT-20260717-14 (persist + replay the
 // live event log); AUDIT-20260718-16 (REGRESSION fix — crash-safe append +
-// crash-tolerant boot replay). Pairs with
-// tests/fleet/plane-runtime-fixes.test.ts's restart-recovery scenario and
-// tests/fleet/event-log-crash-safety.test.ts's crash-safety scenarios.
+// crash-tolerant boot replay); AUDIT-20260718-42 (REGRESSION fix — the
+// AUDIT-20260718-16 recovery path could itself leave a non-newline-
+// terminated tail on disk, which the next append would silently
+// concatenate onto). Pairs with tests/fleet/plane-runtime-fixes.test.ts's
+// restart-recovery scenario and tests/fleet/event-log-crash-safety.test.ts's
+// crash-safety scenarios.
 //
 // THE DEFECT THIS CLOSES (AUDIT-20260717-14): `createPlaneRuntime` held the
 // entire accepted-event history in a single in-process array with NO
@@ -36,6 +39,23 @@
 // (not an artifact of a crash in progress) and still fails loud — the
 // original fail-loud contract is preserved for real corruption.
 //
+// THE FURTHER REGRESSION THIS CLOSES (AUDIT-20260718-42): the
+// AUDIT-20260718-16 recovery path had three branches for the trailing
+// line — empty (skip), non-empty-and-parses (push, no truncation),
+// non-empty-and-fails-to-parse (truncate). The middle branch assumed a
+// well-formed final line with no trailing newline could not be the crash
+// shape; that is wrong — a torn write can be cut short by exactly the
+// final `\n` byte, leaving the JSON body intact and parseable but the file
+// not newline-terminated. Since `appendDurably` opened in plain append
+// mode and wrote `${json}\n` with no separator logic, the next successful
+// append landed directly after that unterminated tail, concatenating two
+// independently-durable records into one unparseable line — defeating the
+// crash-safety AUDIT-20260718-16 exists to provide. The fix:
+// `appendDurably` now defensively re-terminates any pre-existing
+// unterminated tail (reading the file's last byte; writing+fsyncing a
+// single `\n` at end-of-file if missing) BEFORE writing the new record, so
+// two durable records can never merge (see `ensureNewlineTerminated`).
+//
 // SCOPE (flagged, not half-built): this closes the "unrecoverable across
 // restart" consequence. Fully BOUNDING the in-memory `events` array (which the
 // registry re-folds per read) to a windowed/compacted form needs an
@@ -58,6 +78,8 @@ import {
   mkdirSync,
   openSync,
   readFileSync,
+  readSync,
+  statSync,
   truncateSync,
   writeSync,
 } from 'node:fs';
@@ -137,8 +159,16 @@ function replayLog(path: string): ClassifiedEvent[] {
     if (isLast) {
       try {
         replayed.push(parseLine(line, path));
-        // A well-formed final line with no trailing newline is not the
-        // crash shape (no truncation needed) — nothing further to do.
+        // A well-formed final line with no trailing newline is STILL a
+        // possible crash shape (AUDIT-20260718-42): a torn write can be cut
+        // short by exactly the final `\n` byte, leaving the JSON body fully
+        // intact and parseable while the file is not newline-terminated.
+        // Recovery here does not need to truncate anything — the record is
+        // genuinely durable and correct — but the file's on-disk
+        // termination is repaired lazily, by `appendDurably`'s
+        // `ensureNewlineTerminated` guard, the next time (if ever) a new
+        // record is durably appended. That guard is what actually prevents
+        // the corruption; nothing further is required here.
       } catch {
         // Truncated trailing line from a crash-in-progress append: recover
         // the good prefix already pushed above (drop only this partial
@@ -155,14 +185,56 @@ function replayLog(path: string): ClassifiedEvent[] {
 }
 
 /**
- * Durably append one JSONL line to `path`: open for append, write, then
- * `fsyncSync` the fd before closing it — matching the crash-safe pattern
- * `src/plane/commands/store.ts`'s `persistRecord` already established for
- * this feature. Synchronous end-to-end (callers rely on ordering; see
- * `src/plane/runtime.ts`'s `eventLog.append` call, which must observe the
- * write as durable before it returns) (AUDIT-20260718-16).
+ * Ensure `path` (if it exists and is non-empty) ends with a trailing `\n`
+ * before the next durable append writes to it (AUDIT-20260718-42).
+ *
+ * `replayLog` recovers a well-formed-but-non-newline-terminated trailing
+ * line WITHOUT truncating it — that line can be the intact tail of a torn
+ * write cut short by exactly the final `\n` byte (the JSON body survives;
+ * only the terminator is lost). If the next `append` simply opened in plain
+ * append mode and wrote `${json}\n` onto that unterminated tail, the new
+ * bytes would land directly after the old ones with no separator, producing
+ * one concatenated, unparseable line — permanently corrupting a record that
+ * was itself fully durable and already fsynced. So every durable append
+ * first repairs any pre-existing unterminated tail (reading only the final
+ * byte, then writing+fsyncing a single `\n` at end-of-file) BEFORE writing
+ * the new record, so two independently-durable records can never merge
+ * into one unparseable line.
+ */
+function ensureNewlineTerminated(path: string): void {
+  if (!existsSync(path)) {
+    return;
+  }
+  const size = statSync(path).size;
+  if (size === 0) {
+    return;
+  }
+  const fd = openSync(path, 'r+');
+  try {
+    const lastByte = Buffer.alloc(1);
+    readSync(fd, lastByte, 0, 1, size - 1);
+    if (lastByte[0] === 0x0a) {
+      return;
+    }
+    writeSync(fd, '\n', size);
+    fsyncSync(fd);
+  } finally {
+    closeSync(fd);
+  }
+}
+
+/**
+ * Durably append one JSONL line to `path`: first repair any pre-existing
+ * unterminated tail (`ensureNewlineTerminated`, AUDIT-20260718-42), then
+ * open for append, write, and `fsyncSync` the fd before closing it —
+ * matching the crash-safe pattern `src/plane/commands/store.ts`'s
+ * `persistRecord` already established for this feature. Synchronous
+ * end-to-end (callers rely on ordering; see `src/plane/runtime.ts`'s
+ * `eventLog.append` call, which must observe the write as durable before it
+ * returns) (AUDIT-20260718-16).
  */
 function appendDurably(path: string, event: ClassifiedEvent): void {
+  ensureNewlineTerminated(path);
   const fd = openSync(path, 'a');
   try {
     writeSync(fd, `${JSON.stringify(event)}\n`);
