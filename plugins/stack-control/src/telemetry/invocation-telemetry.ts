@@ -45,6 +45,7 @@
  */
 
 import { createEmitClient, resolveLocalSocketPath, type EmitClient } from './emit.js';
+import { EMIT_DRAIN_BUDGET_MS, awaitDeliveredOrBudget } from './emit-drain.js';
 import { constructEnvelope, type TelemetryEvent } from '../fleet/event.js';
 import { classifyEvent } from '../fleet/classification.js';
 import { mintUuidV7 } from '../fleet/types.js';
@@ -76,50 +77,13 @@ function readSessionIdFailOpen(): string | null {
 }
 
 /**
- * The SMALL BOUNDED window `runInvocationWithTelemetry` gives the eager connect
- * to complete + drain the held `invocation.completed` event before close()
- * (specs/037 D-B). A local UDS connect to a live sidecar is single-digit ms, so
- * the common healthy case exits this wait as soon as the event is delivered —
- * adding only the real connect time, NOT this whole budget. The budget bites
- * ONLY as a hard ceiling for a pathological socket that neither connects nor
- * errors; a down/absent sidecar fires `error` on the next tick (state
- * 'unavailable' → no wait), and a connected-but-stalled peer resolves the
- * instant the buffer drains (delivery never waits on a peer ack). Sized in the
- * "tens of ms" band the design mandates — generous headroom (~10x) over a real
- * connect, small enough that a worst-case wait is imperceptible and can never
- * hang. Modeled on the codebase's existing fail-open budgets (emit.ts's
- * `RECONNECT_DELAY_MS` = 25ms; the long-run restart-gap coverage).
+ * The SMALL BOUNDED drain window + poll loop are shared with the session/phase
+ * CLI-verb emit helpers (specs/037 D-B introduced it here for D-B Scenario 1;
+ * D-E hoisted it to `./emit-drain.js` so phase.entered / session.* deliver with
+ * the SAME bound + fail-open discipline). The budget + wait behavior are
+ * unchanged from T046 — only their home moved. `EMIT_DRAIN_BUDGET_MS` is the
+ * former `INVOCATION_EMIT_DRAIN_BUDGET_MS` (50ms), single-sourced.
  */
-export const INVOCATION_EMIT_DRAIN_BUDGET_MS = 50;
-
-/** Poll interval for the bounded drain-wait. Ref'd (NOT unref'd) so the event
- * loop stays alive through the brief wait — otherwise a process whose only live
- * handle is this timer could exit before the eager connect completes, dropping
- * the very event the wait exists to deliver. Short-lived: cleared by the wait
- * resolving within the budget, after which nothing here keeps the CLI alive. */
-const DRAIN_POLL_INTERVAL_MS = 2;
-
-/**
- * Resolve as soon as the emit client has DELIVERED its held event (connected AND
- * the long-run buffer drained to empty), OR the socket is found unavailable
- * (down/absent sidecar — no point waiting), OR the client is closed, OR the
- * bounded budget elapses. Non-hanging by construction: every exit path is either
- * an immediate condition or the hard `budgetMs` ceiling; nothing here waits on a
- * peer reply, so a connected-but-stalled peer resolves the instant the buffer
- * drains — the 036 fail-open-hang contract is preserved. Never throws.
- */
-async function awaitDeliveredOrBudget(client: EmitClient, budgetMs: number): Promise<void> {
-  const deadline = Date.now() + budgetMs;
-  for (;;) {
-    // Delivered: the event was written on connect and the buffer drained.
-    if (client.state === 'connected' && client.buffer.size === 0) return;
-    // Nothing more to wait for — the sidecar is unreachable (fail-open) or the
-    // client is already torn down.
-    if (client.state === 'unavailable' || client.state === 'closed') return;
-    if (Date.now() >= deadline) return;
-    await new Promise<void>((resolve) => setTimeout(resolve, DRAIN_POLL_INTERVAL_MS));
-  }
-}
 
 /** One dispatched subcommand handler. Mirrors `cli.ts`'s `Subcommand`. */
 export type Handler = (args: string[]) => Promise<void>;
@@ -221,7 +185,7 @@ export async function runInvocationWithTelemetry(
         // complete + drain the held event before close() flushes it. Fail-open +
         // non-hanging (see awaitDeliveredOrBudget) — a down sidecar returns
         // instantly, a stalled peer never blocks, the budget is a hard ceiling.
-        await awaitDeliveredOrBudget(emitClient, INVOCATION_EMIT_DRAIN_BUDGET_MS);
+        await awaitDeliveredOrBudget(emitClient, EMIT_DRAIN_BUDGET_MS);
       } catch {
         // Fail-open: nothing about event construction/emission can surface.
       } finally {

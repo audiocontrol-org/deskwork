@@ -24,7 +24,8 @@
  * `.js` imports under node16 resolution (no `@/` alias configured).
  */
 
-import { createEmitClient, resolveLocalSocketPath } from './emit.js';
+import { createEmitClient, resolveLocalSocketPath, type EmitClient } from './emit.js';
+import { EMIT_DRAIN_BUDGET_MS, awaitDeliveredOrBudget } from './emit-drain.js';
 import { constructEnvelope, type SnapshotPayload, type TelemetryEvent } from '../fleet/event.js';
 import { classifyEvent } from '../fleet/classification.js';
 import { mintUuidV7, type EventType } from '../fleet/types.js';
@@ -55,12 +56,17 @@ export type SessionEventType = Extract<EventType, 'session.started' | 'session.e
  * THE SYNCHRONOUS-CONNECT-GAP DETAIL (mirrors `phase-entered.ts`): a session
  * event is emitted with no intervening async work, so the eager socket
  * `connect` has NOT completed at `emit()` time. The `long-run` buffer holds
- * the event and DRAINS it on the `connect` event (emit.ts § onConnect). The
- * client is deliberately NOT closed: `close()` before connect would set the
- * client `closed` and discard the still-buffered event (which a fixed connect
- * budget could not reliably beat under load — the flake this replaces), and
- * the socket + reconnect/flush timers are already `unref()`d (emit.ts), so
- * leaving it open never keeps the CLI alive nor delays its exit.
+ * the event and DRAINS it on the `connect` event (emit.ts § onConnect).
+ *
+ * D-E fix (FR-027 dogfood — consistency with the phase.entered fix): after
+ * `emit()` this awaits a SMALL BOUNDED deliver-or-budget window (`emit-drain.js`,
+ * the same bound the invocation/phase helpers use) then `close()`s the client, so
+ * the event reliably reaches the sidecar before the calling verb returns — instead
+ * of relying on the process staying alive to complete the connect (it only
+ * delivered in the dogfood because the dispatcher's post-handler
+ * `invocation.completed` wait kept the process alive; that coincidence is now
+ * removed). Strictly fail-open + non-hanging: a down/absent sidecar returns
+ * instantly, a stalled peer never blocks, the budget is a hard ceiling.
  */
 export async function emitSessionEvent(
   installationRoot: string,
@@ -68,11 +74,12 @@ export async function emitSessionEvent(
   sessionId: string,
   snapshot: SnapshotPayload,
 ): Promise<void> {
+  let client: EmitClient | undefined;
   try {
     const socketPath = resolveLocalSocketPath(installationRoot);
     // long-run buffer: holds the event across the synchronous connect gap and
-    // drains it on connect (see the module doc). NOT closed — unref()d timers.
-    const client = createEmitClient({ socketPath, callerKind: 'long-run', bufferCapacity: 2 });
+    // drains it on connect (see the module doc).
+    client = createEmitClient({ socketPath, callerKind: 'long-run', bufferCapacity: 2 });
     const clock = new SystemClock();
     const originMonotonicMs = clock.monotonicNowMs();
     const installationId = mintOrReadInstallationId(installationRoot);
@@ -98,7 +105,11 @@ export async function emitSessionEvent(
       snapshot,
     };
     client.emit(event);
+    // D-E: bounded deliver-or-budget window before close() flushes the frame.
+    await awaitDeliveredOrBudget(client, EMIT_DRAIN_BUDGET_MS);
   } catch {
     // Fail-open: nothing about event construction/emission may surface.
+  } finally {
+    client?.close();
   }
 }

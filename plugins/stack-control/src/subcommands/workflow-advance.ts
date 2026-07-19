@@ -32,7 +32,7 @@ function effectContextFor(r: Resolved, transition: Transition, extra: Record<str
   };
 }
 
-export function emitAdvance(itemId: string, apply: boolean, values: Record<string, string>): void {
+export async function emitAdvance(itemId: string, apply: boolean, values: Record<string, string>): Promise<void> {
   const r = resolve(itemId);
   // 032 US3 backstop (FR-009 / AUDIT-20260623-06): `workflow advance` is a mutating
   // lifecycle WAYPOINT, so it shares the off-rail backstop the compass + close step enforce —
@@ -118,8 +118,16 @@ export function emitAdvance(itemId: string, apply: boolean, values: Record<strin
   // is a side emission, so it is NOT in EFFECT_VERBS and never touches the
   // transition-engine's Effect/Transition/git contract. Fail-open: any telemetry
   // failure is swallowed inside `emitPhaseEntered` and never perturbs the advance.
+  //
+  // D-E fix (FR-027 dogfood Scenario 3): AWAIT the emit so its bounded
+  // deliver-or-budget window runs before this function (and, up the chain, the CLI)
+  // returns — otherwise the process exits before the phase.entered client's UDS
+  // connect completes and the buffered event is abandoned (never reaches the
+  // instance). `emitPhaseEntered` is strictly fail-open — it never throws and never
+  // waits past the bounded budget — so awaiting it cannot fail, hang, or alter the
+  // advance's already-committed outcome / stdout / exit code below.
   if (outcome.committed) {
-    emitPhaseEntered(r.root, { phase: t.to, from: t.from, item: r.item.identifier });
+    await emitPhaseEntered(r.root, { phase: t.to, from: t.from, item: r.item.identifier });
   }
   process.stdout.write(`workflow advance ${itemId}: applied ${t.codename} (${t.from} -> ${t.to})\n`);
   process.stdout.write(

@@ -211,7 +211,7 @@ export async function runWorkflowCli(args: string[]): Promise<void> {
       case 'advance': {
         const item = positionals[0];
         if (item === undefined) failUsage('advance requires an <item> positional');
-        emitAdvance(item, apply, {});
+        await emitAdvance(item, apply, {});
         return;
       }
       case 'link-design': {
