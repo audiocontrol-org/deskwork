@@ -3283,3 +3283,4 @@ workflow(graduate): impl:feature/model-sized-dispatch merging -> validating
 workflow(graduate): impl:feature/governance-code-scope merging -> validating
 workflow(graduate): impl:feature/model-tier-task-annotation merging -> validating
 workflow(graduate): design:feature/fleet-control-plane merging -> validating
+workflow(graduate): design:feature/instance-observability merging -> validating
