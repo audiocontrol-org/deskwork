@@ -236,6 +236,8 @@ export function createPlaneRuntime(options: PlaneRuntimeOptions): PlaneRuntime {
         commandStatus: withAuth(consumerHandlers.commandStatus),
         issueFleetCommand: withAuth(consumerHandlers.issueFleetCommand),
         storeHealth: withAuth(consumerHandlers.storeHealth),
+        instanceSnapshot: withAuth(consumerHandlers.instanceSnapshot),
+        instanceDetail: withAuth(consumerHandlers.instanceDetail),
       };
       const sidecarRoutes: readonly ExtraRoute[] = [
         { method: 'POST', pattern: '/v1/ingest', handler: withAuth(ingestHandler) },

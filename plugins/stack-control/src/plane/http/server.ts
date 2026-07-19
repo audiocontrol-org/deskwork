@@ -86,6 +86,10 @@ export interface PlaneRouteHandlers {
   readonly issueFleetCommand: RouteHandler;
   /** `GET /v1/health/store` — durable-store health. */
   readonly storeHealth: RouteHandler;
+  /** `GET /v1/instances` — instance snapshot (specs/037, read-only). */
+  readonly instanceSnapshot: RouteHandler;
+  /** `GET /v1/instances/{id}` — per-instance detail (specs/037, read-only). */
+  readonly instanceDetail: RouteHandler;
 }
 
 // ---------------------------------------------------------------------------
@@ -112,6 +116,14 @@ const ROUTE_TABLE: readonly RouteDefinition[] = [
   { method: 'GET', pattern: '/v1/commands/:commandId', handler: 'commandStatus' },
   { method: 'POST', pattern: '/v1/fleet/commands', handler: 'issueFleetCommand' },
   { method: 'GET', pattern: '/v1/health/store', handler: 'storeHealth' },
+  // specs/037 instance-observability (read-only). ROUTE-ORDERING CONTRACT
+  // (contracts/instance-query-api.md): when the later `/v1/instances/stream`
+  // (T036) and `/v1/instances/:id/runs` (T037) routes land, `/v1/instances/stream`
+  // MUST be registered BEFORE `/v1/instances/:id` — first-path-match dispatch
+  // (dispatch(), below) + the `[^/]+` param regex would otherwise route `stream`
+  // to `instanceDetail`. `:id` is a URL-encoded `host:path` (the handler decodes).
+  { method: 'GET', pattern: '/v1/instances', handler: 'instanceSnapshot' },
+  { method: 'GET', pattern: '/v1/instances/:id', handler: 'instanceDetail' },
 ];
 
 /**

@@ -36,6 +36,11 @@ import {
   type IngestOutcome,
   type IngestState,
 } from './http/ingest.js';
+import { buildInstanceRegistry } from './instance-registry.js';
+import {
+  instanceDetail as projectInstanceDetail,
+  instanceSnapshot as projectInstanceSnapshot,
+} from './http/instance-api.js';
 import type { EventLog } from './event-log.js';
 import {
   assertSessionLiveness,
@@ -306,6 +311,24 @@ export function buildPlaneHandlers(ctx: PlaneHandlerContext): PlaneHandlers {
     },
     storeHealth: (routeCtx) => {
       respondJson(routeCtx.res, 200, computeStoreHealth(ctx.uplinkSignals, ctx.archiveSignals));
+    },
+    // --- instance observability (specs/037, read-only) --------------------
+    // The instance registry is a PURE recompute-on-read over the same in-memory
+    // `events` array the run registry folds (mirrors `fleetSnapshot` calling
+    // `buildRegistry(events)`) — so it stays current as events arrive and reads
+    // zero durable store (FR-023/SC-007). `events` seeds from `eventLog.replayed`
+    // on boot, so the instance view rehydrates across a plane restart (T023).
+    instanceSnapshot: (routeCtx) => {
+      const opts =
+        routeCtx.url.searchParams.get('include') === 'all' ? { include: 'all' as const } : undefined;
+      respondJson(routeCtx.res, 200, projectInstanceSnapshot(buildInstanceRegistry(events), opts));
+    },
+    instanceDetail: (routeCtx) => {
+      // `:id` is a URL-encoded `host:path` (contracts/instance-query-api.md).
+      const id = decodeURIComponent(requireParam(routeCtx, 'id'));
+      const detail = projectInstanceDetail(buildInstanceRegistry(events), id);
+      // Unknown id → 404 with the pure not-found body verbatim ({ found:false, id }).
+      respondJson(routeCtx.res, detail.found ? 200 : 404, detail);
     },
   };
 
