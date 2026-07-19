@@ -33,17 +33,20 @@
 // drives `runInvocationWithTelemetry` directly — this keeps the peer and the
 // verb call in the same event loop for `waitUntil` polling.
 //
-// `CurrentSession.mint/read/clear` take NO caller-supplied installation root
-// (module header, current-session.ts): every call resolves
-// `resolveInstallation(process.cwd())` — so the current-session assertions
-// below are made against the REAL enclosing installation (this plugin's own
-// repo root, which vitest runs from), while `session-end`'s git commit/push
-// side effects are pointed at a disposable temp git fixture via `--at`
-// (session-end.ts threads `installation.root` — the `--at` value — through
-// every OTHER concern, including, per research.md, the reused emit path). A
-// real session-end MUST NEVER run against this actual repository from a test
-// (it would commit/push for real) — `--at <fixture>` + `--no-push` is the
-// isolation boundary that makes this test safe to run at all.
+// `CurrentSession.mint/read/clear` accept an OPTIONAL installation root
+// (module header, current-session.ts; AUDIT-20260719-02): omitted it resolves
+// `resolveInstallation(process.cwd())`, but the `--at`-resolved verbs pass
+// their target root so the record follows the target. The cwd-less scenarios
+// below (session-start with no `--at`) assert against the REAL enclosing
+// installation (this plugin's own repo root, which vitest runs from); the
+// session-end scenarios pass the SAME `--at` fixture root to
+// `CurrentSession.mint/read` so the record they seed lives under the target
+// session-end reads/clears — mirroring session-end.ts threading
+// `installation.root` (the `--at` value) through every concern (record, git
+// commit/push, and the reused emit path). A real session-end MUST NEVER run
+// against this actual repository from a test (it would commit/push for real) —
+// `--at <fixture>` + `--no-push` is the isolation boundary that makes this test
+// safe to run at all.
 //
 // Real UDS peer + real temp dirs + real git fixture; relative `.js` imports
 // under node16 (no `@/` alias configured for this plugin). No `any`/`as`/
@@ -52,7 +55,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { createServer, type Socket } from 'node:net';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { useMachineStateStore } from '../fleet/_machine-state-harness.js';
@@ -240,14 +243,15 @@ describe('session-start / session-end telemetry producers (T025, FR-007/FR-009a/
     const peer = await startAckPeerAt(location.socketPath);
     peers.push(peer);
 
-    // Open session — current-session resolves via process.cwd() regardless
-    // of session-end's --at (module contract, see file header).
+    // Open a session UNDER THE TARGET (`--at` value) — session-end reads/clears
+    // the record for the installation it targets (AUDIT-20260719-02), so the
+    // record must be seeded under that same root, not cwd.
     const sessionId = 'session-end-open-1';
-    CurrentSession.mint(sessionId, '2026-07-18T09:00:00Z');
+    CurrentSession.mint(sessionId, '2026-07-18T09:00:00Z', repo);
 
     await runSessionEndCli(['--at', repo, '--no-push']);
 
-    expect(CurrentSession.read()).toBeNull();
+    expect(CurrentSession.read(repo)).toBeNull();
 
     await waitUntil(() => eventPairs(peer).some((e) => e.envelope.type === 'session.ended'));
     const ended = eventPairs(peer).find((e) => e.envelope.type === 'session.ended');
@@ -259,11 +263,13 @@ describe('session-start / session-end telemetry producers (T025, FR-007/FR-009a/
 
   it('FAIL-OPEN: session-end still clears the record and completes when the sidecar is unreachable (no peer bound)', async () => {
     const repo = makeGitFixture();
-    CurrentSession.mint('session-failopen-1', '2026-07-18T09:30:00Z');
+    // Seed the record under the TARGET (`--at` value); session-end clears the
+    // target's record (AUDIT-20260719-02).
+    CurrentSession.mint('session-failopen-1', '2026-07-18T09:30:00Z', repo);
 
     // Deliberately no peer at all.
     await expect(runSessionEndCli(['--at', repo, '--no-push'])).resolves.toBeUndefined();
-    expect(CurrentSession.read()).toBeNull();
+    expect(CurrentSession.read(repo)).toBeNull();
   });
 
   it('SUPERSEDE (FR-009a): a second session-start emits session.ended{reason:"abandoned"} for the old session before minting the new one', async () => {
@@ -304,5 +310,63 @@ describe('session-start / session-end telemetry producers (T025, FR-007/FR-009a/
       .map((e) => e.snapshot.sessionId)
       .sort();
     expect(startedIds).toEqual([firstId, secondId].sort());
+  });
+});
+
+// AUDIT-20260719-02 (HIGH) — the current-session RECORD must follow the verb's
+// `--at` TARGET installation, not the caller's cwd. Before the fix, `mint`/
+// `read`/`clear` ignored the resolved `--at` root and always resolved
+// `process.cwd()`: `session-start --at <target>` emitted `session.started` for
+// <target> but wrote the OPEN-SESSION record under the CWD installation, and
+// `session-end --at <target>` then read/cleared the CWD record — so <target>'s
+// real record was never closed and its session lifecycle accounting was silently
+// wrong. This is the regression test for that split. It uses a target
+// installation DISTINCT from the test's cwd; both durable dirs land under the
+// SAME harness-redirected machine-state store, keyed by their respective roots.
+describe('session-start / session-end honor --at for the current-session RECORD (AUDIT-20260719-02)', () => {
+  useMachineStateStore();
+
+  it('session-start --at <target> writes the record under the TARGET (not cwd); session-end --at <target> reads+clears it and emits the matching session id', async () => {
+    // A target installation DISTINCT from cwd. makeGitFixture() realpaths the
+    // temp path, so /tmp↔/private/tmp cannot spuriously mismatch the
+    // realpath'd store key that locateMachineState derives.
+    const target = makeGitFixture();
+    const targetLoc = locateMachineState(target);
+    const cwdLoc = locateMachineState(process.cwd());
+    // Sanity: the two installations resolve to genuinely different durable dirs.
+    expect(targetLoc.durableDir).not.toBe(cwdLoc.durableDir);
+
+    const targetRecord = join(targetLoc.durableDir, 'current-session');
+    const cwdRecord = join(cwdLoc.durableDir, 'current-session');
+
+    const peer = await startAckPeerAt(targetLoc.socketPath);
+    peers.push(peer);
+
+    // --- session-start --at <target>: the record must land under TARGET, not cwd.
+    await runSessionStartCli(['--at', target]);
+
+    // FAILS RED today: the record is written under cwd's durable dir instead.
+    expect(existsSync(targetRecord)).toBe(true);
+    expect(existsSync(cwdRecord)).toBe(false);
+
+    // The emitted session.started id is the id of the session now open on TARGET.
+    await waitUntil(() => eventPairs(peer).some((e) => e.envelope.type === 'session.started'));
+    const started = eventPairs(peer).find((e) => e.envelope.type === 'session.started');
+    expect(started).toBeDefined();
+    const startedId = started?.snapshot.sessionId;
+    expect(typeof startedId).toBe('string');
+
+    // --- session-end --at <target>: it must read + CLEAR the TARGET's record and
+    // emit session.ended for the SAME session id session-start opened on TARGET.
+    await runSessionEndCli(['--at', target, '--no-push']);
+
+    // FAILS RED today: session-end reads/clears cwd's record, leaving TARGET's open.
+    expect(existsSync(targetRecord)).toBe(false);
+
+    await waitUntil(() => eventPairs(peer).some((e) => e.envelope.type === 'session.ended'));
+    const ended = eventPairs(peer).find((e) => e.envelope.type === 'session.ended');
+    expect(ended).toBeDefined();
+    expect(ended?.snapshot.sessionId).toBe(startedId);
+    expect(ended?.snapshot.reason).toBe('ended');
   });
 });

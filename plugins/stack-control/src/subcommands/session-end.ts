@@ -227,18 +227,19 @@ function gatherMergedNotShipped(installation: Installation): readonly string[] {
  * specs/037 T026 (D9, FR-007/FR-012) — emit `session.ended{reason:'ended'}`
  * for the open current-session record (if any) and clear it. `installation`
  * is the `--at`-resolved target (events emit to ITS resolved socket, mirroring
- * research.md's "the reused emit path" note); `read`/`clear` themselves take
- * no root argument by module contract (`current-session.ts` always resolves
- * the enclosing installation from `process.cwd()`). The WHOLE block is
- * fail-open — session-end must always complete its capture-and-commit job
- * (`.claude/rules/session-skills-never-block.md`).
+ * research.md's "the reused emit path" note). AUDIT-20260719-02: `read`/`clear`
+ * are given the SAME `installation.root`, so session-end closes the record
+ * session-start opened UNDER THAT TARGET — not one under the caller's cwd (the
+ * split that let `--at <target>` leave the target's real session open). The
+ * WHOLE block is fail-open — session-end must always complete its
+ * capture-and-commit job (`.claude/rules/session-skills-never-block.md`).
  */
 async function closeCurrentSession(installation: Installation): Promise<void> {
   try {
-    const record = readCurrentSession();
+    const record = readCurrentSession(installation.root);
     if (record === null) return;
     const endedAt = new Date().toISOString();
-    clearCurrentSession();
+    clearCurrentSession(installation.root);
     await emitSessionEvent(installation.root, 'session.ended', record.sessionId, {
       sessionId: record.sessionId,
       endedAt,

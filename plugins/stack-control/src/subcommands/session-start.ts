@@ -92,7 +92,9 @@ export async function runSessionStartCli(args: string[]): Promise<void> {
   try {
     const sessionId = mintUuidV7();
     const startedAt = new Date().toISOString();
-    const priorSessionId = mintCurrentSession(sessionId, startedAt);
+    // AUDIT-20260719-02: record the open session under the SAME installation the
+    // event is emitted for (the `--at`-resolved target), not the caller's cwd.
+    const priorSessionId = mintCurrentSession(sessionId, startedAt, installation.root);
     if (priorSessionId !== undefined) {
       // SUPERSEDE (FR-009a): close the old session before the new one is
       // treated as open.

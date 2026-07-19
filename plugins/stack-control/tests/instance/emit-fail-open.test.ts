@@ -136,8 +136,9 @@ describe(
     it('(b) session-end completes without throwing when sidecar is unreachable', async () => {
       const repo = makeGitFixture();
 
-      // Open a session.
-      CurrentSession.mint('session-failopen-end', '2026-07-18T10:00:00Z');
+      // Open a session UNDER THE --at TARGET (AUDIT-20260719-02: session-end --at
+      // <repo> now operates on <repo>'s current-session record, not cwd's).
+      CurrentSession.mint('session-failopen-end', '2026-07-18T10:00:00Z', repo);
 
       // NO peer bound — the resolved socket path is unreachable.
       const startTime = Date.now();
@@ -148,7 +149,7 @@ describe(
       expect(elapsed).toBeLessThan(2000);
 
       // Session-end MUST still clear the record even when unreachable.
-      expect(CurrentSession.read()).toBeNull();
+      expect(CurrentSession.read(repo)).toBeNull();
     });
 
     it('(c) phase advance (committed workflow transition) completes without throwing when sidecar is unreachable', async () => {

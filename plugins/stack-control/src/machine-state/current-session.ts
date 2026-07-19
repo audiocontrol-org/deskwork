@@ -21,13 +21,22 @@
 // wrong-shaped file is a durability failure and throws, naming the problem —
 // never silently treated as absent (Constitution Principle V).
 //
-// No caller-supplied installation root: every entry point resolves the
-// enclosing stack-control installation from `process.cwd()` via
-// `resolveInstallation` (the same default `src/subcommands/workflow-shared.ts`
-// uses), then locates that installation's machine-local store. This mirrors
-// the module's real callers (the `session-start` / `session-end` verbs and
-// every telemetry emit site), which always run from inside the installation
-// they are reporting on.
+// CALLER-SUPPLIED INSTALLATION ROOT (AUDIT-20260719-02): `mint`/`read`/`clear`
+// each accept an OPTIONAL `installationRoot` and locate that installation's
+// machine-local store. This exists because the `session-start` / `session-end`
+// verbs support `--at <target>`: they resolve a target installation, emit the
+// `session.*` event for that target, and MUST persist/read/clear the open-session
+// record under the SAME target — not the caller's cwd. Passing the resolved
+// `--at` root threads that consistency through (the caller emits the event for
+// `installation.root` and records the session under `installation.root`).
+//
+// The root defaults to the enclosing installation resolved from `process.cwd()`
+// (via `resolveInstallation`, the same default `src/subcommands/workflow-shared.ts`
+// uses) — the correct behavior for the callers that genuinely have no target:
+// the telemetry emit sites read the AMBIENT cwd session id (the Claude Code
+// session currently doing the work), independent of which installation the
+// event targets. Only pass a root when the caller has a concrete target
+// (the `--at`-resolved verbs); otherwise the cwd default is the contract.
 //
 // No `any`, no `as`, no `@ts-ignore` (Constitution Principle VI). Relative
 // `.js` imports under node16 module resolution (no `@/` alias configured).
@@ -161,9 +170,12 @@ function persistRecord(path: string, record: CurrentSessionRecord): void {
 }
 
 /**
- * Mint (or supersede) the current-session record for the enclosing
- * installation: persists `{ sessionId, startedAt }` to the machine-local
- * durable dir.
+ * Mint (or supersede) the current-session record for the installation rooted
+ * at `installationRoot` (default: the enclosing installation for
+ * `process.cwd()`): persists `{ sessionId, startedAt }` to that installation's
+ * machine-local durable dir. The `--at`-resolved verbs pass their target root
+ * so the record is recorded under the SAME installation the event targets
+ * (AUDIT-20260719-02).
  *
  * Returns `undefined` when there was no prior open session (first mint).
  * Returns the OLD `sessionId` when this mint supersedes an existing record
@@ -171,8 +183,12 @@ function persistRecord(path: string, record: CurrentSessionRecord): void {
  * before treating the new session as open. Either way the new record is
  * persisted, overwriting whatever was there.
  */
-export function mint(sessionId: string, startedAt: string): string | undefined {
-  const path = currentSessionPath(defaultInstallationRoot());
+export function mint(
+  sessionId: string,
+  startedAt: string,
+  installationRoot: string = defaultInstallationRoot(),
+): string | undefined {
+  const path = currentSessionPath(installationRoot);
   const raw = readRawRecordFile(path);
   const priorSessionId = raw === undefined ? undefined : parseRecordFile(path, raw).sessionId;
   persistRecord(path, { sessionId, startedAt });
@@ -180,24 +196,28 @@ export function mint(sessionId: string, startedAt: string): string | undefined {
 }
 
 /**
- * Read the current-session record for the enclosing installation, or `null`
- * if no session is open. Never mints — a pure read. Throws if a present
- * record file is corrupt (see module header).
+ * Read the current-session record for the installation rooted at
+ * `installationRoot` (default: the enclosing installation for `process.cwd()`),
+ * or `null` if no session is open. Never mints — a pure read. Throws if a
+ * present record file is corrupt (see module header).
  */
-export function read(): CurrentSessionRecord | null {
-  const path = currentSessionPath(defaultInstallationRoot());
+export function read(
+  installationRoot: string = defaultInstallationRoot(),
+): CurrentSessionRecord | null {
+  const path = currentSessionPath(installationRoot);
   const raw = readRawRecordFile(path);
   if (raw === undefined) return null;
   return parseRecordFile(path, raw);
 }
 
 /**
- * Remove the current-session record for the enclosing installation. A
- * no-op (never throws) when no record exists — clearing an already-clear
+ * Remove the current-session record for the installation rooted at
+ * `installationRoot` (default: the enclosing installation for `process.cwd()`).
+ * A no-op (never throws) when no record exists — clearing an already-clear
  * store is not an error.
  */
-export function clear(): void {
-  const path = currentSessionPath(defaultInstallationRoot());
+export function clear(installationRoot: string = defaultInstallationRoot()): void {
+  const path = currentSessionPath(installationRoot);
   try {
     unlinkSync(path);
   } catch (err) {
