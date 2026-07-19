@@ -327,6 +327,8 @@ describe('plane serve — assembled runtime end-to-end (T124, plane-client-api.m
       body: JSON.stringify({
         kind: 'session-liveness',
         installationId: INSTALLATION_ID,
+        host: 'test-host',
+        path: '/test/installation/root',
         emittedAt: new Date().toISOString(),
       }),
     });

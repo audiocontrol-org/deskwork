@@ -7,11 +7,17 @@
 // LIVENESS_WINDOW_MS = 2x the 45s heartbeat; stale -> gone at 10min) and
 // `connection` is a DISTINCT axis = real uplink presence (a recent heartbeat).
 //
-// THE FIX (approach a): the plane records the sidecar's per-installation
-// session-liveness heartbeat in an in-memory (live-only) map; `buildInstanceRegistry`
-// consults it (keyed by the instance's installationId, 1:1 with host:path) to set
-// `lastHeartbeatAt` and derive liveness from max(lastActivityAt, lastHeartbeatAt),
-// and `connection` from heartbeat recency.
+// THE FIX (approach a): the plane records the sidecar's session-liveness
+// heartbeat in an in-memory (live-only) map; `buildInstanceRegistry` consults it
+// to set `lastHeartbeatAt` and derive liveness from
+// max(lastActivityAt, lastHeartbeatAt), and `connection` from heartbeat recency.
+//
+// KEYED BY host:path, NOT installationId (AUDIT-20260719-21): installationId is a
+// UUID copied when a checkout is copied, so it CANNOT distinguish two observed
+// instances that share it (a copied/moved checkout — the exact reason 037 keys the
+// instance by `host:path`). Keying the heartbeat by installationId would inject one
+// sidecar's beat into EVERY instance sharing the id, marking a stale copy `attached`/
+// `live`. The heartbeat carries and is keyed by the instance's own `host:path`.
 //
 // RED against current code: `buildInstanceRegistry` takes only `(events)` today,
 // so a stale-activity + fresh-heartbeat instance derives liveness off the stale
@@ -37,6 +43,8 @@ function mkEvent(opts: {
   classification: EventClassification;
   invocationSequence: number;
   wallClock: string;
+  host?: string;
+  path?: string;
 }): ClassifiedEvent {
   const envelope: EventEnvelope = {
     eventId: mintUuidV7(),
@@ -50,8 +58,8 @@ function mkEvent(opts: {
     wallClock: opts.wallClock,
     monotonicOffsetMs: 0,
     classification: opts.classification,
-    host: HOST,
-    path: PATH,
+    host: opts.host ?? HOST,
+    path: opts.path ?? PATH,
     sessionId: null,
   };
   return { envelope, classification: opts.classification, type: opts.type, snapshot: {} };
@@ -77,7 +85,7 @@ describe('instance liveness folds the live session-liveness heartbeat (dogfood T
     ];
     // ... but the sidecar heartbeated 5s ago (well within the window).
     const emittedAt = isoAgo(5_000);
-    const heartbeats = new Map<string, string>([[installationId, emittedAt]]);
+    const heartbeats = new Map<string, string>([[ID, emittedAt]]);
 
     const instance = buildInstanceRegistry(events, heartbeats).instance(ID);
     if (instance === undefined) throw new Error('expected the instance to exist');
@@ -100,7 +108,7 @@ describe('instance liveness folds the live session-liveness heartbeat (dogfood T
     ];
     // heartbeat 3 min ago — also past the 90s window (still within 10min).
     const emittedAt = isoAgo(180_000);
-    const heartbeats = new Map<string, string>([[installationId, emittedAt]]);
+    const heartbeats = new Map<string, string>([[ID, emittedAt]]);
 
     const instance = buildInstanceRegistry(events, heartbeats).instance(ID);
     if (instance === undefined) throw new Error('expected the instance to exist');
@@ -144,7 +152,7 @@ describe('instance liveness folds the live session-liveness heartbeat (dogfood T
     ];
     // A clock-skewed / malicious sidecar sends emittedAt ~= year 3000.
     const farFuture = new Date(Date.now() + 1000 * 60 * 60 * 24 * 365 * 975).toISOString();
-    const heartbeats = new Map<string, string>([[installationId, farFuture]]);
+    const heartbeats = new Map<string, string>([[ID, farFuture]]);
 
     const instance = buildInstanceRegistry(events, heartbeats).instance(ID);
     if (instance === undefined) throw new Error('expected the instance to exist');
@@ -167,7 +175,7 @@ describe('instance liveness folds the live session-liveness heartbeat (dogfood T
         wallClock: isoAgo(1_000),
       }),
     ];
-    const heartbeats = new Map<string, string>([[installationId, 'not-a-timestamp']]);
+    const heartbeats = new Map<string, string>([[ID, 'not-a-timestamp']]);
 
     const instance = buildInstanceRegistry(events, heartbeats).instance(ID);
     if (instance === undefined) throw new Error('expected the instance to exist');
@@ -189,10 +197,116 @@ describe('instance liveness folds the live session-liveness heartbeat (dogfood T
       }),
     ];
     // ... but the last heartbeat was 2 min ago — the uplink lapsed.
-    const heartbeats = new Map<string, string>([[installationId, isoAgo(120_000)]]);
+    const heartbeats = new Map<string, string>([[ID, isoAgo(120_000)]]);
     const instance = buildInstanceRegistry(events, heartbeats).instance(ID);
     if (instance === undefined) throw new Error('expected the instance to exist');
     expect(instance.liveness).toBe('live'); // activity keeps liveness live
     expect(instance.connection).toBe('disconnected'); // heartbeat lapsed -> uplink absent
+  });
+
+  // AUDIT-20260719-21 (HIGH, blast-radius-high): a heartbeat keyed by host:path
+  // marks ONLY the matching instance. Two observed instances that SHARE an
+  // installationId but differ in host:path (a copied/moved checkout) must NOT both
+  // go live off one sidecar's beat — that is the exact confusion 037's host:path
+  // identity exists to prevent. RED against the pre-fix code (keyed by
+  // installationId): a map keyed by host:path is never found by the installationId
+  // lookup, so instance A is NOT attached; GREEN once the lookup keys by host:path.
+  it('a heartbeat keyed by host:path marks ONLY that instance — a same-installationId copy stays disconnected', () => {
+    const installationId = mintUuidV7(); // ONE installationId, shared by two checkouts.
+    const HOST_A = 'orion-mbp';
+    const PATH_A = '/Users/orion/work/proj-original';
+    const HOST_B = 'orion-mbp';
+    const PATH_B = '/Users/orion/work/proj-copy'; // a copied checkout — same UUID, different path.
+    const ID_A = `${HOST_A}:${PATH_A}`;
+    const ID_B = `${HOST_B}:${PATH_B}`;
+
+    // Both instances are activity-idle (stale) so ONLY a heartbeat can hold one live.
+    const events = [
+      mkEvent({
+        installationId,
+        host: HOST_A,
+        path: PATH_A,
+        type: 'invocation.completed',
+        classification: 'aggregated',
+        invocationSequence: 1,
+        wallClock: isoAgo(120_000),
+      }),
+      mkEvent({
+        installationId,
+        host: HOST_B,
+        path: PATH_B,
+        type: 'invocation.completed',
+        classification: 'aggregated',
+        invocationSequence: 1,
+        wallClock: isoAgo(120_000),
+      }),
+    ];
+    // The sidecar for instance A heartbeats — keyed by A's OWN host:path.
+    const heartbeats = new Map<string, string>([[ID_A, isoAgo(5_000)]]);
+
+    const registry = buildInstanceRegistry(events, heartbeats);
+    const a = registry.instance(ID_A);
+    const b = registry.instance(ID_B);
+    if (a === undefined || b === undefined) throw new Error('expected both instances to exist');
+
+    // A: the heartbeat's own instance — attached + live.
+    expect(a.connection).toBe('attached');
+    expect(a.liveness).toBe('live');
+    expect(a.lastHeartbeatAt).toBe(isoAgo(5_000));
+
+    // B: the same-installationId copy A's heartbeat must NOT reach.
+    expect(b.connection).toBe('disconnected');
+    expect(b.liveness).toBe('stale'); // off its own stale activity, never A's heartbeat
+    expect(b.lastHeartbeatAt).toBeNull();
+  });
+
+  // AUDIT-20260719-20 (HIGH): `connection` recency is fed by TWO heartbeat
+  // channels, and a fresh signal from EITHER marks `attached`:
+  //   (1) an in-band `session.heartbeat` telemetry EVENT (folded by the accumulator
+  //       into lastHeartbeatAt), and
+  //   (2) the out-of-band `/v1/sidecar/liveness` POST (HeartbeatStore -> injected
+  //       into lastHeartbeatAt, latest-wins).
+  // Ordinary activity (invocation.completed) feeds lastActivityAt/liveness but NOT
+  // connection. This exercises BOTH channels together (one stale, one fresh) and
+  // asserts the freshest of the two governs — the documented multi-channel invariant
+  // on `refreshConnectionAndLiveness`.
+  it('connection derives from the freshest of BOTH heartbeat channels (in-band event + out-of-band POST)', () => {
+    const installationId = mintUuidV7();
+
+    // Channel 1 (in-band): a session.heartbeat EVENT that is STALE (2 min old).
+    // Channel 2 (out-of-band POST) will be FRESH — it must win and mark attached.
+    const staleInBand = [
+      mkEvent({
+        installationId,
+        type: 'session.heartbeat',
+        classification: 'live-only',
+        invocationSequence: 1,
+        wallClock: isoAgo(120_000),
+      }),
+    ];
+    const freshOutOfBand = new Map<string, string>([[ID, isoAgo(5_000)]]);
+    const withFreshPost = buildInstanceRegistry(staleInBand, freshOutOfBand).instance(ID);
+    if (withFreshPost === undefined) throw new Error('expected the instance to exist');
+    expect(withFreshPost.connection).toBe('attached'); // fresh out-of-band POST wins
+    expect(withFreshPost.liveness).toBe('live');
+    expect(withFreshPost.lastHeartbeatAt).toBe(isoAgo(5_000));
+
+    // Symmetric: a FRESH in-band session.heartbeat EVENT + a STALE out-of-band POST.
+    // The in-band channel alone must mark attached (latest-wins keeps the fresher).
+    const freshInBand = [
+      mkEvent({
+        installationId,
+        type: 'session.heartbeat',
+        classification: 'live-only',
+        invocationSequence: 1,
+        wallClock: isoAgo(5_000),
+      }),
+    ];
+    const staleOutOfBand = new Map<string, string>([[ID, isoAgo(120_000)]]);
+    const withFreshEvent = buildInstanceRegistry(freshInBand, staleOutOfBand).instance(ID);
+    if (withFreshEvent === undefined) throw new Error('expected the instance to exist');
+    expect(withFreshEvent.connection).toBe('attached'); // fresh in-band event wins
+    expect(withFreshEvent.liveness).toBe('live');
+    expect(withFreshEvent.lastHeartbeatAt).toBe(isoAgo(5_000));
   });
 });

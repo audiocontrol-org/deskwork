@@ -144,25 +144,35 @@ export function computeFleetTickGuarded(
   }
 }
 
-/** A validated session-liveness heartbeat body (C3). */
+/** A validated session-liveness heartbeat body (C3). Carries the instance
+ * identity (`host`/`path`, D8) the plane keys liveness by — NOT installationId
+ * alone (a copied checkout shares the UUID, AUDIT-20260719-21). */
 export interface SessionLivenessHeartbeat {
   readonly kind: 'session-liveness';
   readonly installationId: string;
+  readonly host: string;
+  readonly path: string;
   readonly emittedAt: string;
 }
 
 /** Validate a session-liveness heartbeat body (C3), narrowing `body` to
  * {@link SessionLivenessHeartbeat} so the caller can enforce the claimed
- * `installationId` against the authenticated one (AUDIT-20260718-45). */
+ * `installationId` against the authenticated one (AUDIT-20260718-45) AND key the
+ * live record by the instance's own `host:path` (AUDIT-20260719-21). A body
+ * missing `host`/`path` is a client error (fail-loud 400), consistent with the
+ * existing shape check — the sidecar and plane ship in lockstep, so every live
+ * producer sends them (clean break, no dual-read shim). */
 export function assertSessionLiveness(body: unknown): asserts body is SessionLivenessHeartbeat {
   if (
     !isRecord(body) ||
     body.kind !== 'session-liveness' ||
     typeof body.installationId !== 'string' ||
+    typeof body.host !== 'string' ||
+    typeof body.path !== 'string' ||
     typeof body.emittedAt !== 'string'
   ) {
     throw new Error(
-      'session-liveness heartbeat must carry { kind: "session-liveness", installationId, emittedAt }.',
+      'session-liveness heartbeat must carry { kind: "session-liveness", installationId, host, path, emittedAt }.',
     );
   }
 }

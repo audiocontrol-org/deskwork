@@ -95,15 +95,6 @@ export interface InstanceAccumulator {
   id: InstanceId;
   host: string;
   path: string;
-  /**
-   * The installation this instance belongs to (`envelope.installationId`, 1:1
-   * with `host:path` — derived from the same install root). Captured from the
-   * first folded event; internal bookkeeping ONLY (never projected onto the
-   * served `InstanceState`). Used to key the live session-liveness heartbeat
-   * map (`heartbeat-store.ts`) so `buildInstanceRegistry` can hold an
-   * idle-but-connected instance `live` (dogfood T050).
-   */
-  installationId: string;
   connection: Connection;
   liveness: Liveness;
   lastHeartbeatAt: string | null;

@@ -37,3 +37,30 @@ export function deriveInstanceId(installationRoot: string): string {
   const realpath = realpathSync.native(installationRoot);
   return `${host}:${realpath}`;
 }
+
+/**
+ * Split the `host:path` identity {@link deriveInstanceId} mints (§ D8) into its
+ * two fields. `host` (os.hostname()) never contains a `:`, so the FIRST colon is
+ * the separator and everything after it is the real path (which, on Windows,
+ * legitimately carries its own `C:` drive colon — hence splitting on the first
+ * colon only, never `split(':')`). Reuses the single derivation site so the two
+ * never drift — the sidecar's session-liveness heartbeat and the event envelope
+ * both name the SAME `host`/`path` (AUDIT-20260719-21).
+ */
+export function deriveInstanceFields(installationRoot: string): {
+  readonly host: string;
+  readonly path: string;
+} {
+  const instanceId = deriveInstanceId(installationRoot);
+  const separator = instanceId.indexOf(':');
+  if (separator < 0) {
+    throw new Error(
+      `deriveInstanceFields: deriveInstanceId returned ${JSON.stringify(instanceId)} ` +
+        'without a "host:path" separator — cannot split host from path',
+    );
+  }
+  return {
+    host: instanceId.slice(0, separator),
+    path: instanceId.slice(separator + 1),
+  };
+}

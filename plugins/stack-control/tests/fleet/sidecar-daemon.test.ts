@@ -837,4 +837,104 @@ describe('sidecar daemon — runnable end-to-end (specs/036 sidecar-daemon)', ()
 
     rmSync(installationRoot, { recursive: true, force: true });
   });
+
+  it('AUDIT-20260719-18: a legacy/malformed frame with null host/path is DROPPED (surfaced, never fatal) and subsequent VALID frames still ingest', async () => {
+    // The upgrade-skew scenario: a STALE pre-037 CLI binary (schemaVersion 1,
+    // never derives host/path) still on disk talks to an already-upgraded,
+    // long-lived sidecar during a version rollout. Its `event` frame carries a
+    // null (absent) instance identity. The daemon MUST NOT crash on that one bad
+    // frame — it surfaces it (to the error observer) and DROPS it, then keeps
+    // running so a VALID 037 frame that follows still ingests.
+    const installationRoot = mkdtempSync(join(tmpdir(), 'scf-sidecar-daemon-root-'));
+    const installationId = mintOrReadInstallationId(installationRoot);
+    const location = locateMachineState(installationRoot);
+    openTokenCustody(location.durableDir).write(TOKEN);
+
+    captureStub = await startCapturingPlane();
+
+    // Detect a process-level unhandled rejection: if the daemon lets the guard's
+    // throw escape uncaught, Node emits 'unhandledRejection' and (by default)
+    // would terminate the daemon. Capture it here so the assertion can prove the
+    // one bad frame never became a process-fatal unhandled rejection.
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown): void => {
+      unhandled.push(reason);
+    };
+    process.on('unhandledRejection', onUnhandled);
+
+    const surfacedErrors: unknown[] = [];
+    try {
+      daemon = runSidecarDaemon({
+        installationRoot,
+        planeUrl: captureStub.baseUrl,
+        drainIntervalMs: 5,
+        livenessIntervalMs: 5,
+        onError: (error) => surfacedErrors.push(error),
+      });
+      const start = (await daemon.started) as { kind: string; socketPath?: string };
+      expect(start.kind).toBe('won');
+      if (start.socketPath === undefined) {
+        throw new Error('won election must report the bound socketPath');
+      }
+      const socketPath = start.socketPath;
+
+      // A LEGACY/malformed producer frame: schemaVersion 1, null host/path (the
+      // pre-037 "derive host/path absent" shape). Build the envelope directly so
+      // the null identity lands on the wire (makeTelemetryEvent always stamps a
+      // valid host/path).
+      const legacyEvent: TelemetryEvent = {
+        envelope: {
+          eventId: mintUuidV7(),
+          installationId,
+          invocationId: 'invocation-legacy-1',
+          runId: 'run-legacy',
+          installationSequence: 1,
+          invocationSequence: 1,
+          schemaVersion: 1,
+          type: 'run.started',
+          wallClock: new Date().toISOString(),
+          monotonicOffsetMs: 3,
+          classification: 'durable',
+          host: null,
+          path: null,
+          sessionId: null,
+        },
+        snapshot: {},
+      };
+
+      client = createConnection(socketPath);
+      await new Promise<void>((resolve, reject) => {
+        client?.once('connect', resolve);
+        client?.once('error', reject);
+      });
+      // Send the poison legacy frame FIRST, then a VALID 037 frame.
+      client.write(serializeFrame(buildEventFrame(legacyEvent)));
+      client.write(
+        serializeFrame(buildEventFrame(makeTelemetryEvent(installationId, 'run-valid', 'run.started'))),
+      );
+
+      // The VALID frame reaches the plane — proof the daemon survived the bad one.
+      await pollUntil(
+        async () =>
+          captureStub !== undefined && captureStub.captured.some((c) => c.runId === 'run-valid'),
+        4000,
+        'the VALID 037 frame to ingest after the legacy/malformed frame',
+      );
+
+      // Give any async ingest of the legacy frame a beat to have (not) happened.
+      await sleep(60);
+
+      // The legacy frame was DROPPED — it never reached the plane with a host-less
+      // identity (dropping the ONE bad frame is the contract; ingesting it is not).
+      expect(captureStub.captured.some((c) => c.runId === 'run-legacy')).toBe(false);
+
+      // The bad frame never became a process-fatal unhandled rejection: the guard
+      // is non-fatal (caught + surfaced), never an uncaught escape.
+      expect(unhandled).toEqual([]);
+    } finally {
+      process.removeListener('unhandledRejection', onUnhandled);
+    }
+
+    rmSync(installationRoot, { recursive: true, force: true });
+  });
 });

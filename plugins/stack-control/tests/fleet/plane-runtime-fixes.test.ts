@@ -91,6 +91,8 @@ function livenessBody(installationId: string): string {
   return JSON.stringify({
     kind: 'session-liveness',
     installationId,
+    host: 'test-host',
+    path: '/test/installation/root',
     emittedAt: new Date().toISOString(),
   });
 }

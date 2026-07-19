@@ -72,6 +72,7 @@ import { join } from 'node:path';
 import { SystemClock, type Clock } from '../fleet/clock.js';
 import { locateMachineState } from '../machine-state/locate.js';
 import { mintOrReadInstallationId } from '../machine-state/identity.js';
+import { deriveInstanceFields } from '../machine-state/instance-id.js';
 import { openTokenCustody } from '../machine-state/token.js';
 import { createPipeline, type SidecarPipeline } from './pipeline.js';
 import { openWal, type WalHandle } from './spool/wal.js';
@@ -92,7 +93,7 @@ import {
   type ReceivedFrameHandler,
   type SidecarServer,
 } from './server.js';
-import type { EventFrame } from '../telemetry/protocol.js';
+import { ingestFrameGuarded, type DroppedFrame } from './ingest-frame.js';
 
 /** How the daemon finished its startup (election): won ⇒ it is now live and
  * (if the uplink resolved) transmitting; lost ⇒ another sidecar holds the
@@ -143,6 +144,12 @@ export interface SidecarDaemonOptions {
    * discipline). Absent ⇒ a default recorder logs the drop to stderr, so the
    * production default path is never silent. */
   readonly onDroppedRecord?: (info: DroppedSpoolRecord) => void;
+  /** Observable record for a single INBOUND `event` frame that could not be
+   * ingested (absent host/path identity, or a `receive` that threw) — it is
+   * SURFACED and DROPPED so one poison/legacy frame can never crash the daemon
+   * (AUDIT-20260719-18). Absent ⇒ a default recorder logs the drop to stderr, so
+   * the production default path is never silent (mirrors `onDroppedRecord`). */
+  readonly onDroppedFrame?: (info: DroppedFrame) => void;
 }
 
 /** What the drain loop discarded and WHY when the plane permanently rejects a
@@ -238,6 +245,19 @@ export function runSidecarDaemon(options: SidecarDaemonOptions): SidecarDaemonHa
           `RECORDED AS UNDELIVERED (not routed to a run): ${JSON.stringify(command)}\n`,
       );
     });
+  // A single inbound `event` frame that cannot be ingested (absent host/path
+  // identity, or a `receive` that threw) is SURFACED and DROPPED — one
+  // poison/legacy frame must never crash the daemon (AUDIT-20260719-18). With no
+  // injected sink, the default recorder writes the drop to stderr so the
+  // production path is loud, not silent (mirrors `recordDroppedRecord`).
+  const recordDroppedFrame =
+    options.onDroppedFrame ??
+    ((info: DroppedFrame): void => {
+      process.stderr.write(
+        `stackctl sidecar: DROPPED an inbound event frame (run ${info.runId ?? 'n/a'}) — ` +
+          `surfaced and dropped so one bad frame never crashes the daemon: ${info.reason}\n`,
+      );
+    });
 
   const location = locateMachineState(options.installationRoot);
   const installationId = mintOrReadInstallationId(options.installationRoot);
@@ -249,48 +269,23 @@ export function runSidecarDaemon(options: SidecarDaemonOptions): SidecarDaemonHa
 
   // Redact+spool every received `event` frame through the pipeline. The
   // pipeline mints its own eventId+sequences and redacts BEFORE spooling.
+  // `ingestFrameGuarded` (ingest-frame.ts) owns the NON-FATAL contract: a single
+  // frame with an absent host/path identity, or a `receive` that throws, is
+  // SURFACED via `recordDroppedFrame` and DROPPED — never thrown out of this
+  // callback where it could become a daemon-fatal unhandled rejection
+  // (AUDIT-20260719-18). The strict producer-identity guarantee is unchanged: a
+  // valid 037 frame threads host/path/sessionId through intact.
   const pipeline: SidecarPipeline = createPipeline(walDir);
-  const ingestFrame = async (frame: EventFrame): Promise<void> => {
-    const env = frame.event.envelope;
-    // A LIVE producer frame always carries instance identity by construction
-    // (schemaVersion ≥ 2, FR-011). The `string | null` typing exists only for the
-    // read-side replay of pre-037 durable records (AUDIT-20260719-03), which never
-    // reach this socket path — so a null here is a genuine producer defect, not a
-    // pre-feature record: fail loud rather than forward a host-less identity.
-    const { host, path } = env;
-    if (host === null || path === null) {
-      throw new Error(
-        'sidecar ingestFrame: received a live event frame with absent host/path — a ' +
-          'producer frame must carry instance identity (host/path derived at emit, FR-011).',
-      );
-    }
-    await pipeline.receive({
-      installationId: env.installationId,
-      invocationId: env.invocationId,
-      runId: env.runId,
-      type: env.type,
-      classification: env.classification,
-      // specs/037: PRESERVE the producer's instance identity. host/path were
-      // derived by the producer from the REAL install root (realpath); sessionId
-      // is context only the producer knows. Threading them lets the pipeline
-      // re-mint carry them through instead of re-deriving host/path from the
-      // spool dir / hardcoding sessionId null.
-      host,
-      path,
-      sessionId: env.sessionId,
-      // The producer's bare snapshot. The pipeline carries it through INTACT for
-      // the specs/037 durable-identity event types (session.started/ended,
-      // phase.entered) and ignores it for every other type (which travels the
-      // 036 {content,allowlist} redaction path).
-      bareSnapshot: frame.event.snapshot,
-    });
-  };
   const onFrame: ReceivedFrameHandler = (frame) => {
     if (frame.kind === 'event') {
       // Fire-and-forget: telemetry ingest never blocks the socket read loop and
       // never crashes the sidecar (C1/SC-001). The WAL is the durable buffer;
-      // the drain loop transmits from it independently.
-      void ingestFrame(frame).catch((error: unknown) => onError(error));
+      // the drain loop transmits from it independently. `ingestFrameGuarded`
+      // never rejects; the `.catch` is defence-in-depth for an unforeseen throw.
+      void ingestFrameGuarded(frame, {
+        receive: (raw) => pipeline.receive(raw),
+        recordDroppedFrame,
+      }).catch((error: unknown) => onError(error));
     }
     // `register-run` / `end-invocation` are received but not yet routed to a
     // local run's command delivery — the command→local-run fan-in is a larger
@@ -381,10 +376,16 @@ export function runSidecarDaemon(options: SidecarDaemonOptions): SidecarDaemonHa
   };
 
   // --- session liveness: § C3 heartbeat POSTed to /v1/sidecar/liveness -------
+  // Derive this installation's own instance identity (host:path, D8) — the SAME
+  // identity the event envelope carries — so the plane keys liveness by host:path,
+  // never by installationId alone (a copied checkout shares the UUID, AUDIT-20260719-21).
+  const { host: instanceHost, path: instancePath } = deriveInstanceFields(options.installationRoot);
   const livenessScheduler = createSessionLivenessScheduler({
     clock,
     intervalMs: livenessIntervalMs,
     installationId,
+    host: instanceHost,
+    path: instancePath,
     send: (signal: SessionLivenessSignal): void => {
       void poster
         .post({ url: livenessUrl, headers: bearerHeaders, body: JSON.stringify(signal) })

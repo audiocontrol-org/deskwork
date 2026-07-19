@@ -58,6 +58,12 @@ class FakeClock implements Clock {
 
 const INTERVAL_MS = 20_000;
 const INSTALLATION_ID = 'a1b2c3d4-0000-4000-8000-000000000000';
+// The instance identity the signal carries (AUDIT-20260719-21): host:path, NOT
+// (only) installationId — a UUID a copied checkout shares, so it cannot pin the
+// heartbeat to the RIGHT host:path. The sidecar knows both because it serves ONE
+// installation.
+const HOST = 'orion-mbp';
+const PATH = '/Users/orion/work/proj-a';
 
 describe('session-liveness scheduler (T116, § C3 — sidecar → plane heartbeat, DISTINCT from transport keepalive and run liveness)', () => {
   it('(a) emits a heartbeat at the configured cadence, driven purely by advancing the injected Clock', () => {
@@ -67,6 +73,8 @@ describe('session-liveness scheduler (T116, § C3 — sidecar → plane heartbea
       clock,
       intervalMs: INTERVAL_MS,
       installationId: INSTALLATION_ID,
+      host: HOST,
+      path: PATH,
       send: (signal) => {
         emitted.push(signal);
       },
@@ -103,6 +111,8 @@ describe('session-liveness scheduler (T116, § C3 — sidecar → plane heartbea
       clock,
       intervalMs: INTERVAL_MS,
       installationId: INSTALLATION_ID,
+      host: HOST,
+      path: PATH,
       send: (signal) => {
         emitted.push(signal);
       },
@@ -117,6 +127,9 @@ describe('session-liveness scheduler (T116, § C3 — sidecar → plane heartbea
 
     expect(signal.kind).toBe('session-liveness');
     expect(signal.installationId).toBe(INSTALLATION_ID);
+    // The instance identity (host:path) the plane keys liveness by (AUDIT-20260719-21).
+    expect(signal.host).toBe(HOST);
+    expect(signal.path).toBe(PATH);
     // Descriptive wall-clock timestamp (PT-013: nowIso() is descriptive
     // only, never authoritative for ordering).
     expect(new Date(signal.emittedAt).toISOString()).toBe(signal.emittedAt);
@@ -129,6 +142,8 @@ describe('session-liveness scheduler (T116, § C3 — sidecar → plane heartbea
       clock,
       intervalMs: INTERVAL_MS,
       installationId: INSTALLATION_ID,
+      host: HOST,
+      path: PATH,
       send: (signal) => {
         emitted.push(signal);
       },
@@ -140,12 +155,20 @@ describe('session-liveness scheduler (T116, § C3 — sidecar → plane heartbea
       throw new Error('expected exactly one emitted session-liveness signal');
     }
 
-    // The ENTIRE wire shape is exactly these three fields — no runId, no
-    // executionStatus, no connectionStatus, no livenessStatus. Per § C3,
-    // run liveness is answered ONLY by the local socket
-    // (local-socket-protocol § C5); this signal must structurally be
-    // incapable of standing in for it.
-    expect(Object.keys(signal).sort()).toEqual(['emittedAt', 'installationId', 'kind']);
+    // The ENTIRE wire shape is exactly these identity/timing fields — kind,
+    // installationId, host, path (the instance identity, AUDIT-20260719-21), and
+    // emittedAt — no runId, no executionStatus, no connectionStatus, no
+    // livenessStatus. host/path identify WHICH host is alive (a session-liveness
+    // fact); they are NOT run/execution-status. Per § C3, run liveness is answered
+    // ONLY by the local socket (local-socket-protocol § C5); this signal must
+    // structurally be incapable of standing in for it.
+    expect(Object.keys(signal).sort()).toEqual([
+      'emittedAt',
+      'host',
+      'installationId',
+      'kind',
+      'path',
+    ]);
     expect(signal).not.toHaveProperty('runId');
     expect(signal).not.toHaveProperty('executionStatus');
     expect(signal).not.toHaveProperty('livenessStatus');
@@ -164,6 +187,8 @@ describe('session-liveness scheduler (T116, § C3 — sidecar → plane heartbea
       clock,
       intervalMs: INTERVAL_MS,
       installationId: INSTALLATION_ID,
+      host: HOST,
+      path: PATH,
       send: (signal) => {
         log.push(`${signal.kind}:${signal.installationId}`);
       },

@@ -61,6 +61,19 @@ import type { Clock } from '../fleet/clock.js';
 export interface SessionLivenessSignal {
   readonly kind: 'session-liveness';
   readonly installationId: string;
+  /**
+   * The instance identity this heartbeat marks live (`host` + `path`, D8,
+   * AUDIT-20260719-21). The plane keys liveness by `host:path`, NOT by
+   * `installationId` alone: `installationId` is a UUID a COPIED checkout carries
+   * verbatim, so it cannot distinguish two observed instances that share it (a
+   * copied/moved checkout — the exact reason 037 keys the instance by `host:path`).
+   * Keying the heartbeat by installationId would mark a stale copy `attached`/`live`
+   * off the original's beat. The sidecar knows its own `host`/`path` because it
+   * serves exactly ONE installation. This is instance IDENTITY, never a
+   * run/execution-status field — it names WHICH host is alive, nothing about a run.
+   */
+  readonly host: string;
+  readonly path: string;
   /** Wall-clock ISO-8601 timestamp (PT-013: descriptive only, never
    * authoritative for ordering — `invocationSequence`/`installationSequence`
    * own ordering elsewhere in the protocol). */
@@ -81,6 +94,11 @@ export interface SessionLivenessSchedulerOptions {
   /** The installation this heartbeat identifies (data-model.md:
    * `installationId`, UUIDv4). */
   readonly installationId: string;
+  /** The instance identity (`host:path`, D8) the plane keys liveness by — see
+   * {@link SessionLivenessSignal}. Sourced from `deriveInstanceId(installationRoot)`
+   * at the caller, so it is the SAME identity the event envelope carries. */
+  readonly host: string;
+  readonly path: string;
   /** The injected transmission seam. A plain single-argument function —
    * NOT a `TelemetryPoster` (see module doc comment on decoupling). May
    * return void or a Promise; this module does not await it, matching the
@@ -125,6 +143,8 @@ export function createSessionLivenessScheduler(
       void opts.send({
         kind: 'session-liveness',
         installationId: opts.installationId,
+        host: opts.host,
+        path: opts.path,
         emittedAt: opts.clock.nowIso(),
       });
     },

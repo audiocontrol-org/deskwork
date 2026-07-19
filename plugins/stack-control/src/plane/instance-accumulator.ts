@@ -81,13 +81,11 @@ export function newInstanceAccumulator(
   id: InstanceId,
   host: string,
   path: string,
-  installationId: string,
 ): InstanceAccumulator {
   return {
     id,
     host,
     path,
-    installationId,
     connection: 'disconnected',
     liveness: 'gone',
     lastHeartbeatAt: null,
@@ -282,9 +280,7 @@ function liveHeartbeatMs(iso: string | null, now: number): number | null {
 /**
  * Recompute `connection`/`liveness` as TWO DISTINCT axes (research.md D1,
  * FR-016a). Both derive from the freshest settled signals on the accumulator —
- * `lastActivityAt` (highest-`installationSequence` event) and `lastHeartbeatAt`
- * (the live session-liveness heartbeat, injected after the fold by
- * `applyHeartbeatSignal`):
+ * `lastActivityAt` (highest-`installationSequence` event) and `lastHeartbeatAt`:
  *
  *  - `liveness` tracks the MOST-RECENT signal of EITHER axis. A fresh heartbeat
  *    keeps an activity-idle-but-connected instance `live` instead of wrongly
@@ -296,6 +292,23 @@ function liveHeartbeatMs(iso: string | null, now: number): number | null {
  *    `disconnected`. Independent of `liveness` — an instance with fresh activity
  *    but a lapsed heartbeat is `live` + `disconnected`; an open uplink to a hung
  *    instance is `attached` + `stale`.
+ *
+ * MULTI-CHANNEL HEARTBEAT INVARIANT (AUDIT-20260719-20). `lastHeartbeatAt` — the
+ * ONLY signal that feeds `connection` — is written by TWO heartbeat channels, and
+ * a fresh signal from EITHER marks `attached`; whichever is fresher wins
+ * (latest-wins, both gated on `installationSequence`/timestamp):
+ *   (1) IN-BAND — a `session.heartbeat` telemetry EVENT folded by `applyInstanceEvent`
+ *       (advances `lastHeartbeatAt` on a strictly-newer `installationSequence`).
+ *   (2) OUT-OF-BAND — the `/v1/sidecar/liveness` POST → `HeartbeatStore` → injected
+ *       by `applyHeartbeatSignal` (adopts a strictly-newer `emittedAt`).
+ * Both channels are now keyed by the instance's own `host:path` (AUDIT-20260719-21:
+ * the in-band event carries host/path in its envelope; the out-of-band store is keyed
+ * by host:path), so they name the SAME instance and cannot cross-contaminate a copy.
+ * Ordinary activity (`invocation.completed`, session/phase events) feeds
+ * `lastActivityAt`/`liveness` but does NOT mark `connection` `attached` — only a
+ * heartbeat does. Neither channel is redundant: the in-band event proves the
+ * telemetry stream is flowing; the out-of-band POST proves the uplink is alive even
+ * when the operator runs no verbs (an idle instance emits no in-band events).
  *
  * Idempotent — safe to call after every fold and after the heartbeat injection.
  */
@@ -317,8 +330,12 @@ function refreshConnectionAndLiveness(acc: InstanceAccumulator): void {
  * in the in-memory `HeartbeatStore`) into an instance AFTER its event fold, then
  * recompute the two liveness/connection axes. Adopt `emittedAt` when it is newer
  * than any event-carried heartbeat (latest wins — best-effort heartbeats may
- * arrive out of order). Keyed by the accumulator's `installationId`
- * (1:1 with `host:path`) at the `buildInstanceRegistry` call site.
+ * arrive out of order). Keyed by the accumulator's OWN `host:path` id
+ * (AUDIT-20260719-21 — NOT installationId, which a copied checkout shares) at the
+ * `buildInstanceRegistry` call site. This is the OUT-OF-BAND heartbeat channel;
+ * the in-band `session.heartbeat` telemetry event fold (`applyInstanceEvent`) is
+ * the other — both write `lastHeartbeatAt`, latest-wins (see
+ * `refreshConnectionAndLiveness` for the multi-channel invariant).
  */
 export function applyHeartbeatSignal(acc: InstanceAccumulator, emittedAt: string): void {
   // Never ADOPT an implausible heartbeat (unparseable, or future beyond skew): a

@@ -446,16 +446,21 @@ export function buildPlaneHandlers(ctx: PlaneHandlerContext): PlaneHandlers {
       // AUTHED-INSTALLATION ENFORCEMENT (AUDIT-20260718-45): as with ingest, the
       // heartbeat's claimed installationId must equal the token's authenticated
       // one — else installation-A's token could record liveness as installation B.
+      // Auth stays installationId-based (D8); only the liveness RECORD is keyed by
+      // host:path (AUDIT-20260719-21).
       if (
         refuseInstallationMismatch(routeCtx.res, body.installationId, ctx.requireAuthedInstallation(routeCtx.req), 'liveness installationId')
       ) {
         return;
       }
-      // Record the heartbeat into the in-memory, live-only store (dogfood T050):
-      // this is what lets an idle-but-connected instance stay `live` and populates
-      // `lastHeartbeatAt`. Ephemeral — never durable (FR-023/SC-007, T024). Before
-      // this, the plane authenticated the heartbeat and then DROPPED it.
-      ctx.heartbeats.record(body.installationId, body.emittedAt);
+      // Record the heartbeat into the in-memory, live-only store (dogfood T050),
+      // KEYED BY the instance's own `host:path` (AUDIT-20260719-21) — NOT
+      // installationId, which a copied checkout shares, so keying by it would mark a
+      // stale copy live off the original's beat. This is what lets an idle-but-
+      // connected instance stay `live` and populates `lastHeartbeatAt`. Ephemeral —
+      // never durable (FR-023/SC-007, T024). Before this, the plane authenticated
+      // the heartbeat and then DROPPED it.
+      ctx.heartbeats.record(`${body.host}:${body.path}`, body.emittedAt);
       respondJson(routeCtx.res, 200, { kind: 'session-liveness', accepted: true });
     } catch (error) {
       respondJson(routeCtx.res, 400, { error: error instanceof Error ? error.message : String(error) });

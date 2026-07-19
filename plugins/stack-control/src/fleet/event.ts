@@ -25,7 +25,7 @@ import {
   type EventType,
 } from './types.js';
 import { knownEventTypes } from './classification.js';
-import { deriveInstanceId } from '../machine-state/instance-id.js';
+import { deriveInstanceFields } from '../machine-state/instance-id.js';
 
 /**
  * Maximum serialized byte size for a single event's snapshot payload.
@@ -110,33 +110,6 @@ export function constructEnvelope(
     host,
     path,
     sessionId: input.sessionId,
-  };
-}
-
-/**
- * Split the `host:path` instance identity `deriveInstanceId` mints (§ D8) back
- * into its two envelope fields. `host` (os.hostname()) never contains a `:`, so
- * the FIRST colon is the separator and everything after it is the real path
- * (which, on Windows, legitimately carries its own `C:` drive colon — hence
- * splitting on the first colon only, never `split(':')`). Reuses the single
- * derivation site (src/machine-state/instance-id.ts) rather than re-reading the
- * hostname/realpath here, so the two never drift.
- */
-function deriveInstanceFields(installationRoot: string): {
-  readonly host: string;
-  readonly path: string;
-} {
-  const instanceId = deriveInstanceId(installationRoot);
-  const separator = instanceId.indexOf(':');
-  if (separator < 0) {
-    throw new Error(
-      `deriveInstanceFields: deriveInstanceId returned ${JSON.stringify(instanceId)} ` +
-        'without a "host:path" separator — cannot split host from path',
-    );
-  }
-  return {
-    host: instanceId.slice(0, separator),
-    path: instanceId.slice(separator + 1),
   };
 }
 

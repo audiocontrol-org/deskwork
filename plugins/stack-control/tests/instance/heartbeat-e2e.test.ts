@@ -107,8 +107,14 @@ function bearer(): Record<string, string> {
 
 /** Ingest a single stale invocation.completed so the instance exists with a
  * `lastActivityAt` well past the live->stale window (proving the heartbeat, not
- * activity, is what holds liveness at 'live'). */
-async function ingestStale(plane: RunningPlane, wallClock: string): Promise<void> {
+ * activity, is what holds liveness at 'live'). `host`/`path` default to the
+ * single-instance identity; the AUDIT-21 test overrides them for a second one. */
+async function ingestStale(
+  plane: RunningPlane,
+  wallClock: string,
+  host: string = HOST,
+  path: string = PATH,
+): Promise<void> {
   const res = await fetch(`${plane.baseUrl}/v1/ingest`, {
     method: 'POST',
     headers: bearer(),
@@ -125,8 +131,8 @@ async function ingestStale(plane: RunningPlane, wallClock: string): Promise<void
         wallClock,
         monotonicOffsetMs: 1,
         classification: 'aggregated',
-        host: HOST,
-        path: PATH,
+        host,
+        path,
         sessionId: null,
       },
       snapshot: {},
@@ -135,16 +141,24 @@ async function ingestStale(plane: RunningPlane, wallClock: string): Promise<void
   expect(res.status).toBe(200);
 }
 
-async function postHeartbeat(plane: RunningPlane, emittedAt: string): Promise<Response> {
+async function postHeartbeat(
+  plane: RunningPlane,
+  emittedAt: string,
+  host: string = HOST,
+  path: string = PATH,
+): Promise<Response> {
   return fetch(`${plane.baseUrl}/v1/sidecar/liveness`, {
     method: 'POST',
     headers: bearer(),
-    body: JSON.stringify({ kind: 'session-liveness', installationId: INST, emittedAt }),
+    body: JSON.stringify({ kind: 'session-liveness', installationId: INST, host, path, emittedAt }),
   });
 }
 
-async function getInstance(plane: RunningPlane): Promise<Record<string, unknown>> {
-  const res = await fetch(`${plane.baseUrl}/v1/instances/${encodeURIComponent(ID)}`, {
+async function getInstance(
+  plane: RunningPlane,
+  id: string = ID,
+): Promise<Record<string, unknown>> {
+  const res = await fetch(`${plane.baseUrl}/v1/instances/${encodeURIComponent(id)}`, {
     headers: { authorization: `Bearer ${TOKEN}` },
   });
   expect(res.status).toBe(200);
@@ -223,6 +237,39 @@ describe('POST /v1/sidecar/liveness feeds instance liveness end-to-end (dogfood 
     expect(after.lastHeartbeatAt).toBeNull(); // never recorded
     expect(after.liveness).toBe('stale'); // still derives off (stale) activity, not the future timestamp
     expect(after.connection).toBe('disconnected'); // a future heartbeat is not real uplink presence
+  });
+
+  // AUDIT-20260719-21 (HIGH, blast-radius-high): the heartbeat must mark ONLY the
+  // instance whose host:path it carries — NOT every instance that happens to share
+  // its installationId. Two checkouts (a copy) share ONE installationId but differ
+  // in path; a heartbeat from the original must leave the copy DISCONNECTED. RED
+  // against the pre-fix code (keyed by installationId): the beat marks BOTH live.
+  it('a heartbeat marks ONLY its own host:path — a same-installationId copy stays disconnected', async () => {
+    const plane = await startPlane();
+    const PATH_A = '/tmp/heartbeat/proj-original';
+    const PATH_B = '/tmp/heartbeat/proj-copy'; // a copied checkout: same INST, different path.
+    const ID_A = `${HOST}:${PATH_A}`;
+    const ID_B = `${HOST}:${PATH_B}`;
+
+    // Both checkouts are activity-idle (5 min stale) — only a heartbeat holds one live.
+    const stale = new Date(Date.now() - 300_000).toISOString();
+    await ingestStale(plane, stale, HOST, PATH_A);
+    await ingestStale(plane, stale, HOST, PATH_B);
+
+    // Only checkout A's sidecar heartbeats (carrying A's own host:path).
+    const emittedAt = new Date().toISOString();
+    const hb = await postHeartbeat(plane, emittedAt, HOST, PATH_A);
+    expect(hb.status).toBe(200);
+
+    const a = await getInstance(plane, ID_A);
+    expect(a.lastHeartbeatAt).toBe(emittedAt);
+    expect(a.liveness).toBe('live'); // A's heartbeat holds A live
+    expect(a.connection).toBe('attached');
+
+    const b = await getInstance(plane, ID_B);
+    expect(b.lastHeartbeatAt).toBeNull(); // A's beat must NOT reach the copy
+    expect(b.liveness).toBe('stale'); // B derives off its own stale activity
+    expect(b.connection).toBe('disconnected');
   });
 
   it('the live instance query makes ZERO durable-store reads even after a heartbeat (SC-007)', async () => {
