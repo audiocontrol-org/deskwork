@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "mode": "impl",
+  "item": "design:feature/instance-observability",
+  "governedShaBase": "override-short-circuit",
+  "headSha": "override-short-circuit",
+  "chunkIds": [],
+  "rounds": 0,
+  "liftedFindings": [],
+  "closedInLoopFindings": [],
+  "seamResult": {
+    "boundaryPairs": [],
+    "findings": [],
+    "suppressedCompatible": 0
+  },
+  "splitClusterRefs": [],
+  "outcome": "override-eligible",
+  "anchorRoot": "/Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control",
+  "override": true,
+  "overrideReason": "Operator override 2026-07-19 after 5 govern rounds. 037 is fully implemented and FR-027 dogfood-verified end-to-end with REAL producers - all 5 scenarios PASS (ordinary verb creates an instance, real session-start populates currentSession, currentBearing from a real workflow advance, counters survive a plane restart, idle instance stays live on the sidecar heartbeat), the acceptance 036 shipped without. Five cross-model barrage rounds fixed every real production defect surfaced: dead host:path auth on the real serve path, --at session-store targeting, pre-037 upgrade-replay tolerance, vacuous fail-open guards, session/phase no-regress ordering, heartbeat-poison resistance, negative phase-duration clamp, dogfood honest-exit-code, sidecar frame-guard resilience, emit ack-confirmed delivery, and heartbeat host:path keying for copied-checkout isolation. Full vitest suite green (3657/3658; the one is a pre-existing wall-clock timing flake that passes in isolation), tsc clean. Residual barrage findings are robustness edge-cases and test-hygiene at implementation-altitude, not spec-promise gaps; per the diminishing-returns discipline they are follow-up items, not blockers for graduating a working, dogfood-proven feature."
+}
