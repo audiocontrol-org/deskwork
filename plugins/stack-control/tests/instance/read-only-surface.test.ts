@@ -49,8 +49,11 @@ function extractInstanceRoutes(): RouteEntry[] {
 
   // Extract each route entry: { method: 'GET'|'POST', pattern: '...', handler: '...' }
   // Pattern handles leading whitespace and newlines. We only care about method and pattern.
+  // Capture ANY uppercase method token — not just GET|POST — so a mutating route
+  // declared as DELETE/PUT/PATCH is captured and asserted, never silently skipped
+  // by the regex (AUDIT-20260719-05: the guard exists to catch exactly that).
   const routePattern =
-    /\{\s*method:\s*'(GET|POST)',\s*pattern:\s*'([^']+)',\s*handler:\s*'[^']+'\s*\}/g;
+    /\{\s*method:\s*'([A-Z]+)',\s*pattern:\s*'([^']+)',\s*handler:\s*'[^']+'\s*\}/g;
 
   const routes: RouteEntry[] = [];
   let match: RegExpExecArray | null;

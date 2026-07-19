@@ -310,6 +310,22 @@ describe('session-start / session-end telemetry producers (T025, FR-007/FR-009a/
       .map((e) => e.snapshot.sessionId)
       .sort();
     expect(startedIds).toEqual([firstId, secondId].sort());
+
+    // FR-009a ORDERING (AUDIT-20260719-08): the old session's
+    // session.ended{abandoned} MUST be emitted BEFORE the new session's
+    // session.started — a consumer must never observe two open sessions with no
+    // intervening end. session-start.ts awaits the abandoned emit (bounded
+    // delivery) before the new started emit, so received order == emit order.
+    const received = eventPairs(peer);
+    const abandonedIdx = received.findIndex(
+      (e) => e.envelope.type === 'session.ended' && e.snapshot.sessionId === firstId,
+    );
+    const newStartedIdx = received.findIndex(
+      (e) => e.envelope.type === 'session.started' && e.snapshot.sessionId === secondId,
+    );
+    expect(abandonedIdx).toBeGreaterThanOrEqual(0);
+    expect(newStartedIdx).toBeGreaterThanOrEqual(0);
+    expect(abandonedIdx).toBeLessThan(newStartedIdx);
   });
 });
 

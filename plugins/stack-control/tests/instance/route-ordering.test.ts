@@ -86,7 +86,10 @@ describe('Route-ordering contract (T035, RED)', () => {
     const routeTableMatch = serverSource.match(
       /const ROUTE_TABLE:\s*readonly RouteDefinition\[\]\s*=\s*\[([\s\S]*?)\];/,
     );
-    expect(routeTableMatch, 'ROUTE_TABLE should be present in server.ts').toBeDefined();
+    // `.match()` returns null (not undefined) on no-match, and toBeDefined()
+    // accepts null — so a drifted ROUTE_TABLE annotation would silently pass this
+    // guard and then TypeError on the `[1]` deref below (AUDIT-20260719-07).
+    expect(routeTableMatch, 'ROUTE_TABLE should be present in server.ts').not.toBeNull();
 
     const routeTableBlock = routeTableMatch![1];
 
