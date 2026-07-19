@@ -39,6 +39,28 @@ import { SystemClock, type Clock } from '../fleet/clock.js';
 import { mintOrReadInstallationId } from '../machine-state/identity.js';
 import { locateMachineState } from '../machine-state/locate.js';
 import { reserveNextSequence } from '../machine-state/highwater.js';
+import { read as readCurrentSession } from '../machine-state/current-session.js';
+
+/**
+ * Read the current Claude Code session id for the enclosing installation,
+ * FAIL-OPEN. `current-session.read()` throws on a corrupt/unreadable record
+ * (Constitution Principle V — it refuses to silently treat a corrupt file as
+ * absent); on the telemetry hot path that throw must NOT surface, so it is
+ * caught HERE and degraded to `null`. Wrapping the read separately (rather than
+ * relying on the outer emit-level catch) is deliberate: a swallowed throw at the
+ * envelope-construction level would skip the whole emission, but FR-012 requires
+ * the event to fire regardless — best-effort session identity, never a blocker.
+ * It is a single small sync read (same shape as the identity read already on
+ * this path), so it adds no latency-inducing work.
+ */
+function readSessionIdFailOpen(): string | null {
+  try {
+    const record = readCurrentSession();
+    return record === null ? null : record.sessionId;
+  } catch {
+    return null;
+  }
+}
 
 /** One dispatched subcommand handler. Mirrors `cli.ts`'s `Subcommand`. */
 export type Handler = (args: string[]) => Promise<void>;
@@ -119,8 +141,10 @@ export async function runInvocationWithTelemetry(
               schemaVersion: 2, // specs/037: envelope now carries host/path/sessionId
               type: 'invocation.completed',
               classification: classifyEvent('invocation.completed'),
-              // The current-session read is a later task (T019); null for now.
-              sessionId: null,
+              // T019: thread the current Claude Code session id (§ D3),
+              // read fail-open — a corrupt/unreadable record degrades to null
+              // and NEVER blocks or skips this emission (FR-012).
+              sessionId: readSessionIdFailOpen(),
             },
             installationRoot, // host/path derived by construction (FR-011)
           ),
