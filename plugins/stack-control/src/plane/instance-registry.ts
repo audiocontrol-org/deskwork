@@ -87,6 +87,15 @@ export function buildInstanceRegistry(
     }
     seenEventIds.add(envelope.eventId);
 
+    // A pre-037 (schemaVersion 1) replayed record derives host/path ABSENT
+    // (`null`) — it is "not attributable to an instance" (data-model.md
+    // § EventEnvelope, AUDIT-20260719-03), so it forms no instance key and is
+    // simply not projected. Every schemaVersion-2 event carries both by
+    // construction (FR-011), so this only ever skips genuine pre-feature records.
+    if (envelope.host === null || envelope.path === null) {
+      continue;
+    }
+
     const id: InstanceId = `${envelope.host}:${envelope.path}`;
     let acc = accumulatorsById.get(id);
     if (acc === undefined) {

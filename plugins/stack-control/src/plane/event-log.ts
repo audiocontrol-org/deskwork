@@ -84,7 +84,12 @@ import {
   writeSync,
 } from 'node:fs';
 import { join } from 'node:path';
-import { validateEnvelope, validateSnapshot } from '../fleet/event.js';
+import {
+  validateEnvelope,
+  validateEnvelopeForReplay,
+  validateSnapshot,
+  type SnapshotPayload,
+} from '../fleet/event.js';
 import type { ClassifiedEvent } from './registry.js';
 
 /** File name for the append-only accepted-event log under the log dir. */
@@ -99,14 +104,48 @@ export interface EventLog {
 }
 
 /**
- * Reconstruct a {@link ClassifiedEvent} from one persisted JSONL line. The
- * envelope is re-validated with the same `validateEnvelope` the ingest
- * boundary uses (fail loud on a corrupt record); `classification` / `type` are
- * derived from the validated envelope so the recovered event is always
- * internally consistent — never trusted verbatim off disk. The bounded
- * `snapshot` (specs/037 D5) is likewise re-validated with `validateSnapshot`
- * (same `≤ 32 KiB` / no-history bound the ingest boundary enforced) so a
- * persisted event-specific payload survives a plane restart intact.
+ * The `schemaVersion` at and above which a durable record MUST carry the 037
+ * fields (top-level `snapshot`; envelope `host`/`path`/`sessionId`). A record
+ * below this — a pre-037 durable log written by a 036-era plane — predates those
+ * fields, so replay reads it tolerantly (AUDIT-20260719-03). Matches the emit
+ * side's `SCHEMA_VERSION = 2` (src/sidecar/pipeline.ts).
+ */
+const MIN_SCHEMA_VERSION_WITH_037_FIELDS = 2;
+
+/**
+ * Read the persisted record's envelope `schemaVersion` so replay can decide
+ * whether to demand the 037 fields (v2+) or tolerate their absence (pre-037,
+ * v1). A record whose `schemaVersion` is missing/non-integer is treated as
+ * pre-037 (tolerant) rather than failing loud here — the tolerant validator
+ * still re-checks every core field, and a truly corrupt record fails there.
+ */
+function readSchemaVersion(record: { envelope: unknown }): number {
+  const { envelope } = record;
+  if (typeof envelope !== 'object' || envelope === null || !('schemaVersion' in envelope)) {
+    return 0;
+  }
+  const candidate: unknown = envelope.schemaVersion;
+  return typeof candidate === 'number' && Number.isInteger(candidate) ? candidate : 0;
+}
+
+/**
+ * Reconstruct a {@link ClassifiedEvent} from one persisted JSONL line, SCHEMA-
+ * AWARE so an upgraded plane can replay a durable log that predates specs/037
+ * (AUDIT-20260719-03).
+ *
+ * For a schemaVersion ≥ 2 record (the 037 shape), the envelope is re-validated
+ * with the STRICT `validateEnvelope` the ingest boundary uses and the top-level
+ * bounded `snapshot` is REQUIRED and re-validated with `validateSnapshot` (same
+ * `≤ 32 KiB` / no-history bound the ingest boundary enforced) — ingest-time
+ * strictness is preserved for newly-written records.
+ *
+ * For a schemaVersion < 2 record (a 036-era durable log), the envelope is read
+ * with `validateEnvelopeForReplay` — its absent `host`/`path`/`sessionId` read as
+ * `null` (data-model.md § EventEnvelope: "older events read `sessionId: null` and
+ * derive `host`/`path` absent → not attributable to an instance"), and an absent
+ * top-level `snapshot` normalizes to the empty payload the fold already tolerates
+ * rather than throwing. `classification` / `type` are always derived from the
+ * validated envelope so the recovered event is internally consistent.
  */
 function parseLine(line: string, source: string): ClassifiedEvent {
   let raw: unknown;
@@ -121,12 +160,21 @@ function parseLine(line: string, source: string): ClassifiedEvent {
   if (typeof raw !== 'object' || raw === null || !('envelope' in raw)) {
     throw new Error(`createEventLog: corrupt line in ${source} — missing "envelope".`);
   }
-  if (!('snapshot' in raw)) {
-    throw new Error(`createEventLog: corrupt line in ${source} — missing "snapshot".`);
+  const record: { envelope: unknown; snapshot?: unknown } = raw;
+
+  if (readSchemaVersion(record) >= MIN_SCHEMA_VERSION_WITH_037_FIELDS) {
+    if (!('snapshot' in raw)) {
+      throw new Error(`createEventLog: corrupt line in ${source} — missing "snapshot".`);
+    }
+    const envelope = validateEnvelope(record.envelope);
+    const snapshot = validateSnapshot(record.snapshot);
+    return { envelope, classification: envelope.classification, type: envelope.type, snapshot };
   }
-  const record: { envelope: unknown; snapshot: unknown } = raw;
-  const envelope = validateEnvelope(record.envelope);
-  const snapshot = validateSnapshot(record.snapshot);
+
+  // Pre-037 (schemaVersion < 2) durable record: tolerate absent 037 fields.
+  const envelope = validateEnvelopeForReplay(record.envelope);
+  const snapshot: SnapshotPayload =
+    'snapshot' in raw ? validateSnapshot(record.snapshot) : {};
   return { envelope, classification: envelope.classification, type: envelope.type, snapshot };
 }
 

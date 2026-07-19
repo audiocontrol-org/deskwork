@@ -81,11 +81,18 @@ export type EventClassification = 'live-only' | 'aggregated' | 'durable';
  * - `classification`       decides cost, not `type` (FR-015).
  * - `host`                 os.hostname() — the machine this event was born on
  *   (specs/037 § Instance Identity, D3/D8). DERIVED by construction from the
- *   installation root; never caller-supplied (FR-011).
+ *   installation root; never caller-supplied (FR-011). `string | null`: every
+ *   NEW (schemaVersion ≥ 2) event carries it by construction, but a replayed
+ *   PRE-037 (schemaVersion 1) durable record derives it ABSENT (`null`) — such
+ *   an event is "not attributable to an instance" (data-model.md § EventEnvelope)
+ *   and is simply not projected. Ingest never accepts a null host on a v2 event
+ *   (`validateEnvelope` still requires it); only the read-side replay validator
+ *   tolerates the absent-on-old-record case.
  * - `path`                 fs.realpathSync.native(installationRoot) — the
  *   canonical on-disk location of the checkout. DERIVED by construction; never
- *   caller-supplied (FR-011). Together `host` + `path` form the `host:path`
- *   instance identity (deriveInstanceId, src/machine-state/instance-id.ts).
+ *   caller-supplied (FR-011). `string | null` for the same pre-037 replay reason
+ *   as `host`. Together `host` + `path` form the `host:path` instance identity
+ *   (deriveInstanceId, src/machine-state/instance-id.ts).
  * - `sessionId`            the Claude Code session id this event belongs to, or
  *   `null` when there is no current session. Caller-supplied (specs/037 § D3).
  */
@@ -101,8 +108,8 @@ export interface EventEnvelope {
   readonly wallClock: string;
   readonly monotonicOffsetMs: number;
   readonly classification: EventClassification;
-  readonly host: string;
-  readonly path: string;
+  readonly host: string | null;
+  readonly path: string | null;
   readonly sessionId: string | null;
 }
 

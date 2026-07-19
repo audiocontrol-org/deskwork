@@ -112,6 +112,12 @@ export function instanceRuns(events: readonly ClassifiedEvent[], id: string): In
   // instance's host:path. Short verbs (runId === null) are never runs.
   const ownedRunIds = new Set<string>();
   for (const { envelope } of events) {
+    // A pre-037 replayed record has host/path absent (`null`) and is not
+    // attributable to any instance (AUDIT-20260719-03), so it can never match an
+    // instance id — skip it before forming the `host:path` key.
+    if (envelope.host === null || envelope.path === null) {
+      continue;
+    }
     if (envelope.runId !== null && `${envelope.host}:${envelope.path}` === id) {
       ownedRunIds.add(envelope.runId);
     }

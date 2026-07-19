@@ -195,6 +195,31 @@ function requireNullableString(record: Record<string, unknown>, key: string): st
   return value;
 }
 
+/**
+ * Read a 037 identity field (`host` / `path` / `sessionId`) off a REPLAYED
+ * durable record, tolerating its ABSENCE on a pre-037 (schemaVersion 1) record.
+ *
+ * Unlike `requireNullableString` (which requires the key to be PRESENT with a
+ * `string | null` value — the ingest contract for a v2 event), this reader
+ * treats an absent key (`undefined`) OR an explicit `null` as ABSENT and returns
+ * `null` — the "derive `host`/`path` absent" shape data-model.md § EventEnvelope
+ * mandates for a pre-feature record. A field that IS present but wrong-typed
+ * (e.g. a number) is still genuine corruption and fails loud. This tolerance is
+ * read-side only; the strict ingest validator never uses it.
+ */
+function optionalNullableString(record: Record<string, unknown>, key: string): string | null {
+  const value = record[key];
+  if (value === undefined || value === null) {
+    return null;
+  }
+  if (typeof value !== 'string' || value.length === 0) {
+    throw new Error(
+      `EventEnvelope.${key}: expected a non-empty string, null, or absent, got ${describeType(value)}`,
+    );
+  }
+  return value;
+}
+
 function requireNonNegativeInteger(record: Record<string, unknown>, key: string): number {
   const value = record[key];
   if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
@@ -264,12 +289,25 @@ function requireEventType(record: Record<string, unknown>, key: string): EventTy
 }
 
 /**
- * Validate an unknown value as an `EventEnvelope`, rejecting missing or
- * wrong-typed fields with a descriptive error (fail loud, per the
- * project's no-silent-coercion rule). Returns a freshly-built, correctly
- * typed envelope — never a cast of the input.
+ * How the three 037 identity fields (`host`/`path`/`sessionId`) are read:
+ *
+ * - `'strict'` — the INGEST contract: `host`/`path` are required non-empty
+ *   strings (a v2 event must carry them by construction, FR-011) and `sessionId`
+ *   must be present as `string | null`. A missing field fails loud.
+ * - `'replay-tolerant'` — the READ-side pre-037 tolerance: an absent `host`/
+ *   `path`/`sessionId` reads as `null` (the "derive host/path absent" shape a
+ *   schemaVersion-1 record has, data-model.md § EventEnvelope). Only the replay
+ *   path, and only for schemaVersion < 2, uses this.
  */
-export function validateEnvelope(value: unknown): EventEnvelope {
+type IdentityFieldMode = 'strict' | 'replay-tolerant';
+
+/**
+ * Shared envelope validation. The 036-era CORE fields are validated identically
+ * in both modes (fail loud on a missing/wrong-typed core field); only the three
+ * 037 identity fields differ by `mode` — see {@link IdentityFieldMode}. Returns a
+ * freshly-built, correctly typed envelope — never a cast of the input.
+ */
+function validateEnvelopeCore(value: unknown, mode: IdentityFieldMode): EventEnvelope {
   const record = requireRecord(value, 'EventEnvelope');
 
   const eventId = requireString(record, 'eventId');
@@ -283,9 +321,12 @@ export function validateEnvelope(value: unknown): EventEnvelope {
   const wallClock = requireIsoWallClock(record, 'wallClock');
   const monotonicOffsetMs = requireFiniteNumber(record, 'monotonicOffsetMs');
   const classification = requireClassification(record, 'classification');
-  const host = requireString(record, 'host');
-  const path = requireString(record, 'path');
-  const sessionId = requireNullableString(record, 'sessionId');
+  const host = mode === 'strict' ? requireString(record, 'host') : optionalNullableString(record, 'host');
+  const path = mode === 'strict' ? requireString(record, 'path') : optionalNullableString(record, 'path');
+  const sessionId =
+    mode === 'strict'
+      ? requireNullableString(record, 'sessionId')
+      : optionalNullableString(record, 'sessionId');
 
   return {
     eventId,
@@ -303,6 +344,31 @@ export function validateEnvelope(value: unknown): EventEnvelope {
     path,
     sessionId,
   };
+}
+
+/**
+ * Validate an unknown value as an `EventEnvelope`, rejecting missing or
+ * wrong-typed fields with a descriptive error (fail loud, per the
+ * project's no-silent-coercion rule). This is the STRICT ingest boundary: a v2
+ * event MUST carry `host`/`path`/`sessionId`. Returns a freshly-built, correctly
+ * typed envelope — never a cast of the input.
+ */
+export function validateEnvelope(value: unknown): EventEnvelope {
+  return validateEnvelopeCore(value, 'strict');
+}
+
+/**
+ * Validate a REPLAYED durable record's envelope, tolerating a pre-037
+ * (schemaVersion 1) record whose `host`/`path`/`sessionId` are ABSENT — they
+ * read as `null` (data-model.md § EventEnvelope: "older events read
+ * `sessionId: null` and derive `host`/`path` absent → not attributable to an
+ * instance"). Every 036-era CORE field is still validated strictly (genuine
+ * corruption on an old record still fails loud). Callers use this ONLY for
+ * schemaVersion < 2 records; schemaVersion ≥ 2 records go through the strict
+ * `validateEnvelope`, so ingest-time strictness is never weakened.
+ */
+export function validateEnvelopeForReplay(value: unknown): EventEnvelope {
+  return validateEnvelopeCore(value, 'replay-tolerant');
 }
 
 /**

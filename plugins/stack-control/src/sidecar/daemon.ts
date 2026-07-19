@@ -252,6 +252,18 @@ export function runSidecarDaemon(options: SidecarDaemonOptions): SidecarDaemonHa
   const pipeline: SidecarPipeline = createPipeline(walDir);
   const ingestFrame = async (frame: EventFrame): Promise<void> => {
     const env = frame.event.envelope;
+    // A LIVE producer frame always carries instance identity by construction
+    // (schemaVersion ≥ 2, FR-011). The `string | null` typing exists only for the
+    // read-side replay of pre-037 durable records (AUDIT-20260719-03), which never
+    // reach this socket path — so a null here is a genuine producer defect, not a
+    // pre-feature record: fail loud rather than forward a host-less identity.
+    const { host, path } = env;
+    if (host === null || path === null) {
+      throw new Error(
+        'sidecar ingestFrame: received a live event frame with absent host/path — a ' +
+          'producer frame must carry instance identity (host/path derived at emit, FR-011).',
+      );
+    }
     await pipeline.receive({
       installationId: env.installationId,
       invocationId: env.invocationId,
@@ -263,8 +275,8 @@ export function runSidecarDaemon(options: SidecarDaemonOptions): SidecarDaemonHa
       // is context only the producer knows. Threading them lets the pipeline
       // re-mint carry them through instead of re-deriving host/path from the
       // spool dir / hardcoding sessionId null.
-      host: env.host,
-      path: env.path,
+      host,
+      path,
       sessionId: env.sessionId,
       // The producer's bare snapshot. The pipeline carries it through INTACT for
       // the specs/037 durable-identity event types (session.started/ended,
