@@ -2,6 +2,37 @@
 
 ---
 
+## 2026-07-19: <!-- session title -->
+
+**Goal:** <!-- compose: what we set out to do -->
+
+**Accomplished:**
+- <!-- compose -->
+
+**Didn't Work:**
+- <!-- compose -->
+
+**Course Corrections:**
+- <!-- compose -->
+
+**Insights:**
+- <!-- compose -->
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 10
+  - refine(037-instance-observability): apply /speckit-analyze findings M1, M2, L2
+  - checklist(037-instance-observability): /speckit-checklist — correctness (requirements-quality gate)
+  - tasks(037-instance-observability): /speckit-tasks — 43 tasks, RED-first, tier-tagged
+  - plan(037-instance-observability): /speckit-plan — plan + design artifacts grounded in 036 source
+  - spec(037-instance-observability): /speckit-clarify — record 4 spec-derived clarifications
+  - spec(037-instance-observability): incorporate third-party review refinements
+  - spec(037-instance-observability): author spec via /stack-control:define
+  - design(instance-observability): design record for the instance-centric observability plane
+  - chore(backlog): capture dedupe-on-ref self-hosted bug (TASK-472)
+  - chore(036-fleet-control-plane): capture two live-dogfood gaps to backlog
+- Files changed: 17
+- Backlog touched: TASK-457, TASK-461, TASK-470, TASK-471, TASK-472
+
 ## 2026-07-18: fleet-control-plane — finish the burndown (107→139), build the daemons, 4-round govern to override-graduation
 
 ### Item: `design:feature/fleet-control-plane` (spec `specs/036-fleet-control-plane`)

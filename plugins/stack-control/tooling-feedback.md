@@ -158,3 +158,6 @@
 ## session-end 2026-07-18
 - govern whole-feature barrage: a source file containing a stray control byte (a literal NUL used as a held-map key separator in dispatch.ts) is treated as binary by the differ, so the chunk emits an unactionable 'file is unreadable/binary, hiding logic' finding (AUDIT-20260718-28) instead of auditing the file or flagging the encoding issue clearly. The whole file went un-audited silently. Suggest: govern should detect a control-byte/binary source file in-scope and surface it as an explicit 'un-auditable source file' diagnostic (with the offending byte/line), not a vague content finding.
 - first whole-feature govern of a large, never-previously-governed feature is a multi-round grind (18->24->17->15 across 4 rounds): each fix round introduces some new fix-debt that the next round surfaces. The retired per-phase govern would have amortized this; consider guidance to govern incrementally as phases land even under the 030 whole-feature-at-end model, so the final pass isn't the first audit of thousands of lines at once.
+
+## session-end 2026-07-19
+- backlog capture dedupes on --ref alone: a second distinct finding sharing a spec/source-file ref is silently refused (stdout success-shaped, exit 0). Hit while filing TASK-470/471; worked around by re-pointing the ref. Captured as TASK-472.
