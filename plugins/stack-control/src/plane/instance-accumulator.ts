@@ -208,16 +208,40 @@ function applyPhaseEnteredEvent(acc: InstanceAccumulator, event: ClassifiedEvent
   const item = readSnapshotString(snapshot, 'item');
   if (phase === null || item === null) return;
 
-  // Accrue the LEAVING phase's elapsed time before advancing the bearing.
+  // Accrue the LEAVING phase's elapsed time before advancing the bearing. The
+  // span is CLAMPED to a non-negative floor (AUDIT-20260719-13): the
+  // installationSequence gate above guarantees ordered ADVANCEMENT, but wallClock
+  // is not guaranteed monotonic with installationSequence (clock skew / NTP step),
+  // so `now - phaseEnteredAt` can be negative even for a correctly-ordered pair.
+  // A backward-clock transition contributes 0, never a negative accrual.
   if (acc.phaseEnteredAt !== null && acc.currentBearing !== null) {
     const leaving = acc.currentBearing.phase;
-    const elapsedMs = Date.parse(envelope.wallClock) - Date.parse(acc.phaseEnteredAt);
+    const elapsedMs = clampedSpanMs(acc.phaseEnteredAt, envelope.wallClock);
     acc.phaseDurations[leaving] = (acc.phaseDurations[leaving] ?? 0) + elapsedMs;
   }
 
   acc.currentBearing = { phase, item };
   acc.phaseEnteredAt = envelope.wallClock;
   acc.currentBearingSequence = sequence;
+}
+
+/**
+ * Non-negative elapsed span between two ISO instants, in ms (AUDIT-20260719-13).
+ * Returns `0` when either timestamp is unparseable (NaN) OR the delta is negative
+ * — a wallClock is NOT guaranteed monotonic with `installationSequence` (clock
+ * skew, an NTP step, a producer's clock adjustment), so even a correctly
+ * sequence-ordered pair of `phase.entered` events can carry a newer sequence with
+ * an EARLIER wallClock. Clamp-to-0 is the honest floor: a phase we "left" in
+ * negative wall-time contributes 0, never a negative (or NaN) accrual that would
+ * corrupt the cumulative `phaseDurations` total. Never fabricates a positive span
+ * — a non-monotonic clock yields no trustworthy positive duration.
+ */
+function clampedSpanMs(fromIso: string, toIso: string): number {
+  const fromMs = parseInstantMs(fromIso);
+  const toMs = parseInstantMs(toIso);
+  if (fromMs === null || toMs === null) return 0;
+  const delta = toMs - fromMs;
+  return delta > 0 ? delta : 0;
 }
 
 /** The later of two optional epoch-ms readings, or `null` when both are absent. */

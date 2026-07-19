@@ -207,6 +207,31 @@ describe('instance registry — latest-wins fields honor installationSequence no
     expect(instance.currentBearing).toEqual({ phase: 'spec', item: ITEM });
   });
 
+  it('phaseDurations: a correctly-ORDERED (monotonic installationSequence) pair whose WALLCLOCKS run BACKWARD accrues 0, never a negative span (AUDIT-20260719-13)', () => {
+    // The installationSequence gate (AUDIT-09) passes here — seq 20 > seq 10 is a
+    // legitimately-ordered advancement. But the two events' wallClocks run
+    // BACKWARD (clock skew / NTP step / a producer clock adjustment): the newer
+    // sequence carries an EARLIER wallClock. The DURATION delta
+    // (newWallClock - phaseEnteredAt) = T05 - T10 = -5_000ms would corrupt the
+    // leaving phase's total with a NEGATIVE accrual. The honest floor is 0 — a
+    // non-monotonic clock gives no trustworthy positive span.
+    const events: ClassifiedEvent[] = [
+      phaseEntered(10, '2026-07-18T12:00:10.000Z', 'design'),
+      phaseEntered(20, '2026-07-18T12:00:05.000Z', 'spec'), // newer seq, EARLIER wallClock
+    ];
+
+    const [instance] = buildInstanceRegistry(events).instances();
+
+    // design was left by a strictly-newer (seq 20) event, so it accrues — but the
+    // backward wallClock delta must clamp to 0, never a negative number.
+    expect(instance.phaseDurations.design).toBe(0);
+    for (const ms of Object.values(instance.phaseDurations)) {
+      expect(ms).toBeGreaterThanOrEqual(0);
+    }
+    // The bearing still advanced to the newer-sequence phase (spec).
+    expect(instance.currentBearing).toEqual({ phase: 'spec', item: ITEM });
+  });
+
   it('re-delivery (same eventId) folds effectively-once and does not corrupt latest-wins fields', () => {
     const sessA = mintUuidV7();
     const dupId = mintUuidV7();

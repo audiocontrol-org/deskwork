@@ -39,6 +39,7 @@ mkdir -p "$HOME" "$TMPDIR" "$XDG_STATE_HOME" "$XDG_RUNTIME_DIR"
 
 PLANE_PID=""
 SIDECAR_PID=""
+FAILURES=0
 cleanup() {
   [ -n "$SIDECAR_PID" ] && kill "$SIDECAR_PID" 2>/dev/null
   [ -n "$PLANE_PID" ] && kill "$PLANE_PID" 2>/dev/null
@@ -49,6 +50,7 @@ trap cleanup EXIT INT TERM
 
 section() { printf '\n============================================================\n%s\n============================================================\n' "$1"; }
 note()    { printf '  %s\n' "$1"; }
+fail_note() { FAILURES=$((FAILURES + 1)); note "$1"; }
 
 # --- installation under test (a real git repo carrying a real roadmap item) ---
 INSTALL="$TMPROOT/install"
@@ -109,7 +111,7 @@ S1_COUNT="$(instances_all | jq '.instances | length')"
 if [ "$S1_COUNT" -ge 1 ]; then
   note "S1 VERDICT: PASS — an instance appeared from a real ordinary verb"
 else
-  note "S1 VERDICT: FAIL — NO instance appeared from real ordinary verbs."
+  fail_note "S1 VERDICT: FAIL — NO instance appeared from real ordinary verbs."
   note "  invocation.completed rides the C4 'short-verb' emit buffer (capacity 0):"
   note "  a fresh short-lived CLI process exits before its local-socket connect"
   note "  completes, so the buffer DROPS the event and nothing is ever uplinked."
@@ -144,7 +146,7 @@ CUR_SESSION="$( [ -n "$ID" ] && curl -s "${AUTH[@]}" "$BASE/v1/instances/$(enc "
 if [ "$CUR_SESSION" != "null" ]; then
   note "S2 currentSession VERDICT: PASS — real session-start populated currentSession"
 else
-  note "S2 currentSession VERDICT: FAIL — sessionsStarted counts, but currentSession/firstSessionAt stay null."
+  fail_note "S2 currentSession VERDICT: FAIL — sessionsStarted counts, but currentSession/firstSessionAt stay null."
   note "  The sidecar re-mint pipeline (src/sidecar/pipeline.ts) hard-codes sessionId:null"
   note "  ('T019 later; null for now') and drops the {sessionId,startedAt} snapshot, so the"
   note "  uplinked session.started carries no session linkage."
@@ -208,7 +210,7 @@ BEARING="$( [ -n "$ID" ] && curl -s "${AUTH[@]}" "$BASE/v1/instances/$(enc "$ID"
 if [ "$BEARING" != "null" ]; then
   note "S3 VERDICT: PASS — currentBearing reflects the real phase transition"
 else
-  note "S3 VERDICT: FAIL — phase.entered reaches the plane (lastActivity=phase.entered) but"
+  fail_note "S3 VERDICT: FAIL — phase.entered reaches the plane (lastActivity=phase.entered) but"
   note "  currentBearing stays null and phaseDurations stays {}. The sidecar re-mint pipeline"
   note "  drops the {phase,from,item} snapshot (redaction expects a {content,allowlist} shape;"
   note "  the 037 producer emits a bare snapshot), so bearing/durations never derive."
@@ -285,7 +287,7 @@ else
   elif [ "$HB" != "null" ] && [ "$LV" = "live" ]; then
     note "S5 VERDICT: PARTIAL — lastHeartbeatAt populated and liveness=live, but activity age ${ACT_AGE}s did not exceed the 90s window this run (raise IDLE_WAIT to isolate the heartbeat)."
   else
-    note "S5 VERDICT: FAIL — lastHeartbeatAt=${HB}, activity age=${ACT_AGE}s, liveness=${LV} (expected a populated heartbeat holding an idle instance live)."
+    fail_note "S5 VERDICT: FAIL — lastHeartbeatAt=${HB}, activity age=${ACT_AGE}s, liveness=${LV} (expected a populated heartbeat holding an idle instance live)."
   fi
 fi
 
@@ -299,3 +301,12 @@ find "$HOME/Library/Application Support/stack-control" -maxdepth 3 2>/dev/null |
 
 section "DOGFOOD COMPLETE"
 echo "Evidence above is the real, captured output of real producers driving the real API."
+
+section "DOGFOOD SUMMARY"
+if [ "$FAILURES" -eq 0 ]; then
+  echo "DOGFOOD: all scenarios PASSED"
+  exit 0
+else
+  echo "DOGFOOD: $FAILURES scenario(s) FAILED"
+  exit 1
+fi
