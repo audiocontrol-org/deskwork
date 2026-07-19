@@ -39,3 +39,9 @@
 {"id":"T039","tierLabel":"fast","model":"haiku","commitRange":"e784d743..ef6fdbf0","reviewClean":true,"note":"read-only-surface guard (pass on arrival)"}
 {"id":"T040","tierLabel":"fast","model":"haiku","commitRange":"e784d743..ef6fdbf0","reviewClean":true,"note":"emit-fail-open guard (pass on arrival)"}
 {"id":"fix/session-emit-flake","tierLabel":"controller","model":"opus","commitRange":"a63661e5..e784d743","reviewClean":true,"note":"session-events no-close pattern; killed supersede flake under load"}
+{"id": "T044", "tierLabel": "powerful", "model": "opus", "commitRange": "see-git-log", "reviewClean": true, "note": "RED real-sidecar-path identity+snapshot preservation"}
+{"id": "T045", "tierLabel": "powerful", "model": "opus", "commitRange": "see-git-log", "reviewClean": true, "note": "preserve host/path/sessionId+bare snapshot through daemon+pipeline re-mint; 036 byte-identical"}
+{"id": "T046", "tierLabel": "powerful", "model": "opus", "commitRange": "see-git-log", "reviewClean": true, "note": "short-verb invocation.completed delivery; long-run + bounded 50ms drain"}
+{"id": "T048", "tierLabel": "powerful", "model": "opus", "commitRange": "see-git-log", "reviewClean": true, "note": "phase.entered+session.* CLI delivery via shared emit-drain bounded wait"}
+{"id": "T041", "tierLabel": "powerful", "model": "opus", "commitRange": "see-git-log", "reviewClean": true, "note": "FR-027 real-producer dogfood harness (revealed producer-path defects)"}
+{"id": "T047", "tierLabel": "powerful", "model": "opus", "commitRange": "see-git-log", "reviewClean": true, "note": "dogfood all-green with real producers; S3 harness-artifact fix (same-port restart)"}
