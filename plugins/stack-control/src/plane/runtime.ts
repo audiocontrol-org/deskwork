@@ -81,6 +81,18 @@ export interface PlaneRuntimeOptions {
    * per-installation provisioning is a documented follow-up seam.
    */
   readonly acceptedTokens: ReadonlyMap<string, string>;
+  /**
+   * Accepted bearer tokens, each mapped to the instance identity (`host:path`,
+   * D8) it is authorized to act for (specs/037 T038). Recorded ALONGSIDE
+   * {@link acceptedTokens}'s installationId authorization — never replacing it:
+   * `installationId` stays the durable, path-independent identity while this
+   * `host:path` composite names "this checkout on this machine". When a token
+   * has an entry here, an ingest whose envelope `host:path` differs from it is
+   * refused 403 (the token→`host:path` check running alongside the installationId
+   * check). A token with NO entry is not host:path-gated — only its installationId
+   * authorization applies (this map, like `acceptedTokens`, seeds from a
+   * documented per-installation provisioning seam). Defaults to empty. */
+  readonly acceptedInstances?: ReadonlyMap<string, string>;
   /** Tokens explicitly revoked — refused with reason 'revoked', never
    * downgraded (FR-088). Defaults to empty. */
   readonly revokedTokens?: ReadonlySet<string>;
@@ -180,12 +192,25 @@ export function createPlaneRuntime(options: PlaneRuntimeOptions): PlaneRuntime {
   // stream's `installationIdOf`) that must not re-derive identity.
   const authedInstallation = new WeakMap<IncomingMessage, string>();
 
+  // The authenticated instance identity (`host:path`, D8) for the in-flight
+  // request, keyed by the request object — set by the auth guard ONLY when the
+  // verified token has a recorded authorized instance (acceptedInstances). A
+  // token with no entry leaves this unset, so `requireAuthedInstance` returns
+  // `undefined` and the caller skips the host:path check (installationId auth
+  // still applies).
+  const acceptedInstances: ReadonlyMap<string, string> = options.acceptedInstances ?? new Map();
+  const authedInstance = new WeakMap<IncomingMessage, string>();
+
   function requireAuthedInstallation(req: IncomingMessage): string {
     const id = authedInstallation.get(req);
     if (id === undefined) {
       throw new Error('plane runtime: handler ran without an authenticated installation (auth-guard bug).');
     }
     return id;
+  }
+
+  function requireAuthedInstance(req: IncomingMessage): string | undefined {
+    return authedInstance.get(req);
   }
 
   // --- auth guard ---------------------------------------------------------
@@ -200,6 +225,13 @@ export function createPlaneRuntime(options: PlaneRuntimeOptions): PlaneRuntime {
         return;
       }
       authedInstallation.set(ctx.req, outcome.installationId);
+      // Record the token's authorized instance (`host:path`, D8) alongside its
+      // installationId — ONLY when this token has one provisioned. `token` is
+      // defined here (verify() returned ok only for a present token).
+      const authorizedInstance = token === undefined ? undefined : acceptedInstances.get(token);
+      if (authorizedInstance !== undefined) {
+        authedInstance.set(ctx.req, authorizedInstance);
+      }
       await handler(ctx);
     };
   }
@@ -221,6 +253,7 @@ export function createPlaneRuntime(options: PlaneRuntimeOptions): PlaneRuntime {
       scheduler,
       cdnReader: options.cdnReader,
       requireAuthedInstallation,
+      requireAuthedInstance,
     });
 
   // --- wire the server ----------------------------------------------------
@@ -237,7 +270,9 @@ export function createPlaneRuntime(options: PlaneRuntimeOptions): PlaneRuntime {
         issueFleetCommand: withAuth(consumerHandlers.issueFleetCommand),
         storeHealth: withAuth(consumerHandlers.storeHealth),
         instanceSnapshot: withAuth(consumerHandlers.instanceSnapshot),
+        instanceStream: withAuth(consumerHandlers.instanceStream),
         instanceDetail: withAuth(consumerHandlers.instanceDetail),
+        instanceRuns: withAuth(consumerHandlers.instanceRuns),
       };
       const sidecarRoutes: readonly ExtraRoute[] = [
         { method: 'POST', pattern: '/v1/ingest', handler: withAuth(ingestHandler) },

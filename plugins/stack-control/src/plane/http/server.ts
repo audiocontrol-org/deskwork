@@ -88,8 +88,12 @@ export interface PlaneRouteHandlers {
   readonly storeHealth: RouteHandler;
   /** `GET /v1/instances` — instance snapshot (specs/037, read-only). */
   readonly instanceSnapshot: RouteHandler;
+  /** `GET /v1/instances/stream` — instance deltas over SSE (specs/037, T036). */
+  readonly instanceStream: RouteHandler;
   /** `GET /v1/instances/{id}` — per-instance detail (specs/037, read-only). */
   readonly instanceDetail: RouteHandler;
+  /** `GET /v1/instances/{id}/runs` — the instance's runs, filtered (specs/037, T037). */
+  readonly instanceRuns: RouteHandler;
 }
 
 // ---------------------------------------------------------------------------
@@ -117,13 +121,18 @@ const ROUTE_TABLE: readonly RouteDefinition[] = [
   { method: 'POST', pattern: '/v1/fleet/commands', handler: 'issueFleetCommand' },
   { method: 'GET', pattern: '/v1/health/store', handler: 'storeHealth' },
   // specs/037 instance-observability (read-only). ROUTE-ORDERING CONTRACT
-  // (contracts/instance-query-api.md): when the later `/v1/instances/stream`
-  // (T036) and `/v1/instances/:id/runs` (T037) routes land, `/v1/instances/stream`
-  // MUST be registered BEFORE `/v1/instances/:id` — first-path-match dispatch
-  // (dispatch(), below) + the `[^/]+` param regex would otherwise route `stream`
-  // to `instanceDetail`. `:id` is a URL-encoded `host:path` (the handler decodes).
+  // (contracts/instance-query-api.md): `/v1/instances/stream` (T036) MUST be
+  // registered BEFORE `/v1/instances/:id` — first-path-match dispatch
+  // (dispatch(), below) + the `[^/]+` param regex would otherwise route the
+  // literal `stream` segment to `instanceDetail` as an `:id`. `:id/runs` (T037)
+  // is a distinct DEEPER path (4 segments vs. 3): its anchored `^...$` regex
+  // cannot collide with `:id`, so it orders after `:id` (mirroring the fleet
+  // `/v1/runs/:runId` → `/v1/runs/:runId/history` nesting). `:id` is a
+  // URL-encoded `host:path` (the handler decodes).
   { method: 'GET', pattern: '/v1/instances', handler: 'instanceSnapshot' },
+  { method: 'GET', pattern: '/v1/instances/stream', handler: 'instanceStream' },
   { method: 'GET', pattern: '/v1/instances/:id', handler: 'instanceDetail' },
+  { method: 'GET', pattern: '/v1/instances/:id/runs', handler: 'instanceRuns' },
 ];
 
 /**

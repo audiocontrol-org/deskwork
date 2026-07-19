@@ -212,3 +212,56 @@ export function ingestClaimedInstallationId(body: unknown): string | undefined {
   const { installationId } = envelope;
   return typeof installationId === 'string' ? installationId : undefined;
 }
+
+/**
+ * Refuse a sidecar-facing request 403 when the body-claimed instance identity
+ * (`host:path`, D8) differs from the token's authorized one — the token→
+ * `host:path` check that runs ALONGSIDE {@link refuseInstallationMismatch}'s
+ * installationId (UUID) check, never replacing it (specs/037 § Instance
+ * Identity, D8). Returns `true` (response written) on a mismatch, `false`
+ * (no response) when they match so the caller proceeds. Same status/shape as
+ * the installationId mismatch — a distinct `reason` names the offending axis
+ * so an operator can tell a host:path spoof from an installationId spoof.
+ */
+export function refuseInstanceMismatch(
+  res: ServerResponse,
+  claimed: string,
+  authed: string,
+  surface: string,
+): boolean {
+  if (claimed === authed) {
+    return false;
+  }
+  respondJson(res, 403, {
+    error: 'forbidden',
+    reason: 'instance-mismatch',
+    detail: `${surface} does not match the authenticated instance (host:path); a token may only act for its own instance.`,
+  });
+  return true;
+}
+
+/**
+ * Extract the caller-claimed instance identity `${host}:${path}` (D8) from an
+ * ingest event body, or `undefined` when the body does not carry both `host`
+ * and `path` as strings in the expected `{ envelope: { host, path } }` shape.
+ * The runtime enforces this equals the token's authorized instance BEFORE
+ * ingest (specs/037 T038) — so installation A's token, authorized for instance
+ * A, cannot POST telemetry claiming instance B's `host:path`. A body missing a
+ * claimed instance (`undefined`) is left to `ingestEvent`'s envelope
+ * validation, which rejects it 400 — malformed-body stays a client error
+ * (AUDIT-20260718-26), never a spoof.
+ */
+export function ingestClaimedInstance(body: unknown): string | undefined {
+  if (!isRecord(body)) {
+    return undefined;
+  }
+  const { envelope } = body;
+  if (!isRecord(envelope)) {
+    return undefined;
+  }
+  const { host, path } = envelope;
+  if (typeof host !== 'string' || typeof path !== 'string') {
+    return undefined;
+  }
+  return `${host}:${path}`;
+}

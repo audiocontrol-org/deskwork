@@ -41,16 +41,19 @@ import {
   instanceDetail as projectInstanceDetail,
   instanceSnapshot as projectInstanceSnapshot,
 } from './http/instance-api.js';
+import { buildInstanceObservabilityHandlers } from './instance-handlers.js';
 import type { EventLog } from './event-log.js';
 import {
   assertSessionLiveness,
   computeFleetTickGuarded,
   ingestClaimedInstallationId,
+  ingestClaimedInstance,
   installationIdForRun,
   parseCommandKind,
   parseTargets,
   readJsonBody,
   refuseInstallationMismatch,
+  refuseInstanceMismatch,
   requireParam,
   respondJson,
 } from './runtime-http.js';
@@ -99,6 +102,10 @@ export interface PlaneHandlerContext {
   /** Resolve the authenticated installation for the in-flight request (set by
    * the runtime's auth guard, read here without re-deriving identity). */
   readonly requireAuthedInstallation: (req: IncomingMessage) => string;
+  /** Resolve the token-authorized instance identity (`host:path`, D8) for the
+   * in-flight request, or `undefined` when this token has no provisioned
+   * instance authorization (then only the installationId check applies). */
+  readonly requireAuthedInstance: (req: IncomingMessage) => string | undefined;
 }
 
 /** The RAW (pre-auth) handlers the runtime wraps with `withAuth` and mounts. */
@@ -162,6 +169,13 @@ function rollbackAcceptedIngest(
  */
 export function buildPlaneHandlers(ctx: PlaneHandlerContext): PlaneHandlers {
   const { events } = ctx;
+
+  // --- instance observability SSE + runs facet (specs/037 T036/T037) ------
+  // Extracted to the sibling `instance-handlers.ts` so this module stays under
+  // the Constitution VI file cap. Both handlers fold the SAME `events` array on
+  // every read (pure recompute-on-read, FR-023/SC-007); the SSE keepalive
+  // scheduler is the same injected test seam the fleet stream uses.
+  const instanceObservability = buildInstanceObservabilityHandlers(events, ctx.scheduler);
 
   // --- fleet SSE (C2 deltas) ---------------------------------------------
   const fleetStreamHandler: RouteHandler = (routeCtx: RouteContext): void => {
@@ -330,6 +344,8 @@ export function buildPlaneHandlers(ctx: PlaneHandlerContext): PlaneHandlers {
       // Unknown id → 404 with the pure not-found body verbatim ({ found:false, id }).
       respondJson(routeCtx.res, detail.found ? 200 : 404, detail);
     },
+    instanceStream: instanceObservability.instanceStream,
+    instanceRuns: instanceObservability.instanceRuns,
   };
 
   // --- sidecar-facing handlers (C1/C3/C7) --------------------------------
@@ -351,6 +367,23 @@ export function buildPlaneHandlers(ctx: PlaneHandlerContext): PlaneHandlers {
       if (
         claimed !== undefined &&
         refuseInstallationMismatch(routeCtx.res, claimed, ctx.requireAuthedInstallation(routeCtx.req), 'ingest body envelope.installationId')
+      ) {
+        return;
+      }
+      // INSTANCE-IDENTITY ENFORCEMENT (specs/037 T038, D8): ALONGSIDE the
+      // installationId check above (not replacing it), refuse a body whose
+      // claimed `host:path` differs from the TOKEN's authorized instance — so
+      // a token authorized for instance A cannot POST telemetry claiming
+      // instance B's `host:path`. Only enforced when this token has a
+      // provisioned instance authorization (`authedInstance` set); a body with
+      // NO claimed instance (`undefined`) falls through to envelope validation,
+      // which 400s it (AUDIT-20260718-26).
+      const authedInstance = ctx.requireAuthedInstance(routeCtx.req);
+      const claimedInstance = ingestClaimedInstance(body);
+      if (
+        authedInstance !== undefined &&
+        claimedInstance !== undefined &&
+        refuseInstanceMismatch(routeCtx.res, claimedInstance, authedInstance, 'ingest body envelope host:path')
       ) {
         return;
       }
