@@ -184,7 +184,7 @@ describe('phase.entered emit seam (T030, D4 — committed advance emits; dry-run
     const f = drivableInstall();
     const peer = await peerAtEmitTarget(store(), f);
 
-    emitAdvance(ITEM, true, {});
+    await emitAdvance(ITEM, true, {});
 
     // Sanity: the real transition actually LANDED (open-design → status in-flight),
     // so we are observing a COMMITTED advance, not a refused/no-op one.
@@ -199,7 +199,7 @@ describe('phase.entered emit seam (T030, D4 — committed advance emits; dry-run
     const f = drivableInstall();
     const peer = await peerAtEmitTarget(store(), f);
 
-    emitAdvance(ITEM, false, {});
+    await emitAdvance(ITEM, false, {});
 
     // Dry-run wrote nothing (status unchanged) — and must have emitted nothing.
     expect(loadRoadmap(f.roadmapPath, f.opts).byId.get(ITEM)?.status).toBe('planned');
@@ -208,11 +208,14 @@ describe('phase.entered emit seam (T030, D4 — committed advance emits; dry-run
     expect(phaseEnteredSnapshots(peer)).toEqual([]);
   });
 
-  it('FAIL-OPEN: with NO telemetry sink the phase advance still commits and never throws', () => {
+  it('FAIL-OPEN: with NO telemetry sink the phase advance still commits and never throws', async () => {
     const f = drivableInstall();
     // Deliberately bind NO peer — the emit target socket is absent, the canonical
     // fail-open condition (sidecar unavailable). The advance must be unperturbed.
-    expect(() => emitAdvance(ITEM, true, {})).not.toThrow();
+    // emitAdvance is async (its bounded deliver-or-budget wait — T048): assert the
+    // RETURNED PROMISE resolves, not a synchronous throw, or a rejected promise
+    // (a real fail-open regression) would sail past a `() => ...).not.toThrow()`.
+    await expect(emitAdvance(ITEM, true, {})).resolves.toBeUndefined();
     expect(loadRoadmap(f.roadmapPath, f.opts).byId.get(ITEM)?.status).toBe('in-flight');
   });
 });

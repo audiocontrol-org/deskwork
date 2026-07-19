@@ -151,7 +151,7 @@ describe(
       expect(CurrentSession.read()).toBeNull();
     });
 
-    it('(c) phase advance (committed workflow transition) completes without throwing when sidecar is unreachable', () => {
+    it('(c) phase advance (committed workflow transition) completes without throwing when sidecar is unreachable', async () => {
       // Use a real workflow fixture with one planned node.
       const f = makeWorkflowFixture(
         [{ identifier: 'multi:feature/test-phase-failopen', status: 'planned' }],
@@ -164,8 +164,13 @@ describe(
 
       try {
         // NO peer bound — the resolved socket path is unreachable.
+        // emitAdvance is async (bounded deliver-or-budget wait — T048): AWAIT the
+        // returned promise and assert it RESOLVES. A sync `() => ...).not.toThrow()`
+        // would let a rejected promise (a real fail-open regression) pass silently.
         const startTime = Date.now();
-        expect(() => emitAdvance('multi:feature/test-phase-failopen', true, {})).not.toThrow();
+        await expect(
+          emitAdvance('multi:feature/test-phase-failopen', true, {}),
+        ).resolves.toBeUndefined();
         const elapsed = Date.now() - startTime;
 
         // Sanity: should not have blocked on connect.
