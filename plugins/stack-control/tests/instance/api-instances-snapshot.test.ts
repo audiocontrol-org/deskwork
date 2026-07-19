@@ -24,7 +24,7 @@
 // Repo convention: relative `.js` imports under node16 resolution (no `@/` alias).
 
 import { afterEach, describe, expect, it } from 'vitest';
-import { useMachineStateStore, assertTripwireEmpty } from './_machine-state-harness.ts';
+import { useMachineStateStore, assertTripwireEmpty } from '../fleet/_machine-state-harness.js';
 
 // Data types (will be authored by T018 + data-model.md)
 interface InstanceState {
