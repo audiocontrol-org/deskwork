@@ -15,11 +15,28 @@
  *
  * FAIL-OPEN + NON-HANGING BY CONSTRUCTION (spec § "The constraint that dominates
  * every other"): every exit path of `awaitDeliveredOrBudget` is either an immediate
- * condition (delivered / unavailable / closed) or the hard `budgetMs` ceiling.
- * Nothing here waits on a peer reply, so a connected-but-stalled peer resolves the
- * instant the buffer drains — the 036 fail-open-hang contract is preserved. A
- * down/absent sidecar fires `error` on the next tick (state → 'unavailable') and
- * returns with NO wait. Never throws.
+ * condition (delivery CONFIRMED / unavailable / closed) or the hard `budgetMs`
+ * ceiling. The wait PREFERS a confirmed delivery within the budget, but it NEVER
+ * hangs waiting for one: a connected-but-stalled peer that accepts + drains our
+ * buffer yet never sends a compatible `hello-ack` leaves delivery unconfirmed, so
+ * the wait rides the bounded budget and returns at the ceiling (best-effort, the
+ * fire-and-forget writes already went out) — the 036 fail-open-hang contract is
+ * preserved because `budgetMs` is a hard ceiling. A down/absent sidecar fires
+ * `error` on the next tick (state → 'unavailable') and returns with NO wait.
+ * Never throws.
+ *
+ * WHY CONFIRMED DELIVERY, NOT AN EMPTY BUFFER (AUDIT-20260719-19): the emit client
+ * writes held events to the socket on connect and drains its buffer to empty
+ * BEFORE the peer's `hello-ack` confirms a version-compatible peer received them
+ * (emit.ts `onConnect` ~260-269 push to `unconfirmed`; a matching ack clears it
+ * ~283-298). Resolving on `buffer.size === 0` alone therefore declares "delivered"
+ * while the events are still PROVISIONAL — then `close()` runs and, on a protocol
+ * mismatch / slow ack / peer-close-before-ack, the requeue/reconnect protection
+ * can't help because success was already declared. Since this helper gates
+ * `invocation.completed`, `session.*`, and `phase.entered`, that would SILENTLY
+ * DROP the very events instances/sessions/bearings are built from. So the wait
+ * keys on the client's `deliveryConfirmed` signal (connected AND buffer empty AND
+ * nothing unconfirmed), preferring the ack within the budget.
  *
  * No `any`, no `as`, no `@ts-ignore` (Principle VI). Relative `.js` imports under
  * node16 resolution (no `@/` alias configured for this plugin).
@@ -48,16 +65,19 @@ export const EMIT_DRAIN_BUDGET_MS = 50;
 const DRAIN_POLL_INTERVAL_MS = 2;
 
 /**
- * Resolve as soon as the emit client has DELIVERED its held event (connected AND
- * its long-run buffer drained to empty), OR the socket is found unavailable
+ * Resolve as soon as the emit client has CONFIRMED delivery of its held events
+ * (`deliveryConfirmed` — connected, buffer drained empty, AND a matching
+ * `hello-ack` cleared the unconfirmed set), OR the socket is found unavailable
  * (down/absent sidecar — no point waiting), OR the client is closed, OR the
- * bounded budget elapses. Non-hanging by construction; never throws.
+ * bounded budget elapses. Prefers a confirmed delivery within the budget but is
+ * non-hanging by construction (the budget is the hard ceiling); never throws.
  */
 export async function awaitDeliveredOrBudget(client: EmitClient, budgetMs: number): Promise<void> {
   const deadline = Date.now() + budgetMs;
   for (;;) {
-    // Delivered: the event was written on connect and the buffer drained.
-    if (client.state === 'connected' && client.buffer.size === 0) return;
+    // CONFIRMED: the events were written, the buffer drained, AND a compatible
+    // peer's hello-ack confirmed receipt — not merely an empty buffer.
+    if (client.deliveryConfirmed) return;
     // Nothing more to wait for — the sidecar is unreachable (fail-open) or the
     // client is already torn down.
     if (client.state === 'unavailable' || client.state === 'closed') return;

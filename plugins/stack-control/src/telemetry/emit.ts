@@ -101,18 +101,14 @@ export interface EmitClientConfig {
    * `LOCAL_PROTOCOL_VERSION`. */
   readonly localVersion?: number;
   /**
-   * FIRE-AND-FORGET seam invoked when the local socket is found unavailable,
-   * so a sidecar is spawned for SUBSEQUENT invocations (C1 row 1 / C6). The
-   * client NEVER awaits it and swallows any throw. Left as a seam (default
-   * no-op) rather than calling `spawnDetachedSidecar` directly because the
-   * sidecar's command + args are the DISPATCHER's knowledge (T044), and the
-   * advisory debounce that decides WHETHER to spawn belongs there too
-   * (spawn.ts's own doc comment). This keeps process-launch policy out of the
-   * hot path every invocation runs.
+   * FIRE-AND-FORGET seam invoked when the local socket is found unavailable, so a
+   * sidecar is spawned for SUBSEQUENT invocations (C1 row 1 / C6). The client
+   * NEVER awaits it and swallows any throw. Left as a seam (default no-op) because
+   * the sidecar's command + args and the WHETHER-to-spawn debounce are the
+   * DISPATCHER's knowledge (T044) — keeping process-launch policy off the hot path.
    */
   readonly onSocketUnavailable?: () => void;
-  /** Optional override of the long-run buffer's bounded capacity (defaults to
-   * `INVOCATION_BUFFER_BOUND`). Ignored for `'short-verb'`. */
+  /** Optional long-run buffer capacity override (default `INVOCATION_BUFFER_BOUND`; ignored for `'short-verb'`). */
   readonly bufferCapacity?: number;
 }
 
@@ -127,6 +123,11 @@ export interface EmitClient {
   /** The current connection state — observability only; the invocation never
    * branches on it. */
   readonly state: ConnectionState;
+  /** DELIVERY-CONFIRMED: `connected`, buffer drained, AND nothing still
+   * `unconfirmed` (a matching `hello-ack` cleared the provisional writes). The
+   * signal `awaitDeliveredOrBudget` waits on so the bounded drain keys on
+   * confirmed delivery, not a merely-empty buffer (AUDIT-20260719-19). */
+  readonly deliveryConfirmed: boolean;
   /** Idempotent teardown: destroys any open socket and stops reconnecting.
    * Telemetry-only — never something an invocation must call for correctness. */
   close(): void;
@@ -138,22 +139,18 @@ class FailOpenEmitClient implements EmitClient {
   private socket: Socket | undefined;
   private stateValue: ConnectionState = 'idle';
   private readBuffer = '';
-  /**
-   * Whether the current connection's `hello-ack` has been observed AND matched
-   * this build's protocol version (C3). Reset to `false` on every (re)connect.
-   */
+  /** Whether the current connection's `hello-ack` has been observed AND matched
+   * this build's protocol version (C3). Reset to `false` on every (re)connect. */
   private handshakeConfirmed = false;
-  /**
-   * Events written on the current connection BEFORE a matching `hello-ack` was
-   * observed — i.e. delivery to a version-compatible sidecar is not yet
-   * confirmed. On a mismatched `hello-ack` (or a drop before the ack) these are
-   * requeued into the buffer rather than lost (AUDIT-20260717-02). Cleared once
-   * a matching `hello-ack` confirms delivery to a compatible peer.
-   */
+  /** Events written on the current connection BEFORE a matching `hello-ack` — i.e.
+   * delivery to a version-compatible sidecar is not yet confirmed. On a mismatched
+   * ack (or a drop before it) these are requeued into the buffer rather than lost
+   * (AUDIT-20260717-02); cleared once a matching ack confirms delivery. Also gates
+   * the `deliveryConfirmed` signal (AUDIT-20260719-19). */
   private unconfirmed: TelemetryEvent[] = [];
   /** A background reconnect armed after a connection carrying retained events was
    * torn down (AUDIT-20260718-11), draining them to a compatible sidecar without
-   * another `emit()`. `unref()`d; cleared on (re)connect and `close()`. */
+   * another `emit()`. `unref()`d; cleared on (re)connect + `close()`. */
   private reconnectTimer: ReturnType<typeof setTimeout> | undefined;
 
   constructor(private readonly config: EmitClientConfig) {
@@ -170,6 +167,12 @@ class FailOpenEmitClient implements EmitClient {
 
   get state(): ConnectionState {
     return this.stateValue;
+  }
+
+  get deliveryConfirmed(): boolean {
+    // `unconfirmed.length === 0` is the clause beyond `buffer.size === 0`: a
+    // matching `hello-ack` clears it; a mismatch/drop leaves `connected`.
+    return this.stateValue === 'connected' && this.buffer.size === 0 && this.unconfirmed.length === 0;
   }
 
   emit(event: TelemetryEvent): void {
@@ -258,11 +261,10 @@ class FailOpenEmitClient implements EmitClient {
     // Handshake: send `hello` first (C3). We do NOT await the `hello-ack`;
     // `onData` handles a version mismatch out of band as a restart signal.
     this.writeRaw(serializeFrame(buildHelloFrame(this.localVersion)));
-    // Deliver anything held during the connect/reconnect gap. For a short-verb
-    // buffer this drains to `[]` (it dropped); for a long-run buffer it flushes
-    // the FIFO the restart gap accumulated (C4). These writes are PROVISIONAL
-    // until the `hello-ack` matches — track them so a mismatch requeues them
-    // rather than dropping them on the floor (AUDIT-20260717-02).
+    // Deliver anything held during the connect/reconnect gap (short-verb drains
+    // to `[]`; long-run flushes the restart-gap FIFO, C4). These writes are
+    // PROVISIONAL until the `hello-ack` matches — track them so a mismatch
+    // requeues rather than drops (AUDIT-20260717-02).
     for (const held of this.buffer.drain()) {
       this.writeFrame(buildEventFrame(held));
       this.unconfirmed.push(held);
@@ -282,13 +284,11 @@ class FailOpenEmitClient implements EmitClient {
         }
         const outcome = interpretHelloAck(parsed.frame, this.localVersion);
         if (outcome.kind === 'mismatch') {
-          // C3 defined restart path: an upgraded CLI met a stale sidecar. The
-          // events written before this ack went to an INCOMPATIBLE peer — requeue
-          // them so a compatible sidecar (spawned for next time) still gets them,
-          // instead of dropping them on the floor (AUDIT-20260717-02). Then drop
-          // this connection and trigger the spawn — fire-and-forget, the
-          // invocation is NEVER failed. `markUnavailable()` arms the reconnect
-          // that drains the retained events (AUDIT-20260718-11/-32).
+          // C3 restart path: an upgraded CLI met a stale sidecar. The events
+          // written before this ack went to an INCOMPATIBLE peer — `markUnavailable`
+          // requeues them (AUDIT-20260717-02) and arms the reconnect that drains
+          // them to a compatible sidecar (AUDIT-20260718-11/-32); fire-and-forget,
+          // the invocation is NEVER failed.
           this.markUnavailable();
           return;
         }
