@@ -171,12 +171,22 @@ BEFORE="$( [ -n "$ID" ] && curl -s "${AUTH[@]}" "$BASE/v1/instances/$(enc "$ID")
 note "before restart: $BEFORE"
 kill "$PLANE_PID" 2>/dev/null; wait "$PLANE_PID" 2>/dev/null; PLANE_PID=""
 : > "$TMPROOT/plane2.log"
-"$STACKCTL" plane serve --port 0 --token "$TOKEN" >"$TMPROOT/plane2.log" 2>&1 &
+# REBIND THE SAME PORT ($PORT), never a fresh ephemeral one. This mirrors the
+# REAL production model of a plane restart: the plane's address is STABLE, so a
+# restart rebinds it and the long-lived sidecar — whose STACKCTL_CP_URL was fixed
+# at its own startup and is NEVER re-pointed here — reconnects and drains the
+# events it spooled during the outage. A fresh `--port 0` would move the plane
+# out from under the still-running sidecar: every event spooled AFTER the restart
+# (the FIRST of which is Scenario 3's `phase.entered`) would uplink to the dead
+# old port forever ("fetch failed") and never reach the new plane — a HARNESS
+# artifact that masqueraded as a `phase.entered` producer defect (FR-027 S3). The
+# realistic same-port restart lets the real producer really deliver.
+"$STACKCTL" plane serve --port "$PORT" --token "$TOKEN" >"$TMPROOT/plane2.log" 2>&1 &
 PLANE_PID=$!
 PORT2=""
 for _ in $(seq 1 60); do PORT2="$(grep -oE 'port [0-9]+' "$TMPROOT/plane2.log" | grep -oE '[0-9]+' || true)"; [ -n "$PORT2" ] && break; sleep 0.2; done
 BASE="http://127.0.0.1:$PORT2"
-note "plane restarted on $BASE (pid $PLANE_PID)"
+note "plane restarted on $BASE (pid $PLANE_PID) — same port as before, so the running sidecar can still reach it"
 AFTER="$( [ -n "$ID" ] && curl -s "${AUTH[@]}" "$BASE/v1/instances/$(enc "$ID")" | jq -c '.instance | {sessionsStarted,sessionsEnded,firstSeenAt}' || echo '{}')"
 note "after  restart: $AFTER"
 if [ "$BEFORE" = "$AFTER" ] && [ "$BEFORE" != "{}" ]; then

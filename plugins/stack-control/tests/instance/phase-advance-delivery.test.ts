@@ -221,7 +221,9 @@ describe('D-E (FR-027 Scenario 3): a committed `workflow advance --apply` delive
     for (const peer of peers.splice(0)) await peer.close();
     for (const plane of planes.splice(0)) {
       const { server, dir } = plane;
-      await new Promise<void>((resolve, reject) => server.close((e) => (e ? reject(e) : resolve())));
+      // Tolerate an already-closed server: the restart test closes plane A in-body
+      // (to free its port for plane B), so its cleanup close() is a no-op here.
+      await new Promise<void>((resolve) => server.close(() => resolve()));
       rmSync(dir, { recursive: true, force: true });
     }
     for (const f of fixtures.splice(0)) f.cleanup();
@@ -237,7 +239,10 @@ describe('D-E (FR-027 Scenario 3): a committed `workflow advance --apply` delive
     return f;
   }
 
-  async function startPlane(installationId: string): Promise<RunningPlane> {
+  /** Start a real plane runtime. `port` binds a SPECIFIC TCP port (0 ⇒ ephemeral)
+   * — the restart test rebinds plane A's exact port for plane B, mirroring the
+   * dogfood's realistic same-address restart. */
+  async function startPlane(installationId: string, port = 0): Promise<RunningPlane & { port: number }> {
     const dir = mkdtempSync(join(tmpdir(), 'scf-phase-delivery-plane-'));
     const runtime = createPlaneRuntime({
       acceptedTokens: new Map([[TOKEN, installationId]]),
@@ -247,16 +252,17 @@ describe('D-E (FR-027 Scenario 3): a committed `workflow advance --apply` delive
     const server = runtime.createServer();
     await new Promise<void>((resolve, reject) => {
       server.once('error', reject);
-      server.listen(0, '127.0.0.1', () => {
+      server.listen(port, '127.0.0.1', () => {
         server.removeListener('error', reject);
         resolve();
       });
     });
     const address = server.address();
     if (address === null || typeof address === 'string') throw new Error('startPlane: expected a bound TCP AddressInfo');
-    const running: RunningPlane = { server, baseUrl: `http://127.0.0.1:${(address as AddressInfo).port}`, dir };
+    const boundPort = (address as AddressInfo).port;
+    const running: RunningPlane = { server, baseUrl: `http://127.0.0.1:${boundPort}`, dir };
     planes.push(running);
-    return running;
+    return { ...running, port: boundPort };
   }
 
   it('RED discriminator: phase.entered is delivered to the sidecar BY THE TIME emitAdvance returns, and currentBearing derives {phase,item}', async () => {
@@ -346,4 +352,59 @@ describe('D-E (FR-027 Scenario 3): a committed `workflow advance --apply` delive
 
     expect(await bearingAtPlane(plane.baseUrl, id)).toEqual(EXPECTED_BEARING);
   }, 20_000);
+
+  // FR-027 Scenario 3 × SC-006 restart — the FAITHFUL reproduction of the dogfood
+  // loss the plain end-to-end test above MISSES. The dogfood restarts the plane
+  // mid-run (SC-006) BEFORE driving the Scenario 3 `workflow advance`. The producer
+  // path is correct (the test above proves it), so the loss is NOT in
+  // phase.entered — it is that a plane restart must not strand the still-running,
+  // fixed-URL sidecar. This test drives a REAL sidecar delivering to plane A, stops
+  // plane A, brings a plane back up AT THE SAME ADDRESS (the realistic model: a
+  // plane rebinds its stable address across its own restart), then drives the REAL
+  // committed advance and asserts the POST-restart phase.entered reaches
+  // currentBearing. Binding a NEW address instead (what the pre-fix dogfood did via
+  // `--port 0`) is the exact stranding that produced `currentBearing: null` and
+  // masqueraded as a producer defect.
+  it('across a plane restart at the same address, a committed advance still surfaces currentBearing (FR-027 S3 × SC-006)', async () => {
+    const f = drivableInstall();
+    const installationId = mintOrReadInstallationId(f.root);
+    const location = locateMachineState(f.root);
+    openTokenCustody(location.durableDir).write(TOKEN);
+
+    // Plane A: the address the sidecar is pointed at for its whole life (its
+    // planeUrl is fixed at daemon startup and never re-pointed — like production).
+    const planeA = await startPlane(installationId);
+    const daemon = runSidecarDaemon({
+      installationRoot: f.root,
+      planeUrl: planeA.baseUrl,
+      drainIntervalMs: 5,
+      livenessIntervalMs: 600_000,
+    });
+    daemons.push(daemon);
+    const start = await daemon.started;
+    if (start.kind !== 'won') throw new Error('expected a won sidecar election');
+
+    // Restart the plane: stop A (freeing its port), bring B up at the SAME port.
+    // The sidecar keeps running, still pointed at planeA.baseUrl === planeB.baseUrl.
+    await new Promise<void>((resolve) => planeA.server.close(() => resolve()));
+    const planeB = await startPlane(installationId, planeA.port);
+    expect(planeB.baseUrl).toBe(planeA.baseUrl);
+
+    // The REAL committed transition emits phase.entered AFTER the restart — the
+    // record the dogfood lost. The sidecar spools it, then its drain retries the
+    // uplink until plane B answers (bounded backoff), delivering it.
+    await emitAdvance(ITEM, true, {});
+
+    const id = deriveInstanceId(f.root);
+    await pollUntil(
+      async () => {
+        const bearing = await bearingAtPlane(planeB.baseUrl, id);
+        return isRecord(bearing) && bearing.phase === 'designing' && bearing.item === ITEM;
+      },
+      8000,
+      'GET /v1/instances/:id at the RESTARTED plane to show currentBearing = {phase: designing, item}',
+    );
+
+    expect(await bearingAtPlane(planeB.baseUrl, id)).toEqual(EXPECTED_BEARING);
+  }, 25_000);
 });
