@@ -100,7 +100,16 @@ function raw(
   type: EventType,
   classification: EventClassification = 'durable',
 ): RawInvocationEvent {
-  return { installationId, invocationId, runId, type, classification };
+  return {
+    installationId,
+    invocationId,
+    runId,
+    type,
+    classification,
+    host: 'test-host',
+    path: '/test/installation/root',
+    sessionId: null,
+  };
 }
 
 describe('sidecar pipeline -> plane ingest -> registry: duplicate + reordered delivery (T079, SC-015)', () => {

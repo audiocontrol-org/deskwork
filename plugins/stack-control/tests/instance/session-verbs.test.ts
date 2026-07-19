@@ -293,7 +293,12 @@ describe('session-start / session-end telemetry producers (T025, FR-007/FR-009a/
     expect(abandoned?.snapshot.reason).toBe('abandoned');
 
     // Both sessions' session.started events are present (new mint always fires
-    // its own session.started — supersede does not swallow it).
+    // its own session.started — supersede does not swallow it). The second
+    // session.started is fire-and-forget, so wait for BOTH to arrive before
+    // asserting — otherwise this races under heavy parallel load.
+    await waitUntil(
+      () => eventPairs(peer).filter((e) => e.envelope.type === 'session.started').length >= 2,
+    );
     const startedIds = eventPairs(peer)
       .filter((e) => e.envelope.type === 'session.started')
       .map((e) => e.snapshot.sessionId)

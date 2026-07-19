@@ -31,21 +31,24 @@
  * EventFrame(TelemetryEvent) → pipeline.receive(RawInvocationEvent) IMPEDANCE
  * (flagged, not silently papered over): the local socket's `event` frame
  * carries a FULL, RAW `TelemetryEvent` (FR-047 — redaction is the sidecar's
- * job, not the CLI's). `pipeline.receive` takes the narrower
- * `RawInvocationEvent` (identity + type + classification) and MINTS its own
- * `eventId` + BOTH sequences and REDACTS before spooling. So we extract the
- * five identity/classification fields off `frame.event.envelope` and hand them
- * to the pipeline — which spools a fresh, sidecar-sequenced, REDACTED event.
- * The inbound frame's own `eventId`/sequences are deliberately discarded (the
- * sidecar is the authoritative durable outbound counter, FR-039). The pipeline
- * CAN now carry a redactable snapshot (pipeline.ts's `RawSnapshot`,
- * AUDIT-20260717-12), but the daemon does NOT yet thread the inbound
- * `frame.event.snapshot` through, because the local-socket `event` frame
- * carries no per-field `FieldAllowlist` — with none, deny-by-default would drop
- * every snapshot field anyway. Threading it needs the local-socket protocol to
- * carry a field policy (out of scope here); until then the daemon spools
- * identity-only. What matters for FR-048 is preserved either way: redaction
- * still runs inside `receive()` BEFORE the WAL append.
+ * job, not the CLI's). `pipeline.receive` takes `RawInvocationEvent` and MINTS
+ * its own `eventId` + BOTH sequences before spooling. So we thread the
+ * identity/classification fields off `frame.event.envelope` to the pipeline —
+ * which spools a fresh, sidecar-sequenced event. The inbound frame's own
+ * `eventId`/sequences are deliberately discarded (the sidecar is the
+ * authoritative durable outbound counter, FR-039/040/049) — those three, and
+ * ONLY those, are re-minted. The instance identity is PRESERVED, NOT re-derived
+ * (specs/037): `env.host`/`env.path` (the producer's realpath-resolved identity
+ * of the OBSERVED install, not the sidecar's own spool dir) and `env.sessionId`
+ * (context only the producer knows) are threaded through so the re-minted
+ * envelope carries them intact. The snapshot is threaded too
+ * (`bareSnapshot: frame.event.snapshot`): the pipeline carries the producer's
+ * BARE, already-safe status snapshot through INTACT for the specs/037
+ * durable-identity event types (`session.started`/`session.ended`/
+ * `phase.entered`), and for every OTHER type travels the 036
+ * `{content,allowlist}` deny-by-default redaction path unchanged. What matters
+ * for FR-048 is preserved either way: redaction still runs inside `receive()`
+ * BEFORE the WAL append for the 036 path.
  *
  * PLANE-URL / TOKEN RESOLUTION: the uplink is ACTIVE only when BOTH a plane URL
  * (explicit option ?? `STACKCTL_CP_URL`) AND a provisioned bearer token
@@ -255,6 +258,19 @@ export function runSidecarDaemon(options: SidecarDaemonOptions): SidecarDaemonHa
       runId: env.runId,
       type: env.type,
       classification: env.classification,
+      // specs/037: PRESERVE the producer's instance identity. host/path were
+      // derived by the producer from the REAL install root (realpath); sessionId
+      // is context only the producer knows. Threading them lets the pipeline
+      // re-mint carry them through instead of re-deriving host/path from the
+      // spool dir / hardcoding sessionId null.
+      host: env.host,
+      path: env.path,
+      sessionId: env.sessionId,
+      // The producer's bare snapshot. The pipeline carries it through INTACT for
+      // the specs/037 durable-identity event types (session.started/ended,
+      // phase.entered) and ignores it for every other type (which travels the
+      // 036 {content,allowlist} redaction path).
+      bareSnapshot: frame.event.snapshot,
     });
   };
   const onFrame: ReceivedFrameHandler = (frame) => {

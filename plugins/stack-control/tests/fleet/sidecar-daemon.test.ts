@@ -45,7 +45,7 @@ import { locateMachineState } from '../../src/machine-state/locate.js';
 import { mintOrReadInstallationId } from '../../src/machine-state/identity.js';
 import { openTokenCustody } from '../../src/machine-state/token.js';
 import { mintUuidV7 } from '../../src/fleet/types.js';
-import type { TelemetryEvent } from '../../src/fleet/event.js';
+import type { SnapshotPayload, TelemetryEvent } from '../../src/fleet/event.js';
 import type { Clock } from '../../src/fleet/clock.js';
 import { buildEventFrame, serializeFrame } from '../../src/telemetry/protocol.js';
 import { runSidecarDaemon } from '../../src/sidecar/daemon.js';
@@ -259,25 +259,122 @@ async function startStubPlaneRejectingPoison(poisonRunId: string): Promise<StubP
   return { server, baseUrl: `http://127.0.0.1:${address.port}`, ingested };
 }
 
-function makeTelemetryEvent(installationId: string, runId: string, type: string): TelemetryEvent {
+/** What a capturing plane records off each POSTed `/v1/ingest` body — the
+ * instance-identity envelope fields plus the top-level snapshot, as they land
+ * on the wire AFTER the sidecar re-mint. specs/037 requires these survive the
+ * producer -> frame -> daemon -> receive() -> uplink -> plane path intact. */
+interface CapturedIngest {
+  readonly runId: string | undefined;
+  readonly host: unknown;
+  readonly path: unknown;
+  readonly sessionId: unknown;
+  readonly schemaVersion: unknown;
+  readonly snapshot: unknown;
+}
+
+interface CapturingPlane {
+  readonly server: Server;
+  readonly baseUrl: string;
+  readonly captured: CapturedIngest[];
+}
+
+/** Parse a POSTed ingest body into the identity fields the specs/037 assertions
+ * inspect. Reads `envelope.{runId,host,path,sessionId,schemaVersion}` and the
+ * top-level `snapshot` — the extension of `runIdFromIngestBody` this test needs. */
+function captureIngestBody(raw: string): CapturedIngest | undefined {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return undefined;
+  }
+  if (!isRecord(parsed) || !isRecord(parsed.envelope)) return undefined;
+  const env = parsed.envelope;
+  return {
+    runId: typeof env.runId === 'string' ? env.runId : undefined,
+    host: env.host,
+    path: env.path,
+    sessionId: env.sessionId,
+    schemaVersion: env.schemaVersion,
+    snapshot: parsed.snapshot,
+  };
+}
+
+/** A REAL in-process `node:http` plane that 200-ingests every record and
+ * CAPTURES its identity fields + snapshot for inspection, and 200s every other
+ * route (liveness, SSE stream). */
+async function startCapturingPlane(): Promise<CapturingPlane> {
+  const captured: CapturedIngest[] = [];
+  const server = createHttpServer((req, res) => {
+    if (req.method === 'POST' && req.url === '/v1/ingest') {
+      let raw = '';
+      req.setEncoding('utf8');
+      req.on('data', (chunk: string) => {
+        raw += chunk;
+      });
+      req.on('end', () => {
+        const entry = captureIngestBody(raw);
+        if (entry !== undefined) captured.push(entry);
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end('{}');
+      });
+      return;
+    }
+    res.writeHead(200, { 'content-type': 'text/plain' });
+    res.end('');
+  });
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', () => {
+      server.removeListener('error', reject);
+      resolve();
+    });
+  });
+  const address = server.address();
+  if (address === null || typeof address === 'string') {
+    throw new Error('startCapturingPlane: expected a bound TCP AddressInfo');
+  }
+  return { server, baseUrl: `http://127.0.0.1:${address.port}`, captured };
+}
+
+/** Optional producer-side overrides so a test can stamp a DISTINCT instance
+ * identity (host/path), a NON-NULL Claude Code sessionId, and a BARE 037
+ * snapshot onto the wire event — the exact fields specs/037 requires survive
+ * the sidecar re-mint intact. */
+interface TelemetryEventOverrides {
+  readonly host?: string;
+  readonly path?: string;
+  readonly sessionId?: string | null;
+  readonly snapshot?: SnapshotPayload;
+  readonly invocationId?: string;
+}
+
+function makeTelemetryEvent(
+  installationId: string,
+  runId: string,
+  type: string,
+  overrides?: TelemetryEventOverrides,
+): TelemetryEvent {
   return {
     envelope: {
       eventId: mintUuidV7(),
       installationId,
-      invocationId: 'invocation-daemon-1',
+      invocationId: overrides?.invocationId ?? 'invocation-daemon-1',
       runId,
       installationSequence: 1,
       invocationSequence: 1,
-      schemaVersion: 1,
+      // specs/037: all producers stamp schemaVersion 2 (the envelope now carries
+      // the instance-identity fields host/path/sessionId).
+      schemaVersion: 2,
       type,
       wallClock: new Date().toISOString(),
       monotonicOffsetMs: 7,
       classification: 'durable',
-      host: 'test-host',
-      path: '/test/installation/root',
-      sessionId: null,
+      host: overrides?.host ?? 'test-host',
+      path: overrides?.path ?? '/test/installation/root',
+      sessionId: overrides?.sessionId ?? null,
     },
-    snapshot: {},
+    snapshot: overrides?.snapshot ?? {},
   };
 }
 
@@ -336,6 +433,7 @@ describe('sidecar daemon — runnable end-to-end (specs/036 sidecar-daemon)', ()
   let plane: RunningPlane | undefined;
   let stub: StubPlane | undefined;
   let authStub: AuthGateStubPlane | undefined;
+  let captureStub: CapturingPlane | undefined;
   let daemon: { started: Promise<unknown>; stop(): Promise<void> } | undefined;
   let client: Socket | undefined;
 
@@ -369,6 +467,13 @@ describe('sidecar daemon — runnable end-to-end (specs/036 sidecar-daemon)', ()
         server.close((error) => (error ? reject(error) : resolve()));
       });
       authStub = undefined;
+    }
+    if (captureStub !== undefined) {
+      const { server } = captureStub;
+      await new Promise<void>((resolve, reject) => {
+        server.close((error) => (error ? reject(error) : resolve()));
+      });
+      captureStub = undefined;
     }
   });
 
@@ -456,6 +561,9 @@ describe('sidecar daemon — runnable end-to-end (specs/036 sidecar-daemon)', ()
       runId: 'before',
       type: 'run.started',
       classification: 'durable',
+      host: 'test-host',
+      path: '/test/installation/root',
+      sessionId: null,
     });
     await pipeline.receive({
       installationId,
@@ -463,6 +571,9 @@ describe('sidecar daemon — runnable end-to-end (specs/036 sidecar-daemon)', ()
       runId: 'poison',
       type: 'run.progress',
       classification: 'durable',
+      host: 'test-host',
+      path: '/test/installation/root',
+      sessionId: null,
     });
     await pipeline.receive({
       installationId,
@@ -470,6 +581,9 @@ describe('sidecar daemon — runnable end-to-end (specs/036 sidecar-daemon)', ()
       runId: 'after',
       type: 'run.completed',
       classification: 'durable',
+      host: 'test-host',
+      path: '/test/installation/root',
+      sessionId: null,
     });
 
     stub = await startStubPlaneRejectingPoison('poison');
@@ -575,6 +689,9 @@ describe('sidecar daemon — runnable end-to-end (specs/036 sidecar-daemon)', ()
       runId: 'authloss-a',
       type: 'run.started',
       classification: 'durable',
+      host: 'test-host',
+      path: '/test/installation/root',
+      sessionId: null,
     });
     await pipeline.receive({
       installationId,
@@ -582,6 +699,9 @@ describe('sidecar daemon — runnable end-to-end (specs/036 sidecar-daemon)', ()
       runId: 'authloss-b',
       type: 'run.completed',
       classification: 'durable',
+      host: 'test-host',
+      path: '/test/installation/root',
+      sessionId: null,
     });
 
     // The plane refuses the bearer token (401) until we flip `accept`.
@@ -636,6 +756,84 @@ describe('sidecar daemon — runnable end-to-end (specs/036 sidecar-daemon)', ()
 
     // No record was ever recorded as a permanent drop during the auth window.
     expect(dropped).toEqual([]);
+
+    rmSync(installationRoot, { recursive: true, force: true });
+  });
+
+  it('specs/037 T044: preserves the producer envelope host/path/sessionId AND the bare 037 snapshot through the real frame -> daemon -> receive() -> uplink -> plane path', async () => {
+    const installationRoot = mkdtempSync(join(tmpdir(), 'scf-sidecar-daemon-root-'));
+    const installationId = mintOrReadInstallationId(installationRoot);
+    const location = locateMachineState(installationRoot);
+    openTokenCustody(location.durableDir).write(TOKEN);
+
+    captureStub = await startCapturingPlane();
+
+    daemon = runSidecarDaemon({
+      installationRoot,
+      planeUrl: captureStub.baseUrl,
+      drainIntervalMs: 5,
+      livenessIntervalMs: 5,
+    });
+    const start = (await daemon.started) as { kind: string; socketPath?: string };
+    expect(start.kind).toBe('won');
+    if (start.socketPath === undefined) {
+      throw new Error('won election must report the bound socketPath');
+    }
+
+    // A producer-shaped event carrying a DISTINCT instance identity (host/path
+    // NOT the sidecar's own hostname/spool dir), a NON-NULL Claude Code
+    // sessionId, and a BARE 037 status snapshot ({phase, from, item} — the
+    // phase.entered producer's exact shape). specs/037: NONE of these may be
+    // re-derived from the spool dir, hardcoded to null, or clobbered to {} by
+    // the 036 deny-by-default redaction path.
+    const distinctHost = 'producer-host.example';
+    const distinctPath = '/real/observed/installation/root';
+    const sessionId = 'session-037-abc';
+    const bareSnapshot: SnapshotPayload = {
+      phase: 'implementing',
+      from: 'planning',
+      item: 'feature/x',
+    };
+    const event = makeTelemetryEvent(installationId, 'run-identity', 'phase.entered', {
+      host: distinctHost,
+      path: distinctPath,
+      sessionId,
+      snapshot: bareSnapshot,
+      invocationId: 'invocation-identity-1',
+    });
+
+    const socketPath = start.socketPath;
+    client = createConnection(socketPath);
+    await new Promise<void>((resolve, reject) => {
+      client?.once('connect', resolve);
+      client?.once('error', reject);
+    });
+    client.write(serializeFrame(buildEventFrame(event)));
+
+    // The event must ARRIVE AT THE PLANE (poll the capture) with identity + the
+    // bare snapshot intact.
+    await pollUntil(
+      async () =>
+        captureStub !== undefined &&
+        captureStub.captured.some((c) => c.runId === 'run-identity'),
+      4000,
+      'the phase.entered event to reach the plane carrying its producer identity',
+    );
+
+    const arrived = captureStub.captured.find((c) => c.runId === 'run-identity');
+    if (arrived === undefined) {
+      throw new Error('expected the run-identity event to have reached the plane');
+    }
+    // Producer instance identity PRESERVED (not re-derived from the spool dir).
+    expect(arrived.host).toBe(distinctHost);
+    expect(arrived.path).toBe(distinctPath);
+    // sessionId PRESERVED (not hardcoded null).
+    expect(arrived.sessionId).toBe(sessionId);
+    // schemaVersion 2 (specs/037 — all producers stamp 2).
+    expect(arrived.schemaVersion).toBe(2);
+    // The BARE 037 snapshot survived intact (not clobbered to {} by the 036
+    // {content,allowlist} deny-by-default redaction path).
+    expect(arrived.snapshot).toEqual(bareSnapshot);
 
     rmSync(installationRoot, { recursive: true, force: true });
   });

@@ -77,6 +77,12 @@ describe('spool-redacted (SC-013 — on-disk redaction guarantee via the real pi
           runId: 'run-test-789',
           type: 'run.failed',
           classification: 'durable',
+          // Instance identity is the UN-redacted envelope key (specs/037) — it is
+          // NOT snapshot content, so it must NOT collide with the redaction-secret
+          // strings this test asserts are absent from disk. Deliberately benign.
+          host: 'wal-host',
+          path: '/observed/install/root',
+          sessionId: null,
           snapshot: { content: rawSnapshotContent, allowlist },
         });
 
@@ -129,6 +135,9 @@ describe('spool-redacted (SC-013 — on-disk redaction guarantee via the real pi
         runId: 'run-test-789',
         type: 'run.started',
         classification: 'durable',
+        host: 'wal-host',
+        path: '/observed/install/root',
+        sessionId: null,
       });
       expect(event.snapshot).toEqual({});
 

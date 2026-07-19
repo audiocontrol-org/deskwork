@@ -80,6 +80,9 @@ describe('pipeline invocationSequence recovery across restart (AUDIT-20260718-07
         runId: 'run-1',
         type: 'run.started',
         classification: 'durable',
+        host: 'h',
+        path: '/p',
+        sessionId: null,
       });
       const e2 = await p1.receive({
         installationId: 'inst-1',
@@ -87,6 +90,9 @@ describe('pipeline invocationSequence recovery across restart (AUDIT-20260718-07
         runId: 'run-1',
         type: 'run.progress',
         classification: 'durable',
+        host: 'h',
+        path: '/p',
+        sessionId: null,
       });
       expect(e1.envelope.invocationSequence).toBe(1);
       expect(e2.envelope.invocationSequence).toBe(2);
@@ -99,6 +105,9 @@ describe('pipeline invocationSequence recovery across restart (AUDIT-20260718-07
         runId: 'run-1',
         type: 'run.completed',
         classification: 'durable',
+        host: 'h',
+        path: '/p',
+        sessionId: null,
       });
 
       // Pre-fix: invocationSequences seeded empty -> e3 regresses to 1 (below the
@@ -116,16 +125,16 @@ describe('pipeline invocationSequence recovery across restart (AUDIT-20260718-07
     try {
       const p1 = createPipeline(walDir, { redactionContext: FAKE_CTX });
       // invA gets three events, invB gets one — interleaved.
-      await p1.receive({ installationId: 'i', invocationId: 'invA', runId: null, type: 'run.started', classification: 'durable' });
-      await p1.receive({ installationId: 'i', invocationId: 'invB', runId: null, type: 'run.started', classification: 'durable' });
-      await p1.receive({ installationId: 'i', invocationId: 'invA', runId: null, type: 'run.progress', classification: 'durable' });
-      const a3 = await p1.receive({ installationId: 'i', invocationId: 'invA', runId: null, type: 'run.progress', classification: 'durable' });
+      await p1.receive({ installationId: 'i', invocationId: 'invA', runId: null, type: 'run.started', classification: 'durable', host: 'h', path: '/p', sessionId: null });
+      await p1.receive({ installationId: 'i', invocationId: 'invB', runId: null, type: 'run.started', classification: 'durable', host: 'h', path: '/p', sessionId: null });
+      await p1.receive({ installationId: 'i', invocationId: 'invA', runId: null, type: 'run.progress', classification: 'durable', host: 'h', path: '/p', sessionId: null });
+      const a3 = await p1.receive({ installationId: 'i', invocationId: 'invA', runId: null, type: 'run.progress', classification: 'durable', host: 'h', path: '/p', sessionId: null });
       expect(a3.envelope.invocationSequence).toBe(3);
 
       // Restart.
       const p2 = createPipeline(walDir, { redactionContext: FAKE_CTX });
-      const aNext = await p2.receive({ installationId: 'i', invocationId: 'invA', runId: null, type: 'run.completed', classification: 'durable' });
-      const bNext = await p2.receive({ installationId: 'i', invocationId: 'invB', runId: null, type: 'run.completed', classification: 'durable' });
+      const aNext = await p2.receive({ installationId: 'i', invocationId: 'invA', runId: null, type: 'run.completed', classification: 'durable', host: 'h', path: '/p', sessionId: null });
+      const bNext = await p2.receive({ installationId: 'i', invocationId: 'invB', runId: null, type: 'run.completed', classification: 'durable', host: 'h', path: '/p', sessionId: null });
 
       // invA continues at 4 (its max was 3); invB continues at 2 (its max was 1).
       expect(aNext.envelope.invocationSequence).toBe(4);
@@ -139,11 +148,11 @@ describe('pipeline invocationSequence recovery across restart (AUDIT-20260718-07
     const walDir = mkdtempSync(join(tmpdir(), 'pipeline-restart-new-'));
     try {
       const p1 = createPipeline(walDir, { redactionContext: FAKE_CTX });
-      await p1.receive({ installationId: 'i', invocationId: 'old-inv', runId: null, type: 'run.started', classification: 'durable' });
-      await p1.receive({ installationId: 'i', invocationId: 'old-inv', runId: null, type: 'run.progress', classification: 'durable' });
+      await p1.receive({ installationId: 'i', invocationId: 'old-inv', runId: null, type: 'run.started', classification: 'durable', host: 'h', path: '/p', sessionId: null });
+      await p1.receive({ installationId: 'i', invocationId: 'old-inv', runId: null, type: 'run.progress', classification: 'durable', host: 'h', path: '/p', sessionId: null });
 
       const p2 = createPipeline(walDir, { redactionContext: FAKE_CTX });
-      const fresh = await p2.receive({ installationId: 'i', invocationId: 'brand-new-inv', runId: null, type: 'run.started', classification: 'durable' });
+      const fresh = await p2.receive({ installationId: 'i', invocationId: 'brand-new-inv', runId: null, type: 'run.started', classification: 'durable', host: 'h', path: '/p', sessionId: null });
       expect(fresh.envelope.invocationSequence).toBe(1);
     } finally {
       rmSync(walDir, { recursive: true });
@@ -160,9 +169,9 @@ describe('pipeline sequence recovery is serialized under concurrent receive() (A
       // (nextInstallationSequence === null) and must recover from disk, same
       // as a real restart.
       const seeder = createPipeline(walDir, { redactionContext: FAKE_CTX });
-      await seeder.receive({ installationId: 'inst-1', invocationId: 'seed-inv', runId: null, type: 'run.started', classification: 'durable' });
-      await seeder.receive({ installationId: 'inst-1', invocationId: 'seed-inv', runId: null, type: 'run.progress', classification: 'durable' });
-      await seeder.receive({ installationId: 'inst-1', invocationId: 'seed-inv', runId: null, type: 'run.progress', classification: 'durable' });
+      await seeder.receive({ installationId: 'inst-1', invocationId: 'seed-inv', runId: null, type: 'run.started', classification: 'durable', host: 'h', path: '/p', sessionId: null });
+      await seeder.receive({ installationId: 'inst-1', invocationId: 'seed-inv', runId: null, type: 'run.progress', classification: 'durable', host: 'h', path: '/p', sessionId: null });
+      await seeder.receive({ installationId: 'inst-1', invocationId: 'seed-inv', runId: null, type: 'run.progress', classification: 'durable', host: 'h', path: '/p', sessionId: null });
 
       // --- the fresh pipeline under test. nextInstallationSequence is still
       // null at this point — no receive() has run on THIS instance yet.
@@ -187,6 +196,9 @@ describe('pipeline sequence recovery is serialized under concurrent receive() (A
             runId: null,
             type: 'run.progress',
             classification: 'durable',
+            host: 'h',
+            path: '/p',
+            sessionId: null,
           }),
         ),
       );

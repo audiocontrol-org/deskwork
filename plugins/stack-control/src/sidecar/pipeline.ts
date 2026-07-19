@@ -47,26 +47,22 @@
  *     survives sidecar restart the same way the WAL itself does) and
  *     consistent by construction (this pipeline performs exactly one
  *     `append()` per `receive()`, so the locally-tracked next value always
- *     equals the sequence the WAL is about to assign). This avoids a second,
- *     independently-drifting durable store for what is, functionally, the
- *     same "how many things has this sidecar spooled" count the WAL already
- *     keeps (contrast with `src/cli.ts`'s short-verb emit path, which has no
- *     WAL of its own and instead sources this counter from the
- *     machine-state high-water mark, `src/machine-state/highwater.ts` — both
- *     are legitimate durable sources per this task's brief; this module
- *     picks the WAL because it already durably counts exactly the thing
- *     this pipeline is doing: spooling).
+ *     equals the sequence the WAL is about to assign). This reuses the WAL's
+ *     own durable count rather than standing up a second, independently-
+ *     drifting durable store (contrast `src/cli.ts`'s short-verb emit path,
+ *     which has no WAL and instead sources this counter from the machine-state
+ *     high-water mark, `src/machine-state/highwater.ts`).
  *
- * NORMALIZE+REDACT (AUDIT-20260717-12): `RawInvocationEvent` now carries an
- * OPTIONAL `snapshot` — raw, un-redacted free-text/path/commit-message/error
- * content plus its per-field `FieldAllowlist`. When present, `receive()`
- * redacts it (via `redactEvent` from `src/fleet/redact.ts`) BEFORE the WAL
- * append, so the bytes on disk are ALREADY the redacted bytes (FR-047/048,
- * SC-013). When absent, the redacted snapshot is `{}` — the redaction STAGE
- * still runs (over an empty payload) so the ORDERING invariant holds
- * identically on both paths. The `RedactionContext` is an injected DI seam
- * (default `createSystemRedactionContext(walDir)`) so a test can drive a
- * deterministic context rather than the real machine's home/user/hostname.
+ * SNAPSHOT (AUDIT-20260717-12; specs/037): `receive()` picks a snapshot path by
+ * event TYPE. The 036 path redacts a `{content,allowlist}` snapshot (via
+ * `redactEvent`) BEFORE the WAL append so the bytes on disk are ALREADY redacted
+ * (FR-047/048, SC-013); an absent snapshot still runs the stage over `{}` so the
+ * ORDERING invariant holds. The specs/037 `BARE_SNAPSHOT_EVENT_TYPES` instead
+ * carry the producer's already-safe bare status snapshot through INTACT (see
+ * `RawInvocationEvent.bareSnapshot`). The `RedactionContext` is an injected DI
+ * seam (default `createSystemRedactionContext(walDir)`) for deterministic tests.
+ * IDENTITY (specs/037): `receive()` PRESERVES the producer's host/path/sessionId
+ * onto the re-minted envelope; only eventId + both sequences are re-minted.
  *
  * No `any`, no `as`, no `@ts-ignore` (Constitution Principle VI). Relative
  * `.js` imports under node16 resolution (no `@/` alias configured in this
@@ -77,7 +73,7 @@
 import { SystemClock, type Clock } from '../fleet/clock.js';
 import { constructEnvelope, type SnapshotPayload, type TelemetryEvent } from '../fleet/event.js';
 import { knownEventTypes } from '../fleet/classification.js';
-import type { EventClassification, EventType } from '../fleet/types.js';
+import type { EventClassification, EventEnvelope, EventType } from '../fleet/types.js';
 import {
   createSystemRedactionContext,
   redactEvent,
@@ -109,13 +105,44 @@ export interface RawInvocationEvent {
   readonly type: EventType;
   readonly classification: EventClassification;
   /**
-   * Optional raw, UN-redacted snapshot content plus the per-field policy the
-   * pipeline redacts it under. Present ⇒ `receive()` runs `redactEvent` over
-   * `content`/`allowlist` and spools the REDACTED result BEFORE the WAL append
-   * (FR-047/048, AUDIT-20260717-12). Absent ⇒ the spooled snapshot is `{}`.
+   * The observed instance's identity (specs/037 § D8), PRESERVED onto the
+   * re-minted envelope. The producer derived host/path from the REAL install root
+   * (realpath), so the sidecar carries them through rather than re-derive from its
+   * spool dir; only the producer knows `sessionId`, so it is threaded here (never
+   * hardcoded null). eventId + both sequences stay sidecar-authoritative
+   * (FR-039/040/049) — those, and only those, are NOT preserved from the inbound.
+   */
+  readonly host: string;
+  readonly path: string;
+  readonly sessionId: string | null;
+  /**
+   * Optional raw, UN-redacted `{content, allowlist}` snapshot. Present ⇒
+   * `receive()` `redactEvent`s it and spools the REDACTED result BEFORE the WAL
+   * append (FR-047/048, AUDIT-20260717-12). Used by the 036 path only — every
+   * type EXCEPT the specs/037 durable-identity types (see `bareSnapshot`).
    */
   readonly snapshot?: RawSnapshot;
+  /**
+   * Optional BARE, already-safe status snapshot (specs/037) — e.g. `{phase, from,
+   * item}` / `{sessionId, startedAt}`. Carried through INTACT (NOT the
+   * deny-by-default `{content,allowlist}` redaction, which would drop every field
+   * for lack of an allowlist) for `BARE_SNAPSHOT_EVENT_TYPES` only; the plane
+   * re-bounds it via `validateSnapshot` (≤32 KiB, no history arrays).
+   */
+  readonly bareSnapshot?: SnapshotPayload;
 }
+
+/**
+ * The specs/037 durable event types whose BARE status snapshot survives to the
+ * plane INTACT. A CLOSED set, so the passthrough does NOT open a general "bare
+ * snapshot bypasses redaction" hole — every OTHER type still travels the 036
+ * `{content,allowlist}` deny-by-default redaction path (FR-047/048).
+ */
+const BARE_SNAPSHOT_EVENT_TYPES: ReadonlySet<EventType> = new Set<EventType>([
+  'session.started',
+  'session.ended',
+  'phase.entered',
+]);
 
 /**
  * A raw snapshot as handed to the pipeline: the un-redacted content and the
@@ -264,6 +291,11 @@ function validateAndNormalize(raw: RawInvocationEvent): RawInvocationEvent {
     runId: requireNullableString(raw.runId, 'runId'),
     type: requireEventType(raw.type, 'type'),
     classification: requireClassification(raw.classification),
+    // Instance identity (specs/037) — validated + carried through so the re-mint
+    // PRESERVES the producer's host/path/sessionId rather than re-deriving them.
+    host: requireNonEmptyString(raw.host, 'host'),
+    path: requireNonEmptyString(raw.path, 'path'),
+    sessionId: requireNullableString(raw.sessionId, 'sessionId'),
   };
 }
 
@@ -403,19 +435,21 @@ export function createPipeline(walDir: string, options?: PipelineOptions): Sidec
       // 1. validate
       const raw = validateAndNormalize(rawInput);
 
-      // 2. normalize+redact — BEFORE spooling (FR-048/049, module header).
-      // If the event carries snapshot content, redact it under its own
-      // allowlist; otherwise redact an empty payload (still runs the stage at
-      // the correct position, yielding `{}`). The redacted output IS the
-      // snapshot that reaches disk — raw content NEVER does (AUDIT-20260717-12).
-      const rawSnapshot = rawInput.snapshot;
-      const snapshotContent = rawSnapshot?.content ?? EMPTY_SNAPSHOT_CONTENT;
-      const snapshotAllowlist = rawSnapshot?.allowlist ?? EMPTY_SNAPSHOT_ALLOWLIST;
-      const snapshot: Readonly<Record<string, unknown>> = redactEvent(
-        snapshotContent,
-        snapshotAllowlist,
-        redactionContext,
-      );
+      // 2. normalize snapshot — BEFORE spooling (FR-048/049, module header).
+      // TWO paths, chosen by event TYPE (never a general redaction bypass):
+      // BARE_SNAPSHOT_EVENT_TYPES (specs/037) carry the producer's bare,
+      // already-safe status snapshot through INTACT (the plane re-bounds it via
+      // validateSnapshot); every OTHER type is the 036 path, UNCHANGED — redact
+      // under its own allowlist (or `{}`) so raw content NEVER reaches disk.
+      let snapshot: Readonly<Record<string, unknown>>;
+      if (BARE_SNAPSHOT_EVENT_TYPES.has(raw.type)) {
+        snapshot = rawInput.bareSnapshot ?? EMPTY_SNAPSHOT_CONTENT;
+      } else {
+        const rawSnapshot = rawInput.snapshot;
+        const snapshotContent = rawSnapshot?.content ?? EMPTY_SNAPSHOT_CONTENT;
+        const snapshotAllowlist = rawSnapshot?.allowlist ?? EMPTY_SNAPSHOT_ALLOWLIST;
+        snapshot = redactEvent(snapshotContent, snapshotAllowlist, redactionContext);
+      }
 
       // 3. assign eventId + sequence. `constructEnvelope` mints `eventId`
       // internally (mintUuidV7) — never passed in, per its own contract.
@@ -424,7 +458,7 @@ export function createPipeline(walDir: string, options?: PipelineOptions): Sidec
       const installationSequence = takeInstallationSequence();
       const invocationSequence = nextInvocationSequence(raw.invocationId);
 
-      const envelope = constructEnvelope(
+      const constructed = constructEnvelope(
         clock,
         originMonotonicMs,
         {
@@ -436,11 +470,22 @@ export function createPipeline(walDir: string, options?: PipelineOptions): Sidec
           schemaVersion: SCHEMA_VERSION,
           type: raw.type,
           classification: raw.classification,
-          // The current-session read is a later task (T019); null for now.
-          sessionId: null,
+          sessionId: raw.sessionId, // PRODUCER's — preserved, never hardcoded null
         },
-        walDir, // the pipeline's on-disk root — host/path derived by construction (FR-011)
+        walDir, // constructs wallClock/monotonic; host/path derived here are overridden next
       );
+
+      // PRESERVE the producer's instance identity. constructEnvelope DERIVES
+      // host/path from its installationRoot arg (FR-011), so it just derived them
+      // from `walDir` (the SPOOL dir) — wrong for the observed instance. Override
+      // with the producer's host/path (realpath of the REAL install root) via a
+      // fresh typed EventEnvelope literal (no cast). The sidecar-authoritative
+      // fields (eventId + both sequences) come from `constructed`, untouched.
+      const envelope: EventEnvelope = {
+        ...constructed,
+        host: raw.host,
+        path: raw.path,
+      };
 
       const event: TelemetryEvent = { envelope, snapshot };
 
@@ -448,8 +493,7 @@ export function createPipeline(walDir: string, options?: PipelineOptions): Sidec
       // later re-send on retry/replay (FR-049).
       await wal.append(JSON.stringify(event));
 
-      // 5. transmit is the caller's concern (module header) — return the
-      // spooled event.
+      // 5. transmit is the caller's concern (module header) — return spooled event.
       return event;
     },
   };
