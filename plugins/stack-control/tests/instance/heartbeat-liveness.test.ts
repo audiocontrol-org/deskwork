@@ -242,7 +242,10 @@ describe('instance liveness folds the live session-liveness heartbeat (dogfood T
       }),
     ];
     // The sidecar for instance A heartbeats — keyed by A's OWN host:path.
-    const heartbeats = new Map<string, string>([[ID_A, isoAgo(5_000)]]);
+    // Capture the instant ONCE: `isoAgo` re-samples `Date.now()` on each call, so
+    // asserting against a re-derived `isoAgo(5_000)` races a 1ms wall-clock tick.
+    const heartbeatAt = isoAgo(5_000);
+    const heartbeats = new Map<string, string>([[ID_A, heartbeatAt]]);
 
     const registry = buildInstanceRegistry(events, heartbeats);
     const a = registry.instance(ID_A);
@@ -252,7 +255,7 @@ describe('instance liveness folds the live session-liveness heartbeat (dogfood T
     // A: the heartbeat's own instance — attached + live.
     expect(a.connection).toBe('attached');
     expect(a.liveness).toBe('live');
-    expect(a.lastHeartbeatAt).toBe(isoAgo(5_000));
+    expect(a.lastHeartbeatAt).toBe(heartbeatAt);
 
     // B: the same-installationId copy A's heartbeat must NOT reach.
     expect(b.connection).toBe('disconnected');
@@ -284,22 +287,24 @@ describe('instance liveness folds the live session-liveness heartbeat (dogfood T
         wallClock: isoAgo(120_000),
       }),
     ];
-    const freshOutOfBand = new Map<string, string>([[ID, isoAgo(5_000)]]);
+    const freshPostAt = isoAgo(5_000);
+    const freshOutOfBand = new Map<string, string>([[ID, freshPostAt]]);
     const withFreshPost = buildInstanceRegistry(staleInBand, freshOutOfBand).instance(ID);
     if (withFreshPost === undefined) throw new Error('expected the instance to exist');
     expect(withFreshPost.connection).toBe('attached'); // fresh out-of-band POST wins
     expect(withFreshPost.liveness).toBe('live');
-    expect(withFreshPost.lastHeartbeatAt).toBe(isoAgo(5_000));
+    expect(withFreshPost.lastHeartbeatAt).toBe(freshPostAt);
 
     // Symmetric: a FRESH in-band session.heartbeat EVENT + a STALE out-of-band POST.
     // The in-band channel alone must mark attached (latest-wins keeps the fresher).
+    const freshEventAt = isoAgo(5_000);
     const freshInBand = [
       mkEvent({
         installationId,
         type: 'session.heartbeat',
         classification: 'live-only',
         invocationSequence: 1,
-        wallClock: isoAgo(5_000),
+        wallClock: freshEventAt,
       }),
     ];
     const staleOutOfBand = new Map<string, string>([[ID, isoAgo(120_000)]]);
@@ -307,6 +312,6 @@ describe('instance liveness folds the live session-liveness heartbeat (dogfood T
     if (withFreshEvent === undefined) throw new Error('expected the instance to exist');
     expect(withFreshEvent.connection).toBe('attached'); // fresh in-band event wins
     expect(withFreshEvent.liveness).toBe('live');
-    expect(withFreshEvent.lastHeartbeatAt).toBe(isoAgo(5_000));
+    expect(withFreshEvent.lastHeartbeatAt).toBe(freshEventAt);
   });
 });
