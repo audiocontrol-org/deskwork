@@ -7,10 +7,16 @@
 //   - no verb     → usage to stderr, exit 2
 //   - --help/-h/help → usage to stdout, exit 0
 //   - no flag silently ignored (each subcommand validates its own flags)
+//
+// T044 (telemetry wiring): every invocation emits an invocation.completed
+// event (FR-012) via a fail-open emit client (C1/SC-001/002). Emission never
+// blocks, throws, or affects exit code/output (the verb's contract is
+// UNCHANGED whether or not anyone observes it).
 
 import { buildCommandSurface } from './cli-help/command-surface.js';
 import { renderSubActionHelp, renderVerbHelp } from './cli-help/render-help.js';
 import { setInstallationNoticeVerb } from './config/installation.js';
+import { runInvocationWithTelemetry } from './telemetry/invocation-telemetry.js';
 import { runVersion } from './subcommands/version.js';
 import { runExecuteCheck } from './subcommands/execute-check.js';
 import { runResolveTiers } from './subcommands/resolve-tiers.js';
@@ -66,6 +72,8 @@ import { runIntercept } from './subcommands/intercept.js';
 import { runCapabilityCli } from './subcommands/capability.js';
 import { runReconcileCli } from './subcommands/capability-reconcile.js';
 import { runCheckFrontDoorCli } from './subcommands/check-front-door.js';
+import { runPlane } from './subcommands/plane.js';
+import { runSidecar } from './subcommands/sidecar.js';
 
 type Subcommand = (args: string[]) => Promise<void>;
 
@@ -161,6 +169,13 @@ const SUBCOMMANDS: Record<string, Subcommand> = {
   // Front-door regression guard (028 US4): the four-assertion check over the
   // fronted-operations registry. Self-documenting (mounted on the command surface).
   'check-front-door': runCheckFrontDoorCli,
+  // Fleet control plane (036): `provision-token` (PT-015) + `serve` (T124, the
+  // runnable PLANE daemon the dogfood drives).
+  plane: runPlane,
+  // Fleet control plane (036): the runnable SIDECAR daemon — `sidecar run`
+  // elects, receives+spools local telemetry, uplinks to the plane, consumes
+  // commands over SSE, and heartbeats session liveness.
+  sidecar: runSidecar,
 };
 
 function printUsage(stream: NodeJS.WriteStream): void {
@@ -231,7 +246,12 @@ async function main(): Promise<void> {
   // The shared resolver's legacy half-installation notice carries the
   // dispatched verb as its prefix (specs/installation-isolation US5).
   setInstallationNoticeVerb(verb);
-  await handler(args);
+
+  // T044: run the handler wrapped in telemetry (fail-open, never blocks). The
+  // wrapper emits exactly one invocation.completed event (FR-012) and closes
+  // the emit client even when the handler throws, then re-throws the handler's
+  // original error unchanged so exit behavior is preserved (AUDIT-20260717-08).
+  await runInvocationWithTelemetry(handler, args);
 }
 
 main().catch((err: unknown) => {

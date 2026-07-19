@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "mode": "impl",
+  "item": "design:feature/fleet-control-plane",
+  "governedShaBase": "override-short-circuit",
+  "headSha": "override-short-circuit",
+  "chunkIds": [],
+  "rounds": 0,
+  "liftedFindings": [],
+  "closedInLoopFindings": [],
+  "seamResult": {
+    "boundaryPairs": [],
+    "findings": [],
+    "suppressedCompatible": 0
+  },
+  "splitClusterRefs": [],
+  "outcome": "override-eligible",
+  "anchorRoot": "/Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control",
+  "override": true,
+  "overrideReason": "Graduating via substantive override after 4 whole-feature govern rounds (findings 18->24->17->15, all triaged; the harmful set fixed RED-first across rounds 1-4; full suite 3505 green + tsc clean as the deterministic floor). Round-4 residual accepted as implementation-altitude and already-captured: 2 compiler-confirmed false-positives (tsc is clean; the compiler is the authority per audit-barrage-is-stochastic-defense-in-depth); 3 folded known-gaps deliberately scoped out (production command delivery+ack wiring TASK-461/464, config plane.url TASK-462/465, ReconnectBackoff healthy-reset wiring TASK-460); 4 weak-test coverage gaps; 3 captured narrow edges (TASK-466 event-log first-file, TASK-467 expiry sweep, TASK-468 history revisioned key); plus the runtime.ts 500-line cap overage from the AUDIT-45 security patch (TASK-469). Operator-approved (fix security+crash-safety, then override) at the diminishing-returns plateau where further rounds surface fresh fix-debt rather than converge."
+}

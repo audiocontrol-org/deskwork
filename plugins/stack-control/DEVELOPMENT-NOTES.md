@@ -2,6 +2,258 @@
 
 ---
 
+## 2026-07-19: 036 dogfood exposes unbuilt producers → design + spec 037 instance-observability (run-centric → instance-centric)
+
+### Item: `design:feature/instance-observability` (spec `specs/037-instance-observability`, authored this session)
+
+**Goal:** "Let's see if what we built works" — dogfood the graduated 036 fleet control plane. On discovering it doesn't (no real producers), decide the fix; per the operator, **design and spec a corrected architecture** through the full spec-kit chain, stopping at the orchestrator/implementation boundary.
+
+**Accomplished:**
+- **Live dogfood of 036**: booted the real plane + sidecar with a redirected machine-local store, ran real verbs, drove the dashboard-facing API. Established the plane's internals are real and tested but **no real producer exists** — `GET /v1/fleet` stays empty after real verbs; timings/history serve absent data; the mandated end-to-end verification (FR-087/SC-018) was signed off against **synthetic events**, not real runs.
+- **Filed the gaps honestly**: TASK-470 (run-lifecycle producer unwired — the load-bearing one), TASK-471 (short-verb delivery undemonstrated), and TASK-472 (a self-hosted `backlog capture` dedupe-on-ref bug I hit *while filing the first two*). Three parallel evidence audits confirmed the gaps are **mandated MUST requirements 036 never built** (FR-012/013/085/086/087), spanning five clusters.
+- **Designed the corrected architecture** (brainstorming → approved design record `2026-07-18-instance-observability-design.md`): instance-centric (the observable unit is the instance = `host:path`, a sidecar/worktree), observability-only (control deferred), built on 036's reused plumbing.
+- **Authored 037 through the full spec-kit chain** via the stack-control front door with capability mediation: `specify → clarify → plan → checklist → tasks → analyze`, every artifact grounded in 036's real source (two code-reading agent passes for the plan). 43 tasks, RED-first, tier-tagged; analyze reported 100% FR/SC coverage, 0 CRITICAL; applied refinements M1/M2/L2. **`spec-check`: spec=yes plan=yes tasks=yes (runnable).**
+
+**Didn't Work:**
+- **036 cannot honestly be considered delivered against its own spec.** Its graduation (govern convergence record) rests on a floor that isn't there — the producers that make `execute`/`govern` register as commandable runs, and that produce phase-duration/history, were never wired. The completion signals (138/138 tasks, T128 "drive every scenario", govern-graduated) all measured the plane half only.
+- The `backlog capture` verb silently refused a genuine second finding sharing a spec-file `--ref` (success-shaped stdout, exit 0) — nearly lost TASK-471. Worked around by re-pointing the ref; captured as TASK-472.
+
+**Course Corrections:**
+- [PROCESS] Answered "did you file a bug?" honestly — I'd *asked* instead of filing. Corrected: capture ≠ scope, so a found bug gets captured immediately (TASK-472), and prioritization is the separate operator call.
+- [PROCESS] Operator: "if the spec didn't get implemented, it can't graduate — we have to actually implement the spec." Reframed from "backlog hygiene" to "unmet mandated requirements of a graduated feature."
+- [SCOPE] Operator drove the reframes I did not pre-decide: observability-first ("control starts at observability"); the observable unit is the **sidecar/worktree**, not per-installation; identity granule **per-sidecar** now, per-worktree later; **`host:path`** as the derived identifier (dodges the git-branch-global/merge-conflict trap); a **session = the `session-start`..`session-end` span**, NOT the Claude Code session; drop the `waiting` field until its telemetry is defined.
+- [QUALITY] Engaged a third-party review with real pushback: kept identity **legible** (rejected "opaque"), kept `aggregated` (rejected a rename that churns shipped 036 code), kept the "registry" name while adopting the projection *definition* — and kept the factual 036 relationship while removing the governance/blame narrative.
+- [PROCESS] Deviated from the brainstorming skill's default terminal (`writing-plans`) to the stack-control spec-kit lifecycle, since a superpowers plan can't feed `/stack-control:execute`.
+
+**Insights:**
+- **Observability is the foundation of control** — the run-centric 036 model was the wrong root; making the *instance* the root object makes sessions, runs, health, and (later) commands all have a natural home. The dogfood, not the green suite, is what exposed the gap — exactly the FR-027 discipline this new spec makes first-class.
+- **Derived identity beats minted identity** for a fleet: `host:path` is git-safe (nothing to commit → nothing to go branch-global or merge-conflict), stable-across-restart for free, collision-free (host disambiguates), legible, and forward-compatible with the shared-sidecar per-worktree future — all from one choice.
+- **The sharpest implementation seam is 036's dropped snapshot** (TASK-457): identity must ride the envelope; event payload must be threaded through the ClassifiedEvent+log boundary. Grounding the plan in real code (two agent passes) caught this before it became a dogfood surprise.
+- The full spec-kit chain applied faithfully (no skipped step — I backfilled the passed-over `/speckit-checklist`) is the up-front-design investment the thesis calls for; the payoff is a runnable, 100%-covered, RED-first task list a fresh implementation session can execute without re-derivation.
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 10
+  - refine(037-instance-observability): apply /speckit-analyze findings M1, M2, L2
+  - checklist(037-instance-observability): /speckit-checklist — correctness (requirements-quality gate)
+  - tasks(037-instance-observability): /speckit-tasks — 43 tasks, RED-first, tier-tagged
+  - plan(037-instance-observability): /speckit-plan — plan + design artifacts grounded in 036 source
+  - spec(037-instance-observability): /speckit-clarify — record 4 spec-derived clarifications
+  - spec(037-instance-observability): incorporate third-party review refinements
+  - spec(037-instance-observability): author spec via /stack-control:define
+  - design(instance-observability): design record for the instance-centric observability plane
+  - chore(backlog): capture dedupe-on-ref self-hosted bug (TASK-472)
+  - chore(036-fleet-control-plane): capture two live-dogfood gaps to backlog
+- Files changed: 17
+- Backlog touched: TASK-457, TASK-461, TASK-470, TASK-471, TASK-472
+
+## 2026-07-18: fleet-control-plane — finish the burndown (107→139), build the daemons, 4-round govern to override-graduation
+
+### Item: `design:feature/fleet-control-plane` (spec `specs/036-fleet-control-plane`)
+
+**Goal:** Resume `/stack-control:execute` from the 107/139 checkpoint; finish Phase 8 (US6 hostile-network uplink) + Phase 9 (front door, isolation, dogfood, polish); then run the whole-feature `govern` pass to graduation.
+
+**Accomplished:**
+- **Phase 8 (US6, T103–T119):** RED suite + the SSE client, reconnect driver, telemetry-POST dispatcher, plane bearer-auth, machine-local token custody, session-liveness, and the `plane provision-token` verb — the complete sidecar↔plane uplink over a NAT-bound, network-exposed transport.
+- **Runnable daemons (operator-approved scope the task list never broke out):** `plane serve` (live registry + the 9 consumer routes + the 3 sidecar-facing routes — telemetry ingest / command SSE / liveness — + bearer auth) and the `sidecar run` daemon (bind-wins election → local-socket receive → redact-and-spool → uplink → command-consume → session-liveness). Fronted both verbs (`check-front-door` 65→68).
+- **Dogfood (T128, the primary verification):** drove Scenarios 1–4 & 6 end-to-end against the *real* daemons — all pass — and it caught a real Scenario-1 crash (an unhandled connect rejection on an unreachable plane), fixed + regression-locked. S5 scoped out (external Cloudflare/B2; T129 `[~]`).
+- **Isolation + polish:** the isolation probe now *bounds* the machine-local exception (T126); `$HOME`-redirect audit (T127), line-cap/type-safety (T131/132/133), full suite T134. **All 139 tasks complete** (ledger 139/139).
+- **Governed to graduation** via a 4-round cross-model `govern` cycle + a substantive operator-approved override.
+
+**Didn't Work (the govern story):**
+- The whole-feature govern — the **first ever run against 036** — refused **four rounds: 18 → 24 → 17 → 15 findings**. Round 2 *grew* because my round-1 fixes added new code that got audited (and some fixes were regressions). The pattern held every round: each fix pass resolved the prior findings but introduced ~N/2 new fix-debt the next round surfaced — the thesis's "hyperintelligent toddler adds new edges."
+- The barrage found **real, load-bearing bugs the compiler + 3500 passing tests missed**: a plane-crashing unguarded SSE tick (blocking), a fail-open regression *I* introduced (a 10s lockfile block on the hot path), a durability-ordering loss (ACK-before-durable; dedupe-state committed before the durable append), a PII redaction leak on the common path, an **auth-bypass** (one installation spoofing another's `installationId` after auth), a reconcile that never diffed manifest contents, and a stray **NUL byte** (a held-map key separator) that made git treat `dispatch.ts` as binary and silently blinded the auditor to the whole file.
+- Two round-4 "compile-error" findings were **barrage false-positives** — `tsc` was clean, and the compiler is the authority (per `audit-barrage-is-stochastic-defense-in-depth`).
+
+**Course Corrections:**
+- [PROCESS] After each round I **verified findings against the actual code before fixing** — separating real defects (fixed RED-first) from false-positives (dismissed on `tsc` authority) from folded/known-gaps. Two I first judged "overstated" (crash-durability, watchdog-resurrection) turned out real on close reading; the barrage's signal was better than my quick take.
+- [PROCESS] The **operator owned each escalating scope/plateau decision** — build-the-daemons, fix-must-fix-and-re-govern, fix-security+crash-safety-then-override — surfaced as a fork rather than decided unilaterally. The "are these well-founded or nitpicking?" question was the right gate.
+- [QUALITY] **Every harmful finding across all four rounds was fixed RED-first** (a test reproducing the defect before the fix), with the full suite green at each commit.
+- [DISCIPLINE] Captured **11 follow-ups to the backlog (TASK-459…469)** rather than paper over — folded production command-delivery/ack wiring, config `plane.url`, narrow crash edges, and the `runtime.ts` 500-line split — each override-accepted residual item documented.
+
+**Insights:**
+- The cross-model barrage's value is **highest on a large, never-governed feature**: the stochastic layer caught crash/auth-bypass/durability-loss defects the deterministic floor (compiler + 3505 green tests) could not — exactly its design intent.
+- But the fix-loop has a **real, compounding cost**: converging to zero would take many rounds because each pass seeds fresh fix-debt. The **diminishing-returns plateau** — slow decrease, large fix-debt fraction, root issues resurfacing under new IDs, and altitude dropping to compiler-decidable false-positives — is the signal to **override, not grind**. Round 4 was that signal.
+- "The auditor couldn't read the file" is not always noise: a stray NUL byte was a **real encoding defect** blinding the differ to `dispatch.ts` entirely — worth treating as a defect, not dismissing.
+
+**Quantitative reconciliation (per AUDIT-03/04 conventions):** 15 commits — 5 `feat`/`test` (Phase 8 RED+impl, daemons+front-door, dogfood+isolation), 4 `fix` (govern rounds 2–4 + round-4 security/crash-safety), 6 `chore` (ledger/tasks-complete, 4× govern-lift, override record). 100 files changed. Ledger 107→139 (139/139, `[~]` T129). Govern: **4 rounds 18→24→17→15, graduated via substantive override**. Open findings at session end are the **override-accepted residual** — not "0 open": 2 compiler-confirmed false-positives, 3 folded known-gaps (in TASK-460/461/462/464/465, real-but-scoped), 4 weak-test coverage gaps, and 3 captured narrow edges (TASK-466/467/468). The *harmful* set (blocking crash, auth-bypass, durability loss, fail-open regression, PII leak, NUL-byte, command-lifecycle) was fixed RED-first; no unfixed HIGH behavioral defect remains open. Remaining lifecycle step: ship (PR + merge, operator-owned).
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 15
+  - chore(036-fleet-control-plane): govern graduated via substantive override — feature governed (see convergence record + audit-log)
+  - fix(036-fleet-control-plane): fix round-4 security + crash-safety findings (RED-first)
+  - chore(036-fleet-control-plane): re-govern round-4 refused — lift 15 findings (18->24->17->15, plateau)
+  - fix(036-fleet-control-plane): resolve round-3 verified-harmful govern findings (RED-first)
+  - chore(036-fleet-control-plane): re-govern round-3 refused — lift 17 findings to audit-log (18->24->17 converging)
+  - fix(036-fleet-control-plane): resolve round-2 govern findings (21 must-fix, RED-first)
+  - chore(036-fleet-control-plane): re-govern refused — lift round-2 findings (24) to audit-log
+  - fix(036-fleet-control-plane): resolve all 18 whole-feature govern findings (RED-first)
+  - chore(036-fleet-control-plane): govern refused — lift 18 whole-feature findings to audit-log + convergence record
+  - chore(036-fleet-control-plane): mark tasks complete (137 done, T129 [~] scoped out) + ledger T126-T134
+  - feat(036-fleet-control-plane): dogfood loop + isolation bound + Scenario-1 crash fix (T126, T128, T130)
+  - chore(036-fleet-control-plane): ledger T120-T125 + backlog TASK-460..463 (found-mid-build gaps)
+  - feat(036-fleet-control-plane): runnable plane + sidecar daemons + front door (T120-T125)
+  - feat(036-fleet-control-plane): Phase 8 US6 — hostile-network uplink (T112-T119)
+  - test(036-fleet-control-plane): Phase 8 US6 RED — hostile-network uplink suite (T103-T111)
+- Files changed: 100
+- Backlog touched: TASK-459, TASK-460, TASK-461, TASK-465, TASK-466, TASK-467, TASK-468, TASK-469
+
+## 2026-07-17: fleet-control-plane — execute Phases 4–7 + US1 tail (46→107/139, model-sized dispatch)
+
+### Item: `design:feature/fleet-control-plane` (spec `specs/036-fleet-control-plane`)
+
+**Goal:** Resume the `/stack-control:execute` burndown from the prior session's 46/139 checkpoint. Continue the same discipline — a fresh subagent per `tasks.md` task at its declared `[tier:]` model, RED-first, per-task controller review, central race-free commits at each phase boundary, ledger + push — through as many phases as could be done at review quality that stays sharp.
+
+**Accomplished:**
+- Closed **Phase 3 (US1)** (T044 CLI emit wiring, T138 supervised sidecar) and completed **Phases 4–7 in full**: US2 aggregation (registry / node:http server / ingest / snapshot+deltas+per-run-detail / structured errors / artifact-refs), US3 commands (state machine / supersession / durable store / dispatch+fanout+reconcile+config-push / endpoints / cooperative-cancel primitive), US4 trust-and-failure (liveness closure≠death / reconciliation window→0 false deaths / crash-safe WAL / drain+drop policy / redact-before-spool pipeline / two-hop health / delivery semantics / dedupe-is-optional), US5 history (B2 S3-compat adapter / immutable archive writer / revisioned derived artifacts / cache-first CDN reader / listing backstop / history+timings endpoints / Cloudflare config).
+- **61 tasks (46→107/139)**, 5 phase-boundary commits + 3 backlog commits, all pushed; the fleet suite grew 230→**522 tests, green + tsc clean at every boundary**. Front-door marker bracketed each resumed drive (entered/exited cleanly per checkpoint — no leak).
+- Captured 3 latent integration gaps to the backlog rather than paper over them: **TASK-457** (registry consumes envelope-only events, so per-run detail can't carry snapshot-derived facets until their producers land), **TASK-458** (`CommandDispatch.held` keyed by `commandId` alone drops all-but-last target for fleet-wide replay-on-reconnect), **TASK-459** (no producer writes the finalized run-history `summary.json`, so history/timings serve honestly-absent data).
+
+**Didn't Work:**
+- A `fast`-tier subagent (T044) shipped a green, confident telemetry-emit wiring that emitted an **invalid** event — `installationId: ''` behind a `// TODO: load from machine-state (T024, out of scope)` comment, except T024 was already done and `validateEnvelope` rejects an empty id. The "TODO" pointed at completed work; the emitted event would never validate. Caught in review, re-dispatched with the real `mintOrReadInstallationId` + durable high-water sequence.
+- A RED-test subagent (T046) unilaterally added a `@/` path alias to `tsconfig`+`vitest.config` and created mis-shaped stub `src/` files to make its test load — diverging from the 1748:0-relative-import codebase and pre-empting the impl task's surface. Reverted the config, deleted the stubs, re-dispatched aligned to the registry-based model.
+- A RED-test subagent (T048) used a **type-only import** of the not-yet-existing module; esbuild elides it and tsc excludes the tests dir, so the "RED" test passed false-green (5/5) with no implementation. Re-dispatched as a value-import behavioral RED.
+
+**Course Corrections:**
+- [QUALITY] Controller review remained the load-bearing step: beyond the three above, it caught a forbidden `as Record<...>` cast mislabeled as "matches event.ts" (T055 — event.ts actually uses a type guard), and accepted a genuine T052-contract refinement (finalized-run late-event split: strictly-newer stays `late`/durable, reordered-no-newer becomes `accepted`) only after tracing it against the must-stay-green T052 suite. Green + articulate ≠ correct.
+- [PROCESS] Batched RED tests into per-phase clusters sharing one controller-authored canonical model (command model for Phase 5, liveness/spool/health concepts for Phase 6, storage-layout for Phase 7) to prevent the cross-cluster divergence that bit Phase 4 (`CommandKind` reconciled to one canonical home in `command.ts`, with `registry.ts`'s `FleetCommandKind` DRY-aliased to it).
+- [PROCESS] A brief that said add an "inline note" for an untested primitive (T088 idle-exit) produced an untested primitive; the controller wrote the missing test rather than let it ship. Recorded as friction: impl briefs must say "write a test", not "note".
+- [CHECKPOINT] Stopped twice at clean pushed boundaries (after Phase 5, after Phase 7) rather than grind the hardest remaining work — Phase 8's silently-failing SSE keepalive, Phase 9's isolation-probe + dogfood loop, and the whole-feature govern — through a context-exhausted tail. The ledger makes resume exact.
+
+**Insights:**
+- The recurring failure mode across tiers is **confident wrongness that compiles and passes**: an invalid-but-green telemetry event, a false-green type-only RED, a cast mislabeled as matching a sibling. None were caught by tsc or the subagent's own tests; all were caught by an independent controller read before the ledger entry. In model-sized dispatch the review loop *is* the correctness mechanism.
+- Subagents, when briefed to, made honest no-fabrication calls that are exactly right: T050/T054 omitted per-run facets the envelope-only registry can't carry (→ TASK-457) instead of inventing them; T101 represented all four history phase durations as absent because no producer exists (→ TASK-459) instead of fabricating zeros; T096's B2 adapter failed loud on list-truncation-without-token instead of silently capping. The discipline holds when the brief names it.
+- Combining tightly-coupled same-file tasks into one dispatch (T053+T054 in `api.ts`, T069+T070+T073 as the command backend, T082+T083+T088 as the liveness core) avoided cross-dispatch file races and interface-handoff churn — a better fit than strict one-subagent-per-task when tasks share a file and a tier.
+
+**Quantitative reconciliation:** 8 commits this session as auto-derived (5 phase `feat` + 3 backlog `chore`); the 61 tasks collapse into the 5 phase commits (RED+GREEN pairs and combined same-file dispatches land as single boundary commits). Ledger 46→107 entries (local resume artifact, intentionally untracked — the session-end warning about it is expected). Remaining: Phase 8 (T103–T119), Phase 9 (T120–T134), then the whole-feature `govern` pass.
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 8
+  - chore(036-fleet-control-plane): backlog TASK-459 — run-history summary.json producer gap
+  - feat(036-fleet-control-plane): Phase 7 US5 — serve history without amplifying the capped store (T089-T102)
+  - feat(036-fleet-control-plane): Phase 6 US4 — trust what the fleet says, incl. about failure (T074-T088, T139)
+  - chore(036-fleet-control-plane): backlog TASK-458 — fleet-wide command replay held-map keying gap
+  - feat(036-fleet-control-plane): Phase 5 US3 — commands, the operator-promise surface (T056-T073)
+  - chore(036-fleet-control-plane): backlog TASK-457 — registry drops snapshot payload, per-run facets deferred
+  - feat(036-fleet-control-plane): Phase 4 US2 — live fleet aggregation over the plane API (T045-T055)
+  - feat(036-fleet-control-plane): T044 CLI emit wiring + T138 supervised sidecar (US1)
+- Files changed: 75
+- Backlog touched: TASK-457, TASK-458, TASK-459
+
+## 2026-07-17: fleet-control-plane — execute Phases 1–3 core (46/139 tasks, model-sized dispatch)
+
+### Item: `design:feature/fleet-control-plane` (spec `specs/036-fleet-control-plane`)
+
+**Goal:** Begin implementation of the fleet-control-plane spec via `/stack-control:execute` — dispatch each `tasks.md` task to a fresh subagent at its declared `[tier:]` model, RED-first, with per-task controller review and central (race-free) commits. This session was the implementation session (separate from the earlier orchestrator session that authored the spec).
+
+**Accomplished:**
+- Recorded the missing `analyze-clean` marker (via `roadmap approve-design --analyze-clean`) that the node needed to derive to `implementing` — `session-start`'s "next: /speckit-analyze" was a structural artifact (analyze leaves no on-disk signal), not a real gap; commit `3a6b5e76` was the evidence analyze had run.
+- Drove `/stack-control:execute` through the gate chain (compass `behind`/allowed, front-door complete at 65 ops, spec runnable, all 139 tiers resolved: 55 fast / 66 balanced / 18 powerful) and bracketed the drive in the 026 front-door marker (entered at start, exited cleanly at the checkpoint — no leak).
+- Completed **Phase 1 (setup) + Phase 2 (foundational) in full, and ~90% of Phase 3 (US1 fail-open)** — 46/139 tasks, 26 commits, all pushed, 230 fleet tests green + tsc clean at every commit. Landed: all DI seams (Clock, ProcessProbe, SseTransport, storage port), the machine-state redirect harness + two "cruel" fixtures, the shared domain (event/status/sequence/redact/classification), machine-state (locate/identity/highwater), and the US1 fail-open telemetry core (wire protocol + handshake, bounded buffer, detached spawn, bind-wins election + stale recovery, and the fail-open emit client proven at 0.028ms overhead with no hang against a stalled peer).
+
+**Didn't Work:**
+- First `session-start` report parroted the verb's "next: /speckit-analyze" without checking it against git history; the operator corrected it. Root cause is real and worth a fix: chain-position inference can't distinguish "analyze not run" from "analyze ran clean" because analyze leaves no artifact — the same line prints forever.
+- The first opus dispatch (T009) died on a 529 Overloaded mid-read before writing anything; clean retry succeeded. No partial state to clean up.
+- My first T001 commit ran `git add` from the repo root and captured only the root lockfile, not the installation `package.json`; the commit claimed more than it contained. Landed a completing commit rather than force-amending (force-push is operator-authorized only).
+
+**Course Corrections:**
+- [PROCESS] Answered a status question ("analyze has already been run") by first correcting my own inference, then recording *why* the verb can't detect it — rather than re-running analyze.
+- [PROCESS] Switched parallel-batch subagents to implement-and-report-only, with the controller doing all commits serially — concurrent subagent `git commit` would race the index. Preserved the commit-at-boundary discipline (controller executes it).
+- [QUALITY] Per-task review caught and fixed real defects before commit: stale dependency majors from model recall (T001: esp `^1.1.0`→`^3.1.0`, uuidv7 `^0.1.0`→`^1.2.1` — a real API break), an invented behavioral promise in a doc comment (T003), an `as` cast (T011), three `expect(true).toBe(true)` tautology "tests" the sub-agent labeled "structured placeholders" (T137 — the IOU anti-pattern), and a byte-identical `storeKey` clone I single-sourced into `locate.ts` (T024).
+- [CHECKPOINT] Paused at 46/139 before T044 (wires into the live `src/cli.ts` dispatcher) rather than grind into degraded review quality from a large context; exited the front-door marker cleanly. The ledger makes resume exact (skips completed tasks).
+
+**Insights:**
+- The controller-review loop is where quality lives in model-sized dispatch: several subagents produced confident, green, well-argued work that was still wrong (stale deps that compiled, tautology tests that passed, a comment that decided an unspecified design question). Green + articulate ≠ correct — independent review before the ledger entry is load-bearing.
+- Two subagents made genuinely good calls under pressure worth remembering: T006 left Windows `ProcessProbe` unimplemented and fail-loud rather than fabricating an unverifiable syscall path, and the identity subagent fixed its own test rather than loosen a safety guard when its reattach impl correctly refused to clobber.
+- Two design decisions are flagged in commit bodies for the eventual whole-feature govern pass to scrutinize: the `OwnerRegistry` introduced in bind-wins election (stale recovery needs the prior owner's PID+start-time, but the socket file carries none and SO_PEERCRED only works on a live socket), and the event-type vocabulary the classification seam defines as a contract for the US1–US6 emission tasks.
+
+**Quantitative reconciliation:** 26 commits this session. The first (`roadmap(...): record analyze-clean marker`) is the pre-execution gate fix; the remaining 25 are the 46 tasks' implementation (RED+GREEN pairs and multi-task modules collapse into single commits). Feature branch `feature/fleet-control-plane`, all pushed. Remaining: T044 + T138 to close Phase 3, then Phases 4–9 (93 tasks) and the whole-feature `govern` pass.
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 26
+  - feat(036-fleet-control-plane): T031+T032+T039 fail-open emit client (C1/SC-001/002)
+  - feat(036-fleet-control-plane): T035+T036+T041+T043 sidecar bind-wins election + stale recovery (C6/PT-002)
+  - feat(036-fleet-control-plane): T042 detached sidecar spawn (C6)
+  - feat(036-fleet-control-plane): T037+T040 bounded buffer with short/long asymmetry (FR-007/C4)
+  - feat(036-fleet-control-plane): T033+T034+T038 local wire protocol + version handshake
+  - feat(036-fleet-control-plane): T027+T028 installationSequence high-water mark (R-02)
+  - feat(036-fleet-control-plane): T025+T026+T029+T030 installationId mint/read/reattach
+  - feat(036-fleet-control-plane): T023+T024 machine-state store location (PT-001)
+  - feat(036-fleet-control-plane): T135+T136 event classification seam (FR-015/016)
+  - feat(036-fleet-control-plane): T019+T020 two sequences + gap classification (R-04)
+  - test(036-fleet-control-plane): T137 metadata-is-never-identity guard (FR-036)
+  - feat(036-fleet-control-plane): T021+T022 deny-by-default telemetry redaction (PT-008)
+  - feat(036-fleet-control-plane): T017+T018 three status axes, never collapsed
+  - feat(036-fleet-control-plane): T014+T015+T016 event envelope construct/validate + ordering guard
+  - test(036-fleet-control-plane): T011 real socket/process fixture (spawn/SIGKILL/stale/PID-reuse)
+  - test(036-fleet-control-plane): T010 cruel in-process SSE/HTTP server fixture
+  - feat(036-fleet-control-plane): T008 vendor-free object-store port (RED-first)
+  - feat(036-fleet-control-plane): T007 SseTransport DI seam (RED-first)
+  - feat(036-fleet-control-plane): T006 ProcessProbe PID+start-time liveness (RED-first)
+  - feat(036-fleet-control-plane): T004+T005 injectable Clock seam (RED-first)
+  - feat(036-fleet-control-plane): T012+T013 identity + envelope types (RED-first)
+  - test(036-fleet-control-plane): T009 machine-local store redirect harness
+  - feat(036-fleet-control-plane): T003 add plane settings to installation config type
+  - feat(036-fleet-control-plane): T001 (cont) declare the deps in the installation manifest
+  - feat(036-fleet-control-plane): T001 add eventsource-parser + uuidv7 deps
+  - roadmap(fleet-control-plane): record analyze-clean marker (speckit-analyze ran; 4 coverage gaps closed in 3a6b5e76)
+- Files changed: 51
+- Backlog touched: (none)
+
+## 2026-07-17: fleet-control-plane — design → define, full authoring chain to `analyze`
+
+### Item: `design:feature/fleet-control-plane` (spec `specs/036-fleet-control-plane`)
+
+**Goal:** Take the approved fleet-control-plane design record through `/stack-control:define` and the full Spec Kit authoring chain — specify → clarify → plan → checklist → tasks → analyze — leaving a runnable spec for a separate implementation session. Authoring only; no implementation.
+
+**Accomplished:**
+- **Full chain, in order, no steps skipped:** `specify` → `clarify` (1 question) → `plan` (Phase 0 research + Phase 1 artifacts) → `checklist` → `tasks` (139) → `analyze`. Every backend drive bracketed by the `spec-definition` front-door marker; `check-front-door` clean (65 ops) throughout. Node now carries `spec: specs/036-fleet-control-plane` via `workflow link-spec` (the TASK-244 class — a node without a spec pointer can't be resolved by `govern --item`/`reconcile`).
+- **Artifacts:** `spec.md` (89 FRs, 18 SCs, 6 stories, 15 plan-time contracts), `research.md`, `plan.md`, `data-model.md`, `quickstart.md`, `contracts/{local-socket-protocol,sidecar-plane-protocol,plane-client-api}.md`, `checklists/{requirements,correctness}.md`, `tasks.md`.
+- **Phase 0 research via 4 parallel agents** (SSE/transport, CDN/storage, IPC/spawn, clocks/IDs), each instructed to verify against primary sources rather than memory. **All 15 PT contracts settled.** The architecture survived intact — and B2 survived *on the merits*, not just procedurally: R2 prices `ListObjects` at $4.50/M where B2 gives listing free, at ~2.2× the storage cost.
+- **Research found 4 real defects in specified mechanism** (R-01…R-04), all cheap now and expensive later: the object key had **two** independent defects (forecloses sequence probing; doesn't sort — `10-` before `2-`); `installationSequence` across sidecar restart was an unaddressed hole that would make the plane reject its own fleet's telemetry; the un-flushed-spool promise was **unachievable by any shutdown sequence**; gap detection couldn't read the object store because classification makes the durable set sparse by design.
+- **Operator scope pass:** dashboard UI cut from scope, recorded as `design:feature/fleet-dashboard` (hard `depends-on` this feature). `multi:feature/control-plane-frontend` (2026-06-07) removed — predated this design, nothing depended on it, "a much weaker idea than what we've designed now."
+- **Clarify found one genuine gap:** the design record made auth mandatory but never said what the credential *is* — and it was in neither the record's open questions nor the PT list, so it was an omission, not a deliberate deferral. Settled as a per-installation bearer token that inherits `installationId`'s machine-local custody rules exactly.
+- **Two constitution violations declared, not finessed:** the CLI's fail-open silence (Principle V) and machine-local state outside the installation tree (installation-anchor invariant). Both justified and bounded in `plan.md` § Complexity Tracking.
+
+**Didn't Work:**
+- **I proposed "correcting" the approved design record's B2 read-cap premise, off a single vendor page — and was wrong.** Backblaze's public pricing page renders "Cost: Free" for transaction Classes A/B/C. The research agent concluded the cost premise was obsolete; I independently fetched the same page and reached the same conclusion, then brought it to the operator as a finding. The operator has hit Class B caps in production recently. Corroborating them over the page: Backblaze's own help centre still documents the older 2,500/day model — **the vendor's own surfaces contradict each other** — and the agent had explicitly flagged that it could not date any transition and that the finding needed an invoice before being load-bearing. It wasn't confirmed; it was refuted. Pinned in `research.md` with an explicit *do not re-derive this from a pricing page*, because that page has now produced this exact false positive from two independent agents and will do it again.
+- **I published a wrong tier count, twice.** Claimed `fast 57 · balanced 60`; actual was `fast 53 · balanced 64`. Caught by my own validator, re-derived from the file. Then after the analyze additions, re-derived again (`fast 55 · balanced 66 · powerful 18` = 139).
+- **The auto-derived session boundary over-counted** (below).
+
+**Course Corrections:**
+- **[PROCESS]** Offered the operator a rigid multiple-choice menu (`AskUserQuestion`) for the scope-boundary decision; operator: *"let's talk this through instead of offering me a terse set of rigid options."* The conversation that followed surfaced something the menu would have buried — that "control plane" means two different things in the two roadmap items (the older lineage calls the *stackctl front door* the control plane), so part of the apparent overlap was the word colliding with itself.
+- **[PROCESS]** Kept doing bookkeeping on a `DESIGN-INBOX.md` entry orphaned by the node removal; operator: *"stop worrying about the inbox—it's a red herring. the inbox is for ideas, not committed features."*
+- **[PROCESS]** Operator asked to keep the UI in the spec as a later phase so part of the spec could execute with the UI unimplemented. Pushed back once with reasoning — it would pull the dashboard's *design* forward (the exact work they deferred), it's the shape the design record explicitly rejected, and a spec with a knowingly-unexecuted phase never reaches done. Operator: *"never mind. it's fine the way it is."*
+- **[FABRICATION]** The B2 premise (above). The failure wasn't reading the page — it was bringing it as a *finding* with more confidence than a single self-contradicting vendor source could carry.
+
+**Insights:**
+- **Two independent agents, different lenses, converged on the same object key.** The CDN agent found it forecloses sequence probing; the clocks agent — knowing nothing of the CDN work — found it doesn't sort. Neither knew of the other. That's the cross-perspective agreement the audit-barrage doctrine treats as the high-confidence signal, arriving unprompted from ordinary research.
+- **The checklist caught drift the moment it was written.** Authoring the Amendment Coverage category *was* running it: R-01…R-04 had landed in `research.md`/`data-model.md` while `spec.md` still carried the superseded text. `analyze` would have found it later; the checklist found it first. Amendments now cite their research finding **inline**, so the reasoning travels with the requirement instead of living in a file nobody opens.
+- **`analyze` found a gap that hid behind a word collision.** FR-015/016 (event classification — the requirement that *"classification, not emission, decides cost"*) had **zero tasks**. A keyword scan sees "classification" in T019/T020 and moves on — but those are *gap* classification, unrelated. Without it, "every invocation telemeters" silently becomes "every event becomes a cloud object." Only checking requirements against what tasks actually *do* catches that.
+- **The research repeatedly falsified the *reasoning* while the *decisions* held.** That is the case for deferring mechanism to plan-time rather than settling it in prose — and the vindication of the project's rule against forcing write protocols into a spec.
+- **Several findings were "a promise the system cannot keep."** The un-flushed-spool guarantee is unachievable (`SIGKILL` runs no code; Windows has no real `SIGTERM`). Inverting it to a crash-safe WAL made it *testable* — the original phrasing could not pass its own test by construction.
+- **A silent pass can be worse than a failure.** The isolation probe only snapshots the fixture's outer repo, so the declared machine-local exception would pass — for the wrong reason. Scheduled T126 to make the exception able to fail.
+
+**Quantitative (auto-derived boundary CORRECTED — see note):**
+- Commits: **10** (incl. this session-end record) — `8465ff53..81cfe7f8`
+  - `docs(session): session-end record`
+  - `tasks(fleet-control-plane): close 4 coverage gaps found by analyze`
+  - `tasks(fleet-control-plane): 134 tier-annotated tasks, RED-first throughout`
+  - `checklist(fleet-control-plane): correctness + honesty-under-failure; fix 4 real conflicts it caught`
+  - `plan(fleet-control-plane): Phase 0 research + Phase 1 design artifacts`
+  - `spec(fleet-control-plane): clarify — auth mechanism is a per-installation bearer token`
+  - `spec(fleet-control-plane): operator scope pass — cut the dashboard UI, keep the plane's API`
+  - `roadmap(fleet-dashboard): record the dashboard as its own item, blocked on the plane`
+  - `chore(backlog): capture TASK-455 — git.feature hook misdetects a worktree as a non-repo`
+  - `spec(fleet-control-plane): author specs/036 from the approved design record`
+- Files changed: **17**
+- Tasks authored: 139 (fast 55 · balanced 66 · powerful 18; re-derived from the file, `resolve-tiers` resolves all 139)
+- Corrections: 4 (3 × [PROCESS], 1 × [FABRICATION])
+- Backlog: **TASK-455 opened** (new). **TASK-244 is a false positive** — it is already `[Done]`; the commit cited "the TASK-244 class" as a *reference to a bug class*, not work performed on it. No status transition is warranted; recording this so the evidence isn't mistaken for progress.
+
+> **Boundary note (per the AUDIT-04 quantitative discipline).** `stackctl session-end` auto-derived **20 commits / 43 files** from its merge-base boundary. That is wrong for this session: the branch already carried three prior sessions' work (the four `design(fleet-control-plane)` commits, `chore: release v0.58.2`, the PR #524 merge, and the audit-barrage-cc-timeout fixes). Re-derived against the true session start (`3ae9ac9b`, the design-approved marker that was HEAD at boot): **10 commits / 17 files**. The verb's own header says "verify before publishing" — this is that verification. Captured as tooling friction: the merge-base heuristic silently over-attributes on a long-lived feature branch that spans sessions.
+
+**Next:** the compass reads `ahead` for `execute` — `implementing` is the legitimate next phase but its exit gate (`analyze-clean` node marker) is unmet. Record the marker, then run `/stack-control:execute` **in a separate implementation session** (the orchestrator session does not implement).
+
 ## 2026-07-09: model-tier-task-annotation — full lifecycle to `closed` + CI publish root-fix (v0.58.1)
 
 > Session-close record for the whole remote-control session (it began 2026-07-08 and ran past midnight into 2026-07-09). The mid-session 2026-07-08 entry below captures the execute-phase detail; this entry is the end-to-end summary + the ship/release/close half.

@@ -5,6 +5,14 @@
 // refuse-to-end gates (capture-only posture, Clarification OQ-2); never queries
 // GitHub (SC-006). See contracts/session-end-cli.md.
 //
+// specs/037-instance-observability T026 — session lifecycle telemetry
+// (contracts/telemetry-events.md § session.ended; data-model.md D9;
+// FR-007/FR-012). Emits `session.ended{sessionId,endedAt,reason:'ended'}` and
+// CLEARS the machine-local current-session record. FAIL-OPEN
+// (`.claude/rules/session-skills-never-block.md`): this verb must always
+// complete its capture-and-commit job regardless of telemetry/record-clear
+// outcome.
+//
 // Exit codes: 0 captured + committed (+pushed unless --no-push); 1 fail-loud
 // (outside an installation / unwritable working file); 2 usage; 3 committed
 // locally but the push failed (record is safe).
@@ -23,6 +31,8 @@ import { runClose, readJournalTemplate, type CloseResult } from '../session/clos
 import { loadRoadmap } from '../roadmap/roadmap-model.js';
 import { grammarOptsForRoot } from './document-verb-shared.js';
 import { allDanglingMergedItems } from '../workflow/merge-signal.js';
+import { read as readCurrentSession, clear as clearCurrentSession } from '../machine-state/current-session.js';
+import { emitSessionEvent } from '../telemetry/session-events.js';
 
 interface EndFlags {
   readonly at: string | null;
@@ -213,6 +223,33 @@ function gatherMergedNotShipped(installation: Installation): readonly string[] {
   return allDanglingMergedItems(model, installation.root).map((s) => s.itemId);
 }
 
+/**
+ * specs/037 T026 (D9, FR-007/FR-012) — emit `session.ended{reason:'ended'}`
+ * for the open current-session record (if any) and clear it. `installation`
+ * is the `--at`-resolved target (events emit to ITS resolved socket, mirroring
+ * research.md's "the reused emit path" note). AUDIT-20260719-02: `read`/`clear`
+ * are given the SAME `installation.root`, so session-end closes the record
+ * session-start opened UNDER THAT TARGET — not one under the caller's cwd (the
+ * split that let `--at <target>` leave the target's real session open). The
+ * WHOLE block is fail-open — session-end must always complete its
+ * capture-and-commit job (`.claude/rules/session-skills-never-block.md`).
+ */
+async function closeCurrentSession(installation: Installation): Promise<void> {
+  try {
+    const record = readCurrentSession(installation.root);
+    if (record === null) return;
+    const endedAt = new Date().toISOString();
+    clearCurrentSession(installation.root);
+    await emitSessionEvent(installation.root, 'session.ended', record.sessionId, {
+      sessionId: record.sessionId,
+      endedAt,
+      reason: 'ended',
+    });
+  } catch {
+    // Fail-open: session telemetry must never block/throw session-end.
+  }
+}
+
 export async function runSessionEndCli(args: string[]): Promise<void> {
   const flags = parseFlags(args);
 
@@ -226,6 +263,11 @@ export async function runSessionEndCli(args: string[]): Promise<void> {
     }
     throw err;
   }
+
+  // specs/037 T026 — session lifecycle telemetry: emit session.ended for the
+  // open current-session record (if any) and clear it. Fail-open; never
+  // blocks the capture-and-commit job below (session-skills-never-block).
+  await closeCurrentSession(installation);
 
   const cwd = installation.root;
   const date = new Date().toISOString().slice(0, 10);

@@ -1,0 +1,49 @@
+{"id":"T001","tierLabel":"fast","model":"haiku","commitRange":"c0261c3d..230f6609","reviewClean":true,"note":"6 module stubs + tests/instance dir; empty ES modules, no logic"}
+{"id":"T002","tierLabel":"fast","model":"haiku","commitRange":"230f6609..ed6872c6","reviewClean":true,"note":"RED test, verified failing for missing-impl reason"}
+{"id":"T004","tierLabel":"fast","model":"haiku","commitRange":"230f6609..ed6872c6","reviewClean":true,"note":"RED test, verified failing for missing-impl reason"}
+{"id":"T006","tierLabel":"fast","model":"haiku","commitRange":"230f6609..ed6872c6","reviewClean":true,"note":"RED test, verified failing for missing-impl reason"}
+{"id":"T008","tierLabel":"fast","model":"haiku","commitRange":"230f6609..ed6872c6","reviewClean":true,"note":"RED test, verified failing for missing-impl reason"}
+{"id":"T012","tierLabel":"fast","model":"haiku","commitRange":"230f6609..ed6872c6","reviewClean":true,"note":"RED test, verified failing for missing-impl reason"}
+{"id":"T010","tierLabel":"powerful","model":"opus","commitRange":"230f6609..ed6872c6","reviewClean":true,"note":"RED snapshot-threading seam test; used run.started to avoid unknown-type false-red"}
+{"id":"T003","tierLabel":"balanced","model":"sonnet","commitRange":"ed6872c6..f53a7c28","reviewClean":true,"note":"constants + deriveLiveness; reused daemon DEFAULT_LIVENESS_INTERVAL_MS"}
+{"id":"T005","tierLabel":"balanced","model":"sonnet","commitRange":"ed6872c6..f53a7c28","reviewClean":true,"note":"host:path deriver, 39 lines, pure"}
+{"id":"T009","tierLabel":"fast","model":"haiku","commitRange":"ed6872c6..f53a7c28","reviewClean":true,"note":"3 durable types; tightened EventType to closed union"}
+{"id":"T011","tierLabel":"powerful","model":"opus","commitRange":"ed6872c6..f53a7c28","reviewClean":true,"note":"D5 snapshot threading; removed a stale as-cast"}
+{"id":"T013","tierLabel":"balanced","model":"sonnet","commitRange":"ed6872c6..f53a7c28","reviewClean":true,"note":"current-session mint/read/clear; harness durableDir getter"}
+{"id":"T007","tierLabel":"powerful","model":"opus","commitRange":"ed6872c6..f53a7c28","reviewClean":true,"note":"envelope host/path/sessionId derived-by-construction; requireEventType closes 2 tsc errors; schemaVersion 2"}
+{"id":"T014","tierLabel":"powerful","model":"opus","commitRange":"ed6872c6..f53a7c28","reviewClean":true,"note":"runtime-size guard test"}
+{"id":"T015","tierLabel":"powerful","model":"opus","commitRange":"ed6872c6..f53a7c28","reviewClean":true,"note":"split runtime.ts 523->248 + runtime-handlers.ts 391; no behavior change"}
+{"id":"T016","tierLabel":"balanced","model":"sonnet","commitRange":"f53a7c28..8aaaaf9a","reviewClean":true,"note":"RED instance registry fold"}
+{"id":"T017","tierLabel":"fast","model":"haiku","commitRange":"f53a7c28..8aaaaf9a","reviewClean":true,"note":"RED InstanceState 16-field shape"}
+{"id":"T018","tierLabel":"balanced","model":"sonnet","commitRange":"f53a7c28..8aaaaf9a","reviewClean":true,"note":"buildInstanceRegistry + accumulator (sibling file); connection=live?attached:disconnected matched RED"}
+{"id":"T019","tierLabel":"powerful","model":"opus","commitRange":"f53a7c28..8aaaaf9a","reviewClean":true,"note":"telemetry stamps host/path + sessionId; fail-open at read site"}
+{"id":"T021","tierLabel":"fast","model":"haiku","commitRange":"f53a7c28..8aaaaf9a","reviewClean":true,"note":"RED instances API snapshot; controller fixed self-contradictory inst3 fixture"}
+{"id":"T024","tierLabel":"fast","model":"haiku","commitRange":"f53a7c28..8aaaaf9a","reviewClean":true,"note":"RED zero-durable-reads (CountingObjectStore)"}
+{"id":"T020","tierLabel":"balanced","model":"opus","commitRange":"e39119f8..6b663a5a","reviewClean":true,"note":"retention collapsed to feeding instance registry the events stream; no run-registry change"}
+{"id":"T022","tierLabel":"balanced","model":"opus","commitRange":"e39119f8..6b663a5a","reviewClean":true,"note":"routes wired (pure-fns committed earlier in US1-core); withAuth per route"}
+{"id":"T023","tierLabel":"balanced","model":"opus","commitRange":"e39119f8..6b663a5a","reviewClean":true,"note":"recompute-on-read over events array; rehydrates from eventLog.replayed; zero durable reads"}
+{"id":"T025","tierLabel":"balanced","model":"sonnet","commitRange":"6b663a5a..a63661e5","reviewClean":true,"note":"RED session verbs (UDS peer observe)"}
+{"id":"T026","tierLabel":"balanced","model":"sonnet","commitRange":"6b663a5a..a63661e5","reviewClean":true,"note":"session verbs emit+record fail-open; long-run buffer connect-wait"}
+{"id":"T027","tierLabel":"balanced","model":"sonnet","commitRange":"6b663a5a..a63661e5","reviewClean":true,"note":"RED session fold"}
+{"id":"T028","tierLabel":"balanced","model":"opus","commitRange":"6b663a5a..a63661e5","reviewClean":true,"note":"fold session.* (merged with T033); currentSession open/close"}
+{"id":"T029","tierLabel":"fast","model":"haiku","commitRange":"6b663a5a..a63661e5","reviewClean":true,"note":"RED session-counts-rehydrate; timestamps anchored to now"}
+{"id":"T030","tierLabel":"powerful","model":"opus","commitRange":"6b663a5a..a63661e5","reviewClean":true,"note":"RED phase.entered emit (flagged connect-gap)"}
+{"id":"T031","tierLabel":"powerful","model":"opus","commitRange":"6b663a5a..a63661e5","reviewClean":true,"note":"phase.entered side emission; long-run buffer survives sync connect gap"}
+{"id":"T032","tierLabel":"balanced","model":"sonnet","commitRange":"6b663a5a..a63661e5","reviewClean":true,"note":"RED bearing+durations fold"}
+{"id":"T033","tierLabel":"balanced","model":"opus","commitRange":"6b663a5a..a63661e5","reviewClean":true,"note":"fold phase.entered; cumulative durations; bearing persists (merged with T028)"}
+{"id":"T034","tierLabel":"powerful","model":"opus","commitRange":"6b663a5a..a63661e5","reviewClean":true,"note":"RED phase payload e2e through real plane"}
+{"id":"T035","tierLabel":"fast","model":"haiku","commitRange":"e784d743..ef6fdbf0","reviewClean":true,"note":"RED route-ordering (stream before :id)"}
+{"id":"T036","tierLabel":"balanced","model":"opus","commitRange":"e784d743..ef6fdbf0","reviewClean":true,"note":"instanceStream SSE + deltas; new instance-handlers.ts for size cap"}
+{"id":"T037","tierLabel":"balanced","model":"opus","commitRange":"e784d743..ef6fdbf0","reviewClean":true,"note":"instanceRuns facet; run->instance via event-stream correlation"}
+{"id":"T038","tierLabel":"powerful","model":"opus","commitRange":"e784d743..ef6fdbf0","reviewClean":true,"note":"host:path auth refusal alongside installationId (D8 additive)"}
+{"id":"T039","tierLabel":"fast","model":"haiku","commitRange":"e784d743..ef6fdbf0","reviewClean":true,"note":"read-only-surface guard (pass on arrival)"}
+{"id":"T040","tierLabel":"fast","model":"haiku","commitRange":"e784d743..ef6fdbf0","reviewClean":true,"note":"emit-fail-open guard (pass on arrival)"}
+{"id":"fix/session-emit-flake","tierLabel":"controller","model":"opus","commitRange":"a63661e5..e784d743","reviewClean":true,"note":"session-events no-close pattern; killed supersede flake under load"}
+{"id": "T044", "tierLabel": "powerful", "model": "opus", "commitRange": "see-git-log", "reviewClean": true, "note": "RED real-sidecar-path identity+snapshot preservation"}
+{"id": "T045", "tierLabel": "powerful", "model": "opus", "commitRange": "see-git-log", "reviewClean": true, "note": "preserve host/path/sessionId+bare snapshot through daemon+pipeline re-mint; 036 byte-identical"}
+{"id": "T046", "tierLabel": "powerful", "model": "opus", "commitRange": "see-git-log", "reviewClean": true, "note": "short-verb invocation.completed delivery; long-run + bounded 50ms drain"}
+{"id": "T048", "tierLabel": "powerful", "model": "opus", "commitRange": "see-git-log", "reviewClean": true, "note": "phase.entered+session.* CLI delivery via shared emit-drain bounded wait"}
+{"id": "T041", "tierLabel": "powerful", "model": "opus", "commitRange": "see-git-log", "reviewClean": true, "note": "FR-027 real-producer dogfood harness (revealed producer-path defects)"}
+{"id": "T047", "tierLabel": "powerful", "model": "opus", "commitRange": "see-git-log", "reviewClean": true, "note": "dogfood all-green with real producers; S3 harness-artifact fix (same-port restart)"}
+{"id":"T049","tierLabel":"powerful","model":"opus","commitRange":"e93e5fa1..76d27625","reviewClean":true,"note":"dogfood: fix frozen lastActivityAt (installationSequence no-regress key)"}
+{"id":"T050","tierLabel":"powerful","model":"opus","commitRange":"76d27625..2d2b3404","reviewClean":true,"note":"dogfood: wire sidecar heartbeat into instance liveness/connection; idle stays live (95s proof)"}

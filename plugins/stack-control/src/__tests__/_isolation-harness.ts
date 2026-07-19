@@ -206,6 +206,32 @@ export function snapshotOutsideInstallation(
 }
 
 /**
+ * Snapshot an ENTIRE directory tree (path + size + mtime per file), with no
+ * exclusions. Companion to `snapshotOutsideInstallation` for the other half of
+ * the isolation contract: the machine-local-exception probe (specs/036 T126)
+ * needs to prove the INSTALLATION subtree stays byte-identical across a
+ * machine-local write — i.e. a machine-local op never smears into the tree.
+ */
+export function snapshotDirTree(root: string): Snapshot {
+  const snapshot: Snapshot = new Map();
+  const walk = (rel: string): void => {
+    const abs = rel === '' ? root : join(root, rel);
+    for (const entry of readdirSync(abs, { withFileTypes: true })) {
+      const childRel = rel === '' ? entry.name : `${rel}/${entry.name}`;
+      if (entry.isDirectory()) {
+        snapshot.set(`${childRel}/`, 'dir');
+        walk(childRel);
+        continue;
+      }
+      const st = statSync(join(root, childRel));
+      snapshot.set(childRel, `${st.size}:${st.mtimeMs}`);
+    }
+  };
+  walk('');
+  return snapshot;
+}
+
+/**
  * Human-readable delta between two snapshots — the probe's failure message
  * names exactly which outer-tree paths a verb created/changed/removed.
  */

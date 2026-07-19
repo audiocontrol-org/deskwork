@@ -14,11 +14,13 @@
     "ajv-formats": "^3.0.0",
     "backlog.md": "1.46.0",
     "commander": "^12.1.0",
+    "eventsource-parser": "^3.1.0",
     "jscpd": "^4.0.0",
     "markdown-it": "^14.1.0",
     "peggy": "^5.0.0",
     "picomatch": "^2.3.2",
     "tsx": "^4.21.0",
+    "uuidv7": "^1.2.1",
     "yaml": "^2.8.0"
   },
   "devDependencies": {

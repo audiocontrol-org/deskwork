@@ -17,6 +17,7 @@ import { AUDIT_BARRAGE_VERBS } from './surfaces/audit-barrage.js';
 import { AUDIT_RUNS_VERBS } from './surfaces/audit-runs.js';
 import { CAPABILITY_VERBS } from './surfaces/capability.js';
 import { DOCUMENT_PRIMITIVES_VERBS } from './surfaces/document-primitives.js';
+import { FLEET_VERBS } from './surfaces/fleet.js';
 import { SCOPE_CHECKS_VERBS } from './surfaces/scope-checks.js';
 import { SCOPE_CLONES_VERBS } from './surfaces/scope-clones.js';
 import { SCOPE_SURFACE_VERBS } from './surfaces/scope-surface.js';
@@ -144,4 +145,5 @@ export const MOUNTED: readonly MountedVerb[] = [
   ...AUDIT_RUNS_VERBS,
   ...SESSION_SETUP_VERBS,
   ...SPEC_MISC_VERBS,
+  ...FLEET_VERBS,
 ];

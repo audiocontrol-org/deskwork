@@ -1,0 +1,529 @@
+generated_at: 2026-07-19T17:29:35.218Z
+clones:
+  - id: d52fa2a96225
+    lines: 11
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/__tests__/_isolation-harness.ts:111:121
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/__tests__/_isolation-harness.ts:151:161
+    disposition: pending
+    reason: null
+  - id: e2a338afb45b
+    lines: 10
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/__tests__/_isolation-harness.ts:144:153
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/__tests__/_isolation-harness.ts:96:105
+    disposition: pending
+    reason: null
+  - id: a8f9c37a15a2
+    lines: 11
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/__tests__/_run-helpers.ts:19:29
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/subcommands/check-front-door.ts:142:151
+    disposition: pending
+    reason: null
+  - id: 28fbfe7069ed
+    lines: 10
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/__tests__/fixtures/capability-fixtures.ts:48:57
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/__tests__/fixtures/workflow/workflow-fixtures.ts:112:121
+    disposition: pending
+    reason: null
+  - id: 1f05dcf7dc8b
+    lines: 11
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/__tests__/fixtures/capability-fixtures.ts:57:67
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/__tests__/fixtures/workflow/workflow-fixtures.ts:119:129
+    disposition: pending
+    reason: null
+  - id: fa6d71a61921
+    lines: 6
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/__tests__/roadmap/helpers.ts:19:24
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/tests/roadmap/helpers.ts:26:31
+    disposition: pending
+    reason: null
+  - id: e496fd6acbc6
+    lines: 9
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/backlog/slush-migrate.ts:90:98
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/promote-findings/slush-remaining.ts:182:190
+    disposition: pending
+    reason: null
+  - id: 8a5871130c97
+    lines: 11
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/cli-help/surfaces/scope-checks.ts:58:68
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/cli-help/surfaces/scope-checks.ts:75:85
+    disposition: pending
+    reason: null
+  - id: 61e6ced74320
+    lines: 14
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/config/config-loader.ts:219:232
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/sd-config.ts:126:139
+    disposition: pending
+    reason: null
+  - id: edf01bd5b1de
+    lines: 14
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/config/config-loader.ts:248:261
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/sd-config.ts:134:147
+    disposition: pending
+    reason: null
+  - id: 6be33cdfd13a
+    lines: 18
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/config/config-loader.ts:62:79
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/sd-config.ts:72:89
+    disposition: pending
+    reason: null
+  - id: 7bf624ad1d61
+    lines: 13
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/fleet/event.ts:158:170
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/sidecar/spool/wal.ts:96:98
+    disposition: pending
+    reason: null
+  - id: da8d9880d345
+    lines: 11
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/govern/seam-pass.ts:48:58
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/govern/seam-pass.ts:89:99
+    disposition: pending
+    reason: null
+  - id: dd379a90e5a1
+    lines: 13
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/machine-state/current-session.ts:64:76
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/machine-state/identity.ts:65:74
+    disposition: pending
+    reason: null
+  - id: 1600ac520251
+    lines: 15
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/machine-state/current-session.ts:76:90
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/sidecar/spool/wal.ts:98:112
+    disposition: pending
+    reason: null
+  - id: e8d38ab50423
+    lines: 10
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/machine-state/identity.ts:68:77
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/machine-state/token.ts:65:74
+    disposition: pending
+    reason: null
+  - id: 4aae086c97e1
+    lines: 9
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/plane/archive/derived.ts:31:39
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/plane/archive/writer.ts:48:57
+    disposition: pending
+    reason: null
+  - id: ba5014e49e1f
+    lines: 7
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/plane/runtime-handlers.ts:256:262
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/plane/runtime-handlers.ts:278:284
+    disposition: pending
+    reason: null
+  - id: a88a15439dff
+    lines: 12
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/release/portable.ts:60:71
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/release/portable.ts:86:97
+    disposition: pending
+    reason: null
+  - id: 3010c93d4b9d
+    lines: 6
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/roadmap/closes-mutation.ts:109:114
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/roadmap/roadmap-model.ts:111:116
+    disposition: pending
+    reason: null
+  - id: 9c3dea649604
+    lines: 11
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/roadmap/closes-mutation.ts:83:93
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/roadmap/edge-mutations.ts:69:79
+    disposition: pending
+    reason: null
+  - id: 360a83708590
+    lines: 12
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/roadmap/edge-mutations.ts:120:131
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/roadmap/edge-mutations.ts:89:100
+    disposition: pending
+    reason: null
+  - id: b8758bb1dc6b
+    lines: 19
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/roadmap/edge-mutations.ts:203:221
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/roadmap/mutations.ts:316:328
+    disposition: pending
+    reason: null
+  - id: 0098900f4a55
+    lines: 50
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/check-adopters.ts:104:153
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/check-anti-patterns.ts:106:155
+    disposition: pending
+    reason: null
+  - id: 55ea86af4314
+    lines: 17
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/check-adopters.ts:300:316
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/module-symmetry-matrix.ts:295:311
+    disposition: pending
+    reason: null
+  - id: 03d3c81c9494
+    lines: 16
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/check-adopters.ts:317:332
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/check-anti-patterns.ts:367:156
+    disposition: pending
+    reason: null
+  - id: b566619a3fbc
+    lines: 15
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/check-adopters.ts:361:375
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/check-deprecations.ts:210:224
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/check-refactor-preconditions.ts:355:237
+    disposition: pending
+    reason: null
+  - id: eb27c2485a91
+    lines: 27
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/check-adopters.ts:60:86
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/check-anti-patterns.ts:61:88
+    disposition: pending
+    reason: null
+  - id: 7c2f9c9fb89b
+    lines: 19
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/check-anti-patterns.ts:113:131
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/check-module-symmetry.ts:73:91
+    disposition: pending
+    reason: null
+  - id: 48bb7b34be23
+    lines: 12
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/check-anti-patterns.ts:138:149
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/check-module-symmetry.ts:109:123
+    disposition: pending
+    reason: null
+  - id: 71605c93c264
+    lines: 9
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/check-anti-patterns.ts:374:382
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/check-deprecations.ts:159:167
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/check-module-symmetry.ts:148:156
+    disposition: pending
+    reason: null
+  - id: da2a99bb242c
+    lines: 12
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/check-anti-patterns.ts:421:432
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/check-refactor-preconditions.ts:358:237
+    disposition: pending
+    reason: null
+  - id: 3c93b008c797
+    lines: 15
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/check-deprecations.ts:113:127
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/scope-doctor.ts:73:87
+    disposition: pending
+    reason: null
+  - id: 2867c79d739c
+    lines: 28
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/check-deprecations.ts:88:115
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/check-module-symmetry.ts:84:111
+    disposition: pending
+    reason: null
+  - id: 53355d10eca2
+    lines: 16
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/check-disposition-survivor.ts:381:396
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/check-module-symmetry.ts:223:237
+    disposition: pending
+    reason: null
+  - id: ac589e90e811
+    lines: 12
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/check-module-symmetry.ts:223:234
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/check-refactor-preconditions.ts:355:366
+    disposition: pending
+    reason: null
+  - id: 6758469e8b4b
+    lines: 15
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/customize.ts:117:131
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/scope-doctor.ts:61:123
+    disposition: pending
+    reason: null
+  - id: dd910693259c
+    lines: 16
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/deprecation-scan.ts:411:426
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/module-symmetry-matrix.ts:296:311
+    disposition: pending
+    reason: null
+  - id: 9847578bd1d9
+    lines: 6
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/discovery-agents/codebase-state-metrics.ts:184:189
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/discovery-agents/codebase-state-metrics.ts:266:271
+    disposition: pending
+    reason: null
+  - id: fac61074a4c7
+    lines: 8
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/discovery-agents/pattern-handlers/coverage.ts:40:47
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/discovery-agents/pattern-handlers/semantic.ts:53:92
+    disposition: pending
+    reason: null
+  - id: 9600d7aa16af
+    lines: 7
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/discovery-agents/pattern-handlers/loader.ts:148:154
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/discovery-agents/pattern-handlers/loader.ts:185:191
+    disposition: pending
+    reason: null
+  - id: 888c5ae72f09
+    lines: 11
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/discovery-agents/pattern-handlers/regex.ts:27:33
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/discovery-agents/prd-themed-pattern-hunter.ts:138:148
+    disposition: pending
+    reason: null
+  - id: 5ac7942d750e
+    lines: 9
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/discovery-agents/pattern-matrix.ts:176:184
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/discovery-agents/prd-themed-pattern-hunter.ts:181:189
+    disposition: pending
+    reason: null
+  - id: c78278cffcfa
+    lines: 18
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/dispatch-wrapper-overrides.ts:104:121
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/dispatch-wrapper.ts:196:213
+    disposition: pending
+    reason: null
+  - id: 383c85d99447
+    lines: 24
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/dispatch-wrapper-overrides.ts:114:137
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/dispatch-wrapper-overrides.ts:39:62
+    disposition: pending
+    reason: null
+  - id: 99e067d664a6
+    lines: 8
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/dispatch-wrapper-overrides.ts:140:147
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/dispatch-wrapper.ts:232:239
+    disposition: pending
+    reason: null
+  - id: e79cfddc7810
+    lines: 21
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/dispatch-wrapper-overrides.ts:26:46
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/dispatch-wrapper.ts:118:138
+    disposition: pending
+    reason: null
+  - id: 12d818009041
+    lines: 10
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/dispatch-wrapper-overrides.ts:59:68
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/dispatch-wrapper.ts:151:160
+    disposition: pending
+    reason: null
+  - id: 9d3f06bcec1a
+    lines: 11
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/dispatch-wrapper-overrides.ts:74:84
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/dispatch-wrapper.ts:166:176
+    disposition: pending
+    reason: null
+  - id: 46dd66e57135
+    lines: 24
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/dispatch-wrapper.ts:131:154
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/dispatch-wrapper.ts:206:229
+    disposition: pending
+    reason: null
+  - id: f40c1fcbf605
+    lines: 10
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/doctor-rules/anti-patterns-yaml-schema-violation.ts:24:33
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/doctor-rules/clones-yaml-schema-violation.ts:35:44
+    disposition: pending
+    reason: null
+  - id: 6d18068e18bd
+    lines: 10
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/doctor-rules/catalog-entry-missing-status.ts:105:114
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/doctor-rules/scope-discovery-schema-stale.ts:72:81
+    disposition: pending
+    reason: null
+  - id: 05129df2b82b
+    lines: 14
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/doctor-rules/clones-yaml-refactor-incomplete.ts:146:159
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/doctor-rules/clones-yaml-schema-violation.ts:44:56
+    disposition: pending
+    reason: null
+  - id: 2d9246b9fe3c
+    lines: 12
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/install-scope-discovery.ts:109:120
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/scope-doctor.ts:61:72
+    disposition: pending
+    reason: null
+  - id: 91fa37c99f6d
+    lines: 12
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/install-scope-discovery.ts:124:135
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/scope-doctor.ts:76:87
+    disposition: pending
+    reason: null
+  - id: f7e17393ffa0
+    lines: 17
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/promote-findings/adjudicate-findings.ts:43:59
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/promote-findings/extract-barrage-findings.ts:313:327
+    disposition: pending
+    reason: null
+  - id: 512b1298f16e
+    lines: 16
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/scope-inventory-cli.ts:123:138
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/scope-widen-cli.ts:118:133
+    disposition: pending
+    reason: null
+  - id: 0b427a6b448c
+    lines: 10
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/scope-inventory.ts:285:294
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/scope-widen.ts:253:262
+    disposition: pending
+    reason: null
+  - id: f29bdd9a6cfc
+    lines: 11
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/scope-inventory.ts:287:297
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/synthesis-cli.ts:150:160
+    disposition: pending
+    reason: null
+  - id: 64170a9da008
+    lines: 9
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/scope-inventory.ts:327:335
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/scope-widen.ts:297:305
+    disposition: pending
+    reason: null
+  - id: 0f75642243ee
+    lines: 7
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/scope-inventory.ts:81:87
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/scope-discovery/scope-widen.ts:89:95
+    disposition: pending
+    reason: null
+  - id: a1c64db57319
+    lines: 9
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/session/orient.ts:76:84
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/subcommands/session-end.ts:219:236
+    disposition: pending
+    reason: null
+  - id: 160993f91709
+    lines: 11
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/sidecar/spool/wal.ts:98:112
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/telemetry/frame-parse.ts:88:98
+    disposition: pending
+    reason: null
+  - id: 53fbde9c162d
+    lines: 7
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/subcommands/archive.ts:9:15
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/subcommands/curate.ts:61:67
+    disposition: pending
+    reason: null
+  - id: bf5a1dec39b8
+    lines: 8
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/subcommands/audit-barrage-lift.ts:140:147
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/subcommands/audit-barrage-render.ts:112:119
+    disposition: pending
+    reason: null
+  - id: ba5d9adbf508
+    lines: 7
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/subcommands/audit-barrage-render.ts:179:185
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/subcommands/audit-barrage.ts:373:379
+    disposition: pending
+    reason: null
+  - id: acc2a42b4799
+    lines: 9
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/subcommands/execute-check.ts:20:28
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/subcommands/spec-check.ts:21:29
+    disposition: pending
+    reason: null
+  - id: da3b15ba4f2e
+    lines: 8
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/subcommands/resolve-tiers.ts:31:38
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/subcommands/spec-check.ts:22:29
+    disposition: pending
+    reason: null
+  - id: 318a7906b3f8
+    lines: 8
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/subcommands/roadmap-advance-closed.ts:134:141
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/subcommands/roadmap-cascade-emit.ts:38:45
+    disposition: pending
+    reason: null
+  - id: b6f145ad05fa
+    lines: 8
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/subcommands/roadmap-advance-closed.ts:164:171
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/subcommands/roadmap-cascade-emit.ts:56:63
+    disposition: pending
+    reason: null
+  - id: 56c881498b47
+    lines: 13
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/subcommands/roadmap-advance-closed.ts:71:83
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/subcommands/roadmap-cascade-emit.ts:15:27
+    disposition: pending
+    reason: null
+  - id: 760d73ca6349
+    lines: 9
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/subcommands/roadmap-edge-emit.ts:35:43
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/subcommands/roadmap.ts:195:203
+    disposition: pending
+    reason: null
+  - id: 678a18c3e2a8
+    lines: 23
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/telemetry/invocation-telemetry.ts:47:69
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/src/telemetry/phase-entered.ts:35:46
+    disposition: pending
+    reason: null
+  - id: 223749a4f29d
+    lines: 11
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/tests/fleet/_local-socket-peer.ts:126:136
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/tests/fleet/_server-fixture.ts:230:239
+    disposition: pending
+    reason: null
+  - id: 6293a7e17432
+    lines: 11
+    members:
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/tests/inbox/helpers.ts:6:16
+      - /Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control/tests/roadmap/helpers.ts:7:17
+    disposition: pending
+    reason: null

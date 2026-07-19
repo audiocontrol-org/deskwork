@@ -22,6 +22,40 @@
 // set (lift, slush-findings, scope-inventory, backlog capture/import,
 // install-scope-discovery) plus `--at` anchored rows that additionally
 // pin WHERE the state lands inside the installation (SC-001).
+//
+// -----------------------------------------------------------------------------
+// specs/036-fleet-control-plane — T126: BOUND the declared machine-local
+// exception (FR-008 / SC-001; plan.md § Complexity Tracking, "the isolation
+// exception must be tested, not assumed").
+//
+// 036 DELIBERATELY persists identity OUTSIDE the installation tree — the
+// installationId, the bearer token, and the installationSequence high-water
+// mark live in a MACHINE-LOCAL durable store (HOME/XDG-located), never in the
+// version-controlled `.stack-control/`. This is the SOLE sanctioned outside-
+// tree write. The probe below (`snapshotOutsideInstallation`) only watched the
+// OUTER repo, so this machine-local write to `$HOME` passed SILENTLY — for the
+// WRONG reason (the store simply wasn't in view), which is worse than failing.
+//
+// Two things change here to close that gap:
+//   1. EVERY row now runs under the T009 machine-state redirect
+//      (`useMachineStateStore`). This is NOT optional cosmetics: the CLI
+//      dispatcher (cli.ts) calls `locateMachineState(cwd)` at startup for every
+//      verb (creating the durable + socket dirs) and mints identity + advances
+//      the high-water mark on its emit path. Un-redirected, those writes land in
+//      a real developer's `$HOME` (the silent leak) — or, once this harness is
+//      imported, in its import-time durable poison "tripwire", which the
+//      teardown asserts is EMPTY. Redirecting per test makes every row hermetic
+//      and turns the tripwire into a loud proof that no row leaked durable
+//      identity anywhere it shouldn't.
+//   2. A new describe block EXPLICITLY bounds the exception for the 036 write
+//      surface (`plane provision-token`, `mintOrReadInstallationId`,
+//      `advanceHighWaterMark`, token custody): it asserts the write lands in the
+//      machine-local durable store (exception real + exercised), that store is
+//      the ONLY outside-tree write (outer tree byte-identical + tripwire empty),
+//      and the INSTALLATION tree receives nothing (a machine-local write never
+//      smears into the tree). A future 036 durable field is caught by the
+//      known-durable-filenames bound rather than silently admitted.
+// -----------------------------------------------------------------------------
 
 import { afterEach, describe, expect, it } from 'vitest';
 import { existsSync } from 'node:fs';
@@ -39,6 +73,21 @@ import {
   snapshotOutsideInstallation,
   type NestedFixture,
 } from './_isolation-harness.js';
+import {
+  useMachineStateStore,
+  type MachineStateStore,
+} from '../../tests/fleet/_machine-state-harness.js';
+import {
+  assertMachineLocalExceptionBound,
+  MACHINE_LOCAL_OPS,
+} from './_machine-local-exception-probe.js';
+
+// Every test in this file redirects the machine-local durable + ephemeral store
+// to a disposable temp dir and asserts (teardown) that nothing leaked to the
+// import-time durable poison tripwire — i.e. no row wrote durable identity to a
+// real `$HOME`. Registered at file scope so it wraps the table rows, the 026
+// mediation block, AND the 036 machine-local-exception block below.
+const machineStore = useMachineStateStore();
 
 /**
  * Stub model battery: `echo` is universally present, exits 0, and emits
@@ -370,4 +419,31 @@ describe('026 capability mediation — front-door + mediate-check anchor to the 
     expect(result.code).toBe(0); // permit — proves --at resolved the nested install + read its marker
     expect(diffSnapshots(before, snapshotOutsideInstallation(fx))).toEqual([]);
   });
+});
+
+// 036 T126 — BOUND the declared machine-local exception (FR-008 / SC-001).
+//
+// The rows above prove the OUTER tree is byte-identical. 036's identity writes
+// are the ONE sanctioned exception to "nothing outside the installation": they
+// land in the MACHINE-LOCAL durable store, never the tree. Each op below asserts
+// the exception is (a) real + exercised — the write reaches the machine-local
+// store — and (b) bounded on every other axis: the outer tree, the real `$HOME`
+// (tripwire), and the installation tree all receive NOTHING. The ops table + the
+// per-op bound assertions live in `_machine-local-exception-probe.ts` to keep
+// this file under the line cap; this describe drives them under the same
+// per-test machine-state redirect every other row uses.
+describe('036 machine-local exception (T126/FR-008/SC-001) — the ONLY sanctioned outside-tree write, bounded', () => {
+  it.each(MACHINE_LOCAL_OPS.map((op) => [op.name, op] as const))(
+    '%s lands in the machine-local store; outer tree, $HOME, and installation tree receive nothing',
+    async (_name, op) => {
+      const store: MachineStateStore = machineStore();
+      const fixture = makeNestedFixture();
+      try {
+        await assertMachineLocalExceptionBound(op, fixture, store);
+      } finally {
+        fixture.cleanup();
+      }
+    },
+    120_000,
+  );
 });

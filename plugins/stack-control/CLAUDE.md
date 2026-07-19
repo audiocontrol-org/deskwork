@@ -1,8 +1,9 @@
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-specs/035-model-tier-task-annotation/plan.md
-Verification scenarios and the design record live in:
-specs/035-model-tier-task-annotation/spec.md
-specs/035-model-tier-task-annotation/quickstart.md
+specs/037-instance-observability/plan.md
+The spec, design artifacts, and approved design record live at:
+specs/037-instance-observability/spec.md
+specs/037-instance-observability/research.md
+docs/superpowers/specs/2026-07-18-instance-observability-design.md
 <!-- SPECKIT END -->
