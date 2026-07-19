@@ -24,7 +24,7 @@
  * `.js` imports under node16 resolution (no `@/` alias configured).
  */
 
-import { createEmitClient, resolveLocalSocketPath, type EmitClient } from './emit.js';
+import { createEmitClient, resolveLocalSocketPath } from './emit.js';
 import { constructEnvelope, type SnapshotPayload, type TelemetryEvent } from '../fleet/event.js';
 import { classifyEvent } from '../fleet/classification.js';
 import { mintUuidV7, type EventType } from '../fleet/types.js';
@@ -37,44 +37,6 @@ import { reserveNextSequence } from '../machine-state/highwater.js';
 export type SessionEventType = Extract<EventType, 'session.started' | 'session.ended'>;
 
 /**
- * Bounded budget for how long `emitSessionEvent` gives a LOCAL sidecar to
- * finish connecting before closing the client. This is NOT a wait for
- * delivery confirmation (no `hello-ack` is awaited — see below); it exists
- * only because, unlike `invocation-telemetry.ts` (whose emit happens after
- * the handler ran, so the connection — begun eagerly at client construction
- * — has usually already completed by emit time), a session event has no such
- * intervening work: construction, `emit()`, and `close()` would otherwise
- * all land in the same synchronous tick, well before a same-host UDS
- * `connect` callback fires, so `emit()` would see a not-yet-connected socket
- * and — with a `'short-verb'` buffer — DROP the event on the floor every
- * time (`buffer.ts`'s "None. Drops on a sidecar-unavailable socket."). A
- * TINY bounded poll (same shape as `highwater.ts`'s
- * `LOCK_ACQUIRE_TIMEOUT_MS`/`LOCK_POLL_MS` fail-open budget) closes that gap
- * for the common case (a live local sidecar; same-host UDS connects in low
- * single-digit ms) while still bounding worst-case latency when nothing is
- * listening (`markUnavailable` fires the `error` handler almost immediately,
- * so the no-peer case returns well before the budget is exhausted anyway).
- */
-const CONNECT_BUDGET_MS = 150;
-
-/** Poll interval while waiting for the connection (mirrors `LOCK_POLL_MS`). */
-const CONNECT_POLL_MS = 3;
-
-/**
- * Resolve once `client.state` is `'connected'`, or once `budgetMs` has
- * elapsed — whichever comes first. Never rejects, never throws.
- */
-async function waitForConnectOrBudget(client: EmitClient, budgetMs: number): Promise<void> {
-  const start = Date.now();
-  while (client.state !== 'connected') {
-    if (Date.now() - start >= budgetMs) {
-      return;
-    }
-    await new Promise<void>((resolve) => setTimeout(resolve, CONNECT_POLL_MS));
-  }
-}
-
-/**
  * Emit one `session.*` telemetry event for `installationRoot`, FAIL-OPEN.
  *
  * `sessionId` is threaded onto the envelope (the session this event belongs
@@ -83,15 +45,22 @@ async function waitForConnectOrBudget(client: EmitClient, budgetMs: number): Pro
  * already-shaped, bounded payload the caller builds
  * (`{ sessionId, startedAt }` / `{ sessionId, endedAt, reason }`).
  *
- * Opens and closes its OWN short-lived emit client (`callerKind: 'long-run'`
- * with a tiny bound — this emission is retained across the brief connect gap
- * rather than dropped, unlike the dispatcher's `'short-verb'`
- * `invocation.completed` emission) rather than sharing one with it — session
- * verbs may emit zero, one, or two of these (the FR-009a supersede case) in
- * addition to that per-invocation event, and each is independently
- * fail-open. Awaits (with a tiny bound, see `CONNECT_BUDGET_MS`) a live
- * connection before closing so a local sidecar actually receives the event
- * instead of it landing in a buffer that is then torn down unread.
+ * Opens its OWN `callerKind: 'long-run'` emit client (a bounded FIFO that
+ * HOLDS the event across the brief connect gap rather than dropping it —
+ * unlike the dispatcher's `'short-verb'` `invocation.completed` emission)
+ * rather than sharing one. Session verbs may emit zero, one, or two of these
+ * (the FR-009a supersede case) in addition to that per-invocation event, and
+ * each is independently fail-open.
+ *
+ * THE SYNCHRONOUS-CONNECT-GAP DETAIL (mirrors `phase-entered.ts`): a session
+ * event is emitted with no intervening async work, so the eager socket
+ * `connect` has NOT completed at `emit()` time. The `long-run` buffer holds
+ * the event and DRAINS it on the `connect` event (emit.ts § onConnect). The
+ * client is deliberately NOT closed: `close()` before connect would set the
+ * client `closed` and discard the still-buffered event (which a fixed connect
+ * budget could not reliably beat under load — the flake this replaces), and
+ * the socket + reconnect/flush timers are already `unref()`d (emit.ts), so
+ * leaving it open never keeps the CLI alive nor delays its exit.
  */
 export async function emitSessionEvent(
   installationRoot: string,
@@ -99,21 +68,11 @@ export async function emitSessionEvent(
   sessionId: string,
   snapshot: SnapshotPayload,
 ): Promise<void> {
-  let emitClient: EmitClient | undefined;
   try {
     const socketPath = resolveLocalSocketPath(installationRoot);
-    // A tiny bounded 'long-run' buffer (not 'short-verb'): this emission's
-    // one event must survive the brief connect gap above rather than drop
-    // on the floor the instant `emit()` observes a not-yet-connected socket.
-    emitClient = createEmitClient({ socketPath, callerKind: 'long-run', bufferCapacity: 2 });
-  } catch {
-    // Failed to resolve/create — fail-open, nothing to emit or close.
-  }
-  if (emitClient === undefined) {
-    return;
-  }
-  const client = emitClient;
-  try {
+    // long-run buffer: holds the event across the synchronous connect gap and
+    // drains it on connect (see the module doc). NOT closed — unref()d timers.
+    const client = createEmitClient({ socketPath, callerKind: 'long-run', bufferCapacity: 2 });
     const clock = new SystemClock();
     const originMonotonicMs = clock.monotonicNowMs();
     const installationId = mintOrReadInstallationId(installationRoot);
@@ -139,14 +98,7 @@ export async function emitSessionEvent(
       snapshot,
     };
     client.emit(event);
-    await waitForConnectOrBudget(client, CONNECT_BUDGET_MS);
   } catch {
     // Fail-open: nothing about event construction/emission may surface.
-  } finally {
-    try {
-      client.close();
-    } catch {
-      // Fail-open: closing must never surface either.
-    }
   }
 }
