@@ -90,7 +90,8 @@ function makeEvent(seq: number): TelemetryEvent {
       schemaVersion: 1,
       type: 'run.progress',
       classification: 'aggregated',
-    }),
+      sessionId: null,
+    }, process.cwd()),
     snapshot: {},
   };
 }

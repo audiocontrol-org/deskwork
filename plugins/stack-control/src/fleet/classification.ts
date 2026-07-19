@@ -109,10 +109,13 @@ const EVENT_CLASSIFICATIONS: ReadonlyMap<EventType, EventClassification> =
     ['invocation.completed', 'aggregated'],
     ['run.progress', 'aggregated'],
     // durable — its own immutable object (the historical record)
+    ['session.started', 'durable'],
+    ['session.ended', 'durable'],
     ['run.started', 'durable'],
     ['run.completed', 'durable'],
     ['run.failed', 'durable'],
     ['run.cancelled', 'durable'],
+    ['phase.entered', 'durable'],
   ]);
 
 /**

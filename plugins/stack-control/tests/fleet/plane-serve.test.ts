@@ -107,6 +107,9 @@ function makeRawEvent(overrides: {
       wallClock: new Date().toISOString(),
       monotonicOffsetMs: 12,
       classification: 'durable',
+      host: 'test-host',
+      path: '/test/installation/root',
+      sessionId: null,
     },
     snapshot: {},
   };

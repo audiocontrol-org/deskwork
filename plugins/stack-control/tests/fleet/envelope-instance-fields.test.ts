@@ -72,7 +72,7 @@ describe('EventEnvelope instance fields (T006 — host, path, sessionId)', () =>
         installationSequence: 1,
         invocationSequence: 1,
         schemaVersion: 2, // NEW version for this feature
-        type: 'test.event',
+        type: 'invocation.completed',
         classification: 'aggregated',
         sessionId: 'session-123', // NEW field on input
       };
@@ -117,7 +117,7 @@ describe('EventEnvelope instance fields (T006 — host, path, sessionId)', () =>
         installationSequence: 1,
         invocationSequence: 1,
         schemaVersion: 2,
-        type: 'test.event',
+        type: 'invocation.completed',
         classification: 'aggregated',
         sessionId: null, // NEW: nullable sessionId
       };
@@ -145,7 +145,7 @@ describe('EventEnvelope instance fields (T006 — host, path, sessionId)', () =>
         installationSequence: 1,
         invocationSequence: 1,
         schemaVersion: 2,
-        type: 'test.event',
+        type: 'invocation.completed',
         wallClock: '2026-07-18T12:00:00.000Z',
         monotonicOffsetMs: 100,
         classification: 'aggregated' as const,
@@ -185,7 +185,7 @@ describe('EventEnvelope instance fields (T006 — host, path, sessionId)', () =>
         installationSequence: 1,
         invocationSequence: 1,
         schemaVersion: 2,
-        type: 'test.event',
+        type: 'invocation.completed',
         wallClock: '2026-07-18T12:00:00.000Z',
         monotonicOffsetMs: 100,
         classification: 'aggregated' as const,
@@ -225,7 +225,7 @@ describe('EventEnvelope instance fields (T006 — host, path, sessionId)', () =>
         installationSequence: 1,
         invocationSequence: 1,
         schemaVersion: 2,
-        type: 'test.event',
+        type: 'invocation.completed',
         wallClock: '2026-07-18T12:00:00.000Z',
         monotonicOffsetMs: 100,
         classification: 'aggregated' as const,
@@ -265,7 +265,7 @@ describe('EventEnvelope instance fields (T006 — host, path, sessionId)', () =>
         installationSequence: 1,
         invocationSequence: 1,
         schemaVersion: 2,
-        type: 'test.event',
+        type: 'invocation.completed',
         wallClock: '2026-07-18T12:00:00.000Z',
         monotonicOffsetMs: 100,
         classification: 'aggregated' as const,
@@ -300,7 +300,7 @@ describe('EventEnvelope instance fields (T006 — host, path, sessionId)', () =>
         installationSequence: 1,
         invocationSequence: 1,
         schemaVersion: 2, // NEW version for this feature
-        type: 'test.event',
+        type: 'invocation.completed',
         classification: 'aggregated',
         sessionId: 'session-123',
       };

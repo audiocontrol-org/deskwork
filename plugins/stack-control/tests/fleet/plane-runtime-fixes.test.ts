@@ -109,6 +109,9 @@ function runStartedBody(runId: string, installationId: string): string {
       wallClock: new Date().toISOString(),
       monotonicOffsetMs: 5,
       classification: 'durable',
+      host: 'test-host',
+      path: '/test/installation/root',
+      sessionId: null,
     },
     snapshot: {},
   });

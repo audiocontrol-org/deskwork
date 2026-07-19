@@ -107,16 +107,23 @@ export async function runInvocationWithTelemetry(
         // AUDIT-20260717-07: atomic reservation — never the racy read-then-write.
         const installationSequence = reserveNextSequence(location);
         const event: TelemetryEvent = {
-          envelope: constructEnvelope(clock, originMonotonicMs, {
-            installationId,
-            invocationId,
-            runId: null, // short verbs are never commandable runs (FR-013)
-            installationSequence,
-            invocationSequence: 0, // sole event of this invocation
-            schemaVersion: 1,
-            type: 'invocation.completed',
-            classification: classifyEvent('invocation.completed'),
-          }),
+          envelope: constructEnvelope(
+            clock,
+            originMonotonicMs,
+            {
+              installationId,
+              invocationId,
+              runId: null, // short verbs are never commandable runs (FR-013)
+              installationSequence,
+              invocationSequence: 0, // sole event of this invocation
+              schemaVersion: 2, // specs/037: envelope now carries host/path/sessionId
+              type: 'invocation.completed',
+              classification: classifyEvent('invocation.completed'),
+              // The current-session read is a later task (T019); null for now.
+              sessionId: null,
+            },
+            installationRoot, // host/path derived by construction (FR-011)
+          ),
           // Carry a success/failure signal so a fleet monitor can distinguish a
           // clean invocation from a failing one (AUDIT-20260717-08).
           snapshot: { outcome: handlerThrew ? 'error' : 'ok' },

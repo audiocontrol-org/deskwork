@@ -42,7 +42,17 @@ export function mintUuidV7(): string {
 /** Event envelope `type` values recognized at this layer (extended by
  * event.ts as domain event types are added; the envelope shape itself is
  * type-agnostic per data-model.md § Event). */
-export type EventType = string;
+export type EventType =
+  | 'session.heartbeat'
+  | 'session.started'
+  | 'session.ended'
+  | 'invocation.completed'
+  | 'run.progress'
+  | 'run.started'
+  | 'run.completed'
+  | 'run.failed'
+  | 'run.cancelled'
+  | 'phase.entered';
 
 /**
  * The three envelope-level classifications data-model.md § Event → Envelope
@@ -69,6 +79,15 @@ export type EventClassification = 'live-only' | 'aggregated' | 'durable';
  * - `wallClock`            ISO-8601 — describes; never orders (PT-013).
  * - `monotonicOffsetMs`    computed at source.
  * - `classification`       decides cost, not `type` (FR-015).
+ * - `host`                 os.hostname() — the machine this event was born on
+ *   (specs/037 § Instance Identity, D3/D8). DERIVED by construction from the
+ *   installation root; never caller-supplied (FR-011).
+ * - `path`                 fs.realpathSync.native(installationRoot) — the
+ *   canonical on-disk location of the checkout. DERIVED by construction; never
+ *   caller-supplied (FR-011). Together `host` + `path` form the `host:path`
+ *   instance identity (deriveInstanceId, src/machine-state/instance-id.ts).
+ * - `sessionId`            the Claude Code session id this event belongs to, or
+ *   `null` when there is no current session. Caller-supplied (specs/037 § D3).
  */
 export interface EventEnvelope {
   readonly eventId: string;
@@ -82,6 +101,9 @@ export interface EventEnvelope {
   readonly wallClock: string;
   readonly monotonicOffsetMs: number;
   readonly classification: EventClassification;
+  readonly host: string;
+  readonly path: string;
+  readonly sessionId: string | null;
 }
 
 /**

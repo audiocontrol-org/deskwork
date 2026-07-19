@@ -187,7 +187,10 @@ function isPermanentRejection(status: number): boolean {
 }
 
 const DEFAULT_DRAIN_INTERVAL_MS = 1000;
-const DEFAULT_LIVENESS_INTERVAL_MS = 45_000;
+// Exported so specs/037-instance-observability's liveness-constants module can
+// derive its HEARTBEAT_INTERVAL_MS from this single source rather than
+// restating the value independently (data-model.md D1).
+export const DEFAULT_LIVENESS_INTERVAL_MS = 45_000;
 /** Transmit-retry backoff policy (§ C4 shape; only fires on a failed pass). */
 const DRAIN_BACKOFF_BASE_MS = 1000;
 const DRAIN_BACKOFF_CAP_MS = 30_000;

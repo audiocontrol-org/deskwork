@@ -76,6 +76,7 @@
 
 import { SystemClock, type Clock } from '../fleet/clock.js';
 import { constructEnvelope, type SnapshotPayload, type TelemetryEvent } from '../fleet/event.js';
+import { knownEventTypes } from '../fleet/classification.js';
 import type { EventClassification, EventType } from '../fleet/types.js';
 import {
   createSystemRedactionContext,
@@ -86,10 +87,12 @@ import {
 import { openWal, type WalHandle } from './spool/wal.js';
 
 /** The literal event-envelope schema version this pipeline stamps every
- * event with. `src/cli.ts`'s emit-client path uses the same literal `1` —
- * kept as a plain literal here too rather than importing a shared constant
- * that does not yet exist anywhere in this codebase. */
-const SCHEMA_VERSION = 1;
+ * event with. Bumped to `2` for specs/037 (the envelope now carries the
+ * instance-identity fields host/path/sessionId); the short-verb emit path
+ * (src/telemetry/invocation-telemetry.ts) stamps the same `2`. Kept as a plain
+ * literal here rather than importing a shared constant that does not yet exist
+ * anywhere in this codebase. */
+const SCHEMA_VERSION = 2;
 
 /**
  * One raw invocation event as the sidecar-side caller (the emit client, a
@@ -209,6 +212,24 @@ function requireNonEmptyString(value: unknown, label: string): string {
   return value;
 }
 
+/**
+ * Narrow a raw `type` to `EventType` against the registered catalog
+ * (`knownEventTypes()`). Fail loud on an unknown type (Principle V) — an
+ * unregistered type has no classification. `.find` yields `EventType |
+ * undefined`, so the narrowing needs no cast.
+ */
+function requireEventType(value: unknown, label: string): EventType {
+  const raw = requireNonEmptyString(value, label);
+  const match = knownEventTypes().find((known) => known === raw);
+  if (match === undefined) {
+    throw new Error(
+      `RawInvocationEvent.${label}: unknown event type ${JSON.stringify(raw)} — every ` +
+        'event type must be registered in the classification catalog (src/fleet/classification.ts)',
+    );
+  }
+  return match;
+}
+
 function requireNullableString(value: unknown, label: string): string | null {
   if (value === null) return null;
   if (typeof value !== 'string' || value.length === 0) {
@@ -241,7 +262,7 @@ function validateAndNormalize(raw: RawInvocationEvent): RawInvocationEvent {
     installationId: requireNonEmptyString(raw.installationId, 'installationId'),
     invocationId: requireNonEmptyString(raw.invocationId, 'invocationId'),
     runId: requireNullableString(raw.runId, 'runId'),
-    type: requireNonEmptyString(raw.type, 'type'),
+    type: requireEventType(raw.type, 'type'),
     classification: requireClassification(raw.classification),
   };
 }
@@ -403,16 +424,23 @@ export function createPipeline(walDir: string, options?: PipelineOptions): Sidec
       const installationSequence = takeInstallationSequence();
       const invocationSequence = nextInvocationSequence(raw.invocationId);
 
-      const envelope = constructEnvelope(clock, originMonotonicMs, {
-        installationId: raw.installationId,
-        invocationId: raw.invocationId,
-        runId: raw.runId,
-        installationSequence,
-        invocationSequence,
-        schemaVersion: SCHEMA_VERSION,
-        type: raw.type,
-        classification: raw.classification,
-      });
+      const envelope = constructEnvelope(
+        clock,
+        originMonotonicMs,
+        {
+          installationId: raw.installationId,
+          invocationId: raw.invocationId,
+          runId: raw.runId,
+          installationSequence,
+          invocationSequence,
+          schemaVersion: SCHEMA_VERSION,
+          type: raw.type,
+          classification: raw.classification,
+          // The current-session read is a later task (T019); null for now.
+          sessionId: null,
+        },
+        walDir, // the pipeline's on-disk root — host/path derived by construction (FR-011)
+      );
 
       const event: TelemetryEvent = { envelope, snapshot };
 

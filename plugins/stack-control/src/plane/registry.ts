@@ -59,6 +59,7 @@
  */
 
 import type { CommandKind } from '../fleet/command.js';
+import type { SnapshotPayload } from '../fleet/event.js';
 import type { ExecutionStatus, StatusAxes } from '../fleet/status.js';
 import type { EventClassification, EventEnvelope, EventType } from '../fleet/types.js';
 
@@ -78,6 +79,15 @@ export interface ClassifiedEvent {
   readonly envelope: EventEnvelope;
   readonly classification: EventClassification;
   readonly type: EventType;
+  /**
+   * The event's bounded, already-validated snapshot payload (`≤ 32 KiB` —
+   * `event.ts` § `SnapshotPayload` / `MAX_EVENT_SNAPSHOT_BYTES`). Threaded
+   * through the ingest→registry→log boundary (specs/037 D5, data-model.md
+   * § ClassifiedEvent EXTEND): `toClassifiedEvent` copies it off the wire
+   * `TelemetryEvent`, `appendDurably` serializes it, and `parseLine` restores
+   * it (re-validated) so event-specific payload survives a plane restart.
+   */
+  readonly snapshot: SnapshotPayload;
 }
 
 // ---------------------------------------------------------------------------

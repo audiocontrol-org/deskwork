@@ -74,9 +74,10 @@ function makeTelemetryEvent(): TelemetryEvent {
     schemaVersion: 1,
     type: 'run.started',
     classification: 'durable',
+    sessionId: null,
   };
   return {
-    envelope: constructEnvelope(clock, 900, input),
+    envelope: constructEnvelope(clock, 900, input, process.cwd()),
     snapshot: { note: 'representative snapshot payload' },
   };
 }

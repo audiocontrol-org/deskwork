@@ -84,7 +84,7 @@ import {
   writeSync,
 } from 'node:fs';
 import { join } from 'node:path';
-import { validateEnvelope } from '../fleet/event.js';
+import { validateEnvelope, validateSnapshot } from '../fleet/event.js';
 import type { ClassifiedEvent } from './registry.js';
 
 /** File name for the append-only accepted-event log under the log dir. */
@@ -103,7 +103,10 @@ export interface EventLog {
  * envelope is re-validated with the same `validateEnvelope` the ingest
  * boundary uses (fail loud on a corrupt record); `classification` / `type` are
  * derived from the validated envelope so the recovered event is always
- * internally consistent — never trusted verbatim off disk.
+ * internally consistent — never trusted verbatim off disk. The bounded
+ * `snapshot` (specs/037 D5) is likewise re-validated with `validateSnapshot`
+ * (same `≤ 32 KiB` / no-history bound the ingest boundary enforced) so a
+ * persisted event-specific payload survives a plane restart intact.
  */
 function parseLine(line: string, source: string): ClassifiedEvent {
   let raw: unknown;
@@ -118,8 +121,13 @@ function parseLine(line: string, source: string): ClassifiedEvent {
   if (typeof raw !== 'object' || raw === null || !('envelope' in raw)) {
     throw new Error(`createEventLog: corrupt line in ${source} — missing "envelope".`);
   }
-  const envelope = validateEnvelope((raw as { envelope: unknown }).envelope);
-  return { envelope, classification: envelope.classification, type: envelope.type };
+  if (!('snapshot' in raw)) {
+    throw new Error(`createEventLog: corrupt line in ${source} — missing "snapshot".`);
+  }
+  const record: { envelope: unknown; snapshot: unknown } = raw;
+  const envelope = validateEnvelope(record.envelope);
+  const snapshot = validateSnapshot(record.snapshot);
+  return { envelope, classification: envelope.classification, type: envelope.type, snapshot };
 }
 
 /**

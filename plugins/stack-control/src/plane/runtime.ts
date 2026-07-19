@@ -44,53 +44,21 @@
 
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { IncomingMessage, Server, ServerResponse } from 'node:http';
-import { buildRegistry, type ClassifiedEvent, type FleetEntry } from './registry.js';
+import type { IncomingMessage, Server } from 'node:http';
+import type { ClassifiedEvent } from './registry.js';
 import {
-  commandStatus,
-  fleetSnapshot,
-  issueCommand,
-  issueFleetCommand,
-  perRunDetail,
-  runHistory,
-  runTimings,
-  type FleetDelta,
-} from './http/api.js';
-import {
-  ingestEvent,
   rehydrateIngestState,
   type DurableEventStore,
-  type IngestOutcome,
   type IngestState,
 } from './http/ingest.js';
 import { createEventLog, type EventLog } from './event-log.js';
-import {
-  assertSessionLiveness,
-  computeFleetTickGuarded,
-  ingestClaimedInstallationId,
-  installationIdForRun,
-  parseCommandKind,
-  parseTargets,
-  readJsonBody,
-  refuseInstallationMismatch,
-  requireParam,
-  respondJson,
-} from './runtime-http.js';
+import { respondJson } from './runtime-http.js';
 import type { CdnReader } from '../storage/cdn-reader.js';
 import { createCommandStore, type CommandStore } from './commands/store.js';
 import { createCommandDispatch, type CommandDispatch } from './commands/dispatch.js';
-import {
-  KEEPALIVE_INTERVAL_MS,
-  NODE_INTERVAL_SCHEDULER,
-  createCommandStreamHandler,
-  type IntervalScheduler,
-} from './http/stream.js';
+import { NODE_INTERVAL_SCHEDULER, type IntervalScheduler } from './http/stream.js';
 import { createTokenRegistry, parseBearer, type TokenRegistry } from './http/auth.js';
-import {
-  computeStoreHealth,
-  type ArchiveSignals,
-  type UplinkSignals,
-} from './health.js';
+import { type ArchiveSignals, type UplinkSignals } from './health.js';
 import {
   createPlaneServer,
   type ExtraRoute,
@@ -99,6 +67,7 @@ import {
   type RouteHandler,
 } from './http/server.js';
 import type { TelemetryEvent } from '../fleet/event.js';
+import { buildPlaneHandlers } from './runtime-handlers.js';
 
 // ---------------------------------------------------------------------------
 // Options + public surface.
@@ -235,268 +204,24 @@ export function createPlaneRuntime(options: PlaneRuntimeOptions): PlaneRuntime {
     };
   }
 
-  // --- fleet SSE (C2 deltas) ---------------------------------------------
-  function writeFleetDelta(res: ServerResponse, delta: FleetDelta): void {
-    res.write(`event: fleet-delta\ndata: ${JSON.stringify(delta)}\n\n`);
-  }
-
-  function logFleetTickError(error: unknown): void {
-    // A poison event must never crash the process (AUDIT-20260718-04). Skip the
-    // tick, keep the stream alive, and leave a diagnostic so the bad event is
-    // discoverable — the honest "visible, not silent" posture.
-    process.stderr.write(
-      `plane fleet-stream: skipping tick after buildRegistry error: ${
-        error instanceof Error ? error.message : String(error)
-      }\n`,
-    );
-  }
-
-  const fleetStreamHandler: RouteHandler = (ctx: RouteContext): void => {
-    ctx.res.writeHead(200, {
-      'content-type': 'text/event-stream',
-      'cache-control': 'no-cache',
-      connection: 'keep-alive',
+  // --- handlers (extracted to runtime-handlers.ts, T015) ------------------
+  // The raw (pre-auth) handler bodies live in the sibling module to keep both
+  // files under the Constitution VI file cap; they close over the live state
+  // above through the injected context. Behavior is unchanged.
+  const { consumerHandlers, ingestHandler, sidecarStreamHandler, livenessHandler } =
+    buildPlaneHandlers({
+      events,
+      ingestState,
+      commandStore,
+      commandDispatch,
+      uplinkSignals,
+      archiveSignals,
+      durableStore,
+      eventLog,
+      scheduler,
+      cdnReader: options.cdnReader,
+      requireAuthedInstallation,
     });
-    ctx.res.flushHeaders();
-    let last: readonly FleetEntry[] = [];
-    const initial = computeFleetTickGuarded(events, last);
-    if (initial.error === undefined) {
-      for (const delta of initial.deltas) {
-        writeFleetDelta(ctx.res, delta);
-      }
-      last = initial.next;
-    } else {
-      logFleetTickError(initial.error);
-    }
-    const timer = scheduler.setInterval(() => {
-      // GUARDED: the tick body ran a bare `buildRegistry(...)` with no
-      // try/catch — any throw here is an UNCAUGHT exception in a setInterval
-      // callback, which by default terminates the whole Node process (every
-      // route down), not just this stream. `computeFleetTickGuarded` contains
-      // the throw so a bad event only skips a tick (AUDIT-20260718-04).
-      const tick = computeFleetTickGuarded(events, last);
-      if (tick.error === undefined) {
-        for (const delta of tick.deltas) {
-          writeFleetDelta(ctx.res, delta);
-        }
-        last = tick.next;
-      } else {
-        logFleetTickError(tick.error);
-      }
-      // § C3 transport keepalive comment — proves nothing about health.
-      ctx.res.write(':keepalive\n\n');
-    }, KEEPALIVE_INTERVAL_MS);
-    ctx.res.once('close', () => scheduler.clearInterval(timer));
-  };
-
-  // --- consumer handlers (C2/C5/C6, § Store health) -----------------------
-  const consumerHandlers: PlaneRouteHandlers = {
-    fleetSnapshot: (ctx) => {
-      respondJson(ctx.res, 200, fleetSnapshot(buildRegistry(events)));
-    },
-    fleetStream: fleetStreamHandler,
-    runDetail: (ctx) => {
-      const entry = buildRegistry(events)
-        .entries()
-        .find((candidate) => candidate.runId === ctx.params.runId);
-      if (entry === undefined) {
-        respondJson(ctx.res, 404, { error: 'run not found', runId: ctx.params.runId });
-        return;
-      }
-      respondJson(ctx.res, 200, perRunDetail(entry));
-    },
-    runHistory: async (ctx) => {
-      // History reads the finalized run's archived `summary.json` through the
-      // injected CdnReader — the ONLY sanctioned durable-store read seam (C7,
-      // AUDIT-20260717-13/-15). The run's installationId is resolved from the
-      // live registry (the object key is per-installation).
-      const runId = requireParam(ctx, 'runId');
-      if (options.cdnReader === undefined) {
-        respondJson(ctx.res, 200, { found: false, runId });
-        return;
-      }
-      const installationId = installationIdForRun(events, runId);
-      if (installationId === undefined) {
-        respondJson(ctx.res, 200, { found: false, runId });
-        return;
-      }
-      try {
-        const result = await runHistory(options.cdnReader, installationId, runId);
-        respondJson(ctx.res, 200, result);
-      } catch (error) {
-        respondJson(ctx.res, 400, { error: error instanceof Error ? error.message : String(error) });
-      }
-    },
-    runTimings: async (ctx) => {
-      const runId = requireParam(ctx, 'runId');
-      const absent = {
-        runId,
-        phases: { design: undefined, spec: undefined, execution: undefined, governance: undefined },
-      };
-      if (options.cdnReader === undefined) {
-        respondJson(ctx.res, 200, absent);
-        return;
-      }
-      const installationId = installationIdForRun(events, runId);
-      if (installationId === undefined) {
-        respondJson(ctx.res, 200, absent);
-        return;
-      }
-      try {
-        const result = await runTimings(options.cdnReader, installationId, runId);
-        respondJson(ctx.res, 200, result);
-      } catch (error) {
-        respondJson(ctx.res, 400, { error: error instanceof Error ? error.message : String(error) });
-      }
-    },
-    issueRunCommand: async (ctx) => {
-      try {
-        const body = await readJsonBody(ctx.req);
-        const kind = parseCommandKind(body);
-        const runId = requireParam(ctx, 'runId');
-        // Resolve the run's OWNER from the live registry (AUDIT-20260717-16).
-        // The held command must target the installation that owns `runId`, NOT
-        // whichever bearer the caller authenticated with — otherwise
-        // `replayOnReconnect` delivers it to the wrong sidecar. An unknown run
-        // is rejected (the plane cannot command a run it has never observed).
-        const entry = buildRegistry(events).entries().find((candidate) => candidate.runId === runId);
-        if (entry === undefined) {
-          respondJson(ctx.res, 404, { error: 'run not found', runId });
-          return;
-        }
-        const result = await issueCommand(commandStore, commandDispatch, {
-          kind,
-          installationId: entry.installationId,
-          runId,
-        });
-        respondJson(ctx.res, 200, result);
-      } catch (error) {
-        respondJson(ctx.res, 400, { error: error instanceof Error ? error.message : String(error) });
-      }
-    },
-    commandStatus: (ctx) => {
-      respondJson(ctx.res, 200, commandStatus(commandStore, requireParam(ctx, 'commandId')));
-    },
-    issueFleetCommand: async (ctx) => {
-      try {
-        const body = await readJsonBody(ctx.req);
-        const kind = parseCommandKind(body);
-        const targets = parseTargets(body);
-        const installationId = requireAuthedInstallation(ctx.req);
-        const reachable = new Set(buildRegistry(events).entries().map((e) => e.installationId));
-        const result = await issueFleetCommand(
-          commandStore,
-          commandDispatch,
-          { kind, installationId, runId: null },
-          targets,
-          (target) => reachable.has(target),
-        );
-        respondJson(ctx.res, 200, result);
-      } catch (error) {
-        respondJson(ctx.res, 400, { error: error instanceof Error ? error.message : String(error) });
-      }
-    },
-    storeHealth: (ctx) => {
-      respondJson(ctx.res, 200, computeStoreHealth(uplinkSignals, archiveSignals));
-    },
-  };
-
-  // --- sidecar-facing handlers (C1/C3/C7) --------------------------------
-  // Undo an accepted event's ingest-state mutation to its pre-image so a retry
-  // of an event whose durable append FAILED is re-accepted, never deduped/staled
-  // into a 200 for an event the plane never durably recorded (AUDIT-20260718-37).
-  // `ingestEvent` always installs a FRESH `RunIngestState` via `runs.set` (never
-  // mutates one in place), so the shallow snapshot's references are faithful.
-  function rollbackAcceptedIngest(runsBefore: IngestState['runs'], event: ClassifiedEvent): void {
-    ingestState.seenEventIds.delete(event.envelope.eventId);
-    const { runId } = event.envelope;
-    if (runId === null) {
-      return;
-    }
-    const prior = runsBefore.get(runId);
-    if (prior === undefined) {
-      ingestState.runs.delete(runId);
-    } else {
-      ingestState.runs.set(runId, prior);
-    }
-  }
-
-  const ingestHandler: RouteHandler = async (ctx) => {
-    // Pre-image captured BEFORE `ingestEvent` mutates the bookkeeping — the
-    // rollback anchor for a failed durable append (AUDIT-20260718-37).
-    const runsBefore: IngestState['runs'] = new Map(ingestState.runs);
-    let outcome: IngestOutcome;
-    try {
-      const body = await readJsonBody(ctx.req);
-      // AUTHED-INSTALLATION ENFORCEMENT (AUDIT-20260718-45): the authenticated
-      // installation is the TOKEN's, never the caller-claimed body id — so a valid
-      // installation-A token cannot POST telemetry claiming `installationId: B`
-      // (spoofing B's fleet/host-health state). Refuse 403 BEFORE `ingestEvent`
-      // touches any bookkeeping. A body with NO claimed id (`undefined`) falls
-      // through to envelope validation, which 400s it — malformed-body stays a
-      // client error, not a spoof (AUDIT-20260718-26).
-      const claimed = ingestClaimedInstallationId(body);
-      if (
-        claimed !== undefined &&
-        refuseInstallationMismatch(ctx.res, claimed, requireAuthedInstallation(ctx.req), 'ingest body envelope.installationId')
-      ) {
-        return;
-      }
-      outcome = await ingestEvent(ingestState, { durableStore }, body);
-    } catch (error) {
-      // A body rejected AT THE BOUNDARY (malformed JSON / failed validation) is
-      // CLIENT input error — an honest 400 that must NOT move the uplink health
-      // needle, or one caller sending garbage makes /v1/health/store cry wolf to
-      // every subsequent caller (AUDIT-20260718-26). Only failures DOWNSTREAM of
-      // successful validation (the append below) degrade the uplink hop.
-      respondJson(ctx.res, 400, { error: error instanceof Error ? error.message : String(error) });
-      return;
-    }
-    if (outcome.kind === 'accepted') {
-      try {
-        // Durable append is the FIRST irreversible step for an accepted event
-        // (AUDIT-20260718-06/-37): synchronous + fsynced (event-log.ts). Only
-        // after it returns do we admit the event and let the mutation stand.
-        eventLog.append(outcome.event);
-      } catch (error) {
-        // Genuine downstream transport/storage failure (post-validation): roll
-        // the bookkeeping back so the retry re-accepts, degrade the UPLINK hop
-        // honestly, answer non-2xx so the sidecar resends.
-        rollbackAcceptedIngest(runsBefore, outcome.event);
-        uplinkSignals.lastFailure = new Date().toISOString();
-        uplinkSignals.lastError = error instanceof Error ? error.message : String(error);
-        respondJson(ctx.res, 500, { error: uplinkSignals.lastError });
-        return;
-      }
-      events.push(outcome.event);
-    }
-    uplinkSignals.lastSuccess = new Date().toISOString();
-    respondJson(ctx.res, 200, outcome);
-  };
-
-  const sidecarStreamHandler: RouteHandler = createCommandStreamHandler({
-    dispatch: commandDispatch,
-    installationIdOf: (ctx) => requireAuthedInstallation(ctx.req),
-    scheduler,
-  });
-
-  const livenessHandler: RouteHandler = async (ctx) => {
-    try {
-      const body = await readJsonBody(ctx.req);
-      assertSessionLiveness(body);
-      // AUTHED-INSTALLATION ENFORCEMENT (AUDIT-20260718-45): as with ingest, the
-      // heartbeat's claimed installationId must equal the token's authenticated
-      // one — else installation-A's token could record liveness as installation B.
-      if (
-        refuseInstallationMismatch(ctx.res, body.installationId, requireAuthedInstallation(ctx.req), 'liveness installationId')
-      ) {
-        return;
-      }
-      respondJson(ctx.res, 200, { kind: 'session-liveness', accepted: true });
-    } catch (error) {
-      respondJson(ctx.res, 400, { error: error instanceof Error ? error.message : String(error) });
-    }
-  };
 
   // --- wire the server ----------------------------------------------------
   return {

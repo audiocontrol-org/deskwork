@@ -64,8 +64,15 @@ function sampleEvent(runId: string, sequence: number): ClassifiedEvent {
     wallClock: new Date().toISOString(),
     monotonicOffsetMs: 5,
     classification: 'durable',
+    host: 'test-host',
+    path: '/test/installation/root',
+    sessionId: null,
   };
-  return { envelope, classification: envelope.classification, type: envelope.type };
+  // specs/037 D5: `ClassifiedEvent` now carries a bounded `snapshot` that the
+  // event log persists and `parseLine` restores (re-validated). An empty
+  // object is a valid `SnapshotPayload` (within the 32 KiB bound, no history),
+  // sufficient for these crash-safety round-trips.
+  return { envelope, classification: envelope.classification, type: envelope.type, snapshot: {} };
 }
 
 describe('event-log survives a crash mid-append (AUDIT-20260718-16)', () => {

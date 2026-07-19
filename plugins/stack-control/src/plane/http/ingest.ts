@@ -248,11 +248,15 @@ export type IngestOutcome =
   | { readonly kind: 'late'; readonly event: ClassifiedEvent };
 
 function toClassifiedEvent(telemetryEvent: TelemetryEvent): ClassifiedEvent {
-  const { envelope } = telemetryEvent;
+  const { envelope, snapshot } = telemetryEvent;
   return {
     envelope,
     classification: envelope.classification,
     type: envelope.type,
+    // Thread the bounded, already-validated snapshot through the
+    // ingest→registry→log boundary (specs/037 D5) so event-specific payload
+    // (`phase.entered`/`session.*`) reaches the registry and survives replay.
+    snapshot,
   };
 }
 

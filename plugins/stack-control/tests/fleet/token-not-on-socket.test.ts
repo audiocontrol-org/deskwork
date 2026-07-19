@@ -82,9 +82,10 @@ function makeSensitiveLookingEvent(): TelemetryEvent {
     schemaVersion: 1,
     type: 'run.progress',
     classification: 'live-only',
+    sessionId: null,
   };
   return {
-    envelope: constructEnvelope(clock, 900, input),
+    envelope: constructEnvelope(clock, 900, input, process.cwd()),
     snapshot: { commandLine: '--token-like-flag=not-a-real-secret' },
   };
 }

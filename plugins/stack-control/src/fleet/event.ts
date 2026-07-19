@@ -24,6 +24,8 @@ import {
   type EventEnvelope,
   type EventType,
 } from './types.js';
+import { knownEventTypes } from './classification.js';
+import { deriveInstanceId } from '../machine-state/instance-id.js';
 
 /**
  * Maximum serialized byte size for a single event's snapshot payload.
@@ -65,6 +67,13 @@ export interface EnvelopeInput {
   readonly schemaVersion: number;
   readonly type: EventType;
   readonly classification: EventClassification;
+  /**
+   * The Claude Code session id this event belongs to, or `null` when there is
+   * no current session (specs/037 § D3). Caller-supplied — unlike `host`/`path`
+   * (derived by construction, FR-011), the session is context only the caller
+   * knows, so it is threaded in here rather than derived.
+   */
+  readonly sessionId: string | null;
 }
 
 /**
@@ -83,7 +92,9 @@ export function constructEnvelope(
   clock: Clock,
   originMonotonicMs: number,
   input: EnvelopeInput,
+  installationRoot: string,
 ): EventEnvelope {
+  const { host, path } = deriveInstanceFields(installationRoot);
   return {
     eventId: mintUuidV7(),
     installationId: input.installationId,
@@ -96,6 +107,36 @@ export function constructEnvelope(
     wallClock: clock.nowIso(),
     monotonicOffsetMs: clock.monotonicNowMs() - originMonotonicMs,
     classification: input.classification,
+    host,
+    path,
+    sessionId: input.sessionId,
+  };
+}
+
+/**
+ * Split the `host:path` instance identity `deriveInstanceId` mints (§ D8) back
+ * into its two envelope fields. `host` (os.hostname()) never contains a `:`, so
+ * the FIRST colon is the separator and everything after it is the real path
+ * (which, on Windows, legitimately carries its own `C:` drive colon — hence
+ * splitting on the first colon only, never `split(':')`). Reuses the single
+ * derivation site (src/machine-state/instance-id.ts) rather than re-reading the
+ * hostname/realpath here, so the two never drift.
+ */
+function deriveInstanceFields(installationRoot: string): {
+  readonly host: string;
+  readonly path: string;
+} {
+  const instanceId = deriveInstanceId(installationRoot);
+  const separator = instanceId.indexOf(':');
+  if (separator < 0) {
+    throw new Error(
+      `deriveInstanceFields: deriveInstanceId returned ${JSON.stringify(instanceId)} ` +
+        'without a "host:path" separator — cannot split host from path',
+    );
+  }
+  return {
+    host: instanceId.slice(0, separator),
+    path: instanceId.slice(separator + 1),
   };
 }
 
@@ -198,6 +239,31 @@ function requireClassification(record: Record<string, unknown>, key: string): Ev
 }
 
 /**
+ * Narrow a raw envelope `type` to `EventType` by matching against the
+ * registered catalog (`knownEventTypes()` from classification.ts). Fail loud on
+ * an unknown type (Principle V) — an unregistered type has no classification, so
+ * accepting it would defer a guaranteed failure to `classifyEvent`. `.find`
+ * yields `EventType | undefined`, so the narrowing needs no cast.
+ */
+function requireEventType(record: Record<string, unknown>, key: string): EventType {
+  const value = record[key];
+  if (typeof value !== 'string') {
+    throw new Error(
+      `EventEnvelope.${key}: expected a known event type string, got ${describeType(value)}`,
+    );
+  }
+  const match = knownEventTypes().find((known) => known === value);
+  if (match === undefined) {
+    throw new Error(
+      `EventEnvelope.${key}: unknown event type ${JSON.stringify(value)} — every ` +
+        'envelope type must be one registered in the classification catalog ' +
+        '(src/fleet/classification.ts)',
+    );
+  }
+  return match;
+}
+
+/**
  * Validate an unknown value as an `EventEnvelope`, rejecting missing or
  * wrong-typed fields with a descriptive error (fail loud, per the
  * project's no-silent-coercion rule). Returns a freshly-built, correctly
@@ -213,10 +279,13 @@ export function validateEnvelope(value: unknown): EventEnvelope {
   const installationSequence = requireNonNegativeInteger(record, 'installationSequence');
   const invocationSequence = requireNonNegativeInteger(record, 'invocationSequence');
   const schemaVersion = requireNonNegativeInteger(record, 'schemaVersion');
-  const type = requireString(record, 'type');
+  const type = requireEventType(record, 'type');
   const wallClock = requireIsoWallClock(record, 'wallClock');
   const monotonicOffsetMs = requireFiniteNumber(record, 'monotonicOffsetMs');
   const classification = requireClassification(record, 'classification');
+  const host = requireString(record, 'host');
+  const path = requireString(record, 'path');
+  const sessionId = requireNullableString(record, 'sessionId');
 
   return {
     eventId,
@@ -230,6 +299,9 @@ export function validateEnvelope(value: unknown): EventEnvelope {
     wallClock,
     monotonicOffsetMs,
     classification,
+    host,
+    path,
+    sessionId,
   };
 }
 

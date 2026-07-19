@@ -54,7 +54,8 @@ import { afterAll, afterEach, beforeEach } from 'vitest';
 // module). The harness redirects the store that locate.ts resolves, so its key
 // MUST be locate's key, byte-for-byte — importing it makes divergence impossible
 // rather than merely test-detectable.
-import { storeKey } from '../../src/machine-state/locate.js';
+import { locateMachineState, storeKey } from '../../src/machine-state/locate.js';
+import { resolveInstallation } from '../../src/config/installation.js';
 import {
   existsSync,
   mkdirSync,
@@ -98,6 +99,15 @@ export interface MachineStateStore {
   readonly env: Readonly<Record<MachineStateEnvKey, string>>;
   /** The worst-case socket path for a given installation root (budget-relevant). */
   socketPathFor(installationRoot: string): string;
+  /**
+   * The durable dir for the enclosing stack-control installation (the one
+   * `resolveInstallation(process.cwd())` resolves) UNDER this redirected
+   * store — the same resolution `current-session.ts` and other root-less
+   * machine-state callers use. Convenience for tests that assert against a
+   * module with no caller-supplied installation root (e.g.
+   * `tests/instance/current-session.test.ts`).
+   */
+  readonly durableDir: string;
 }
 
 /** A redirect handle whose `dispose()` re-poisons durable + restores ephemeral. */
@@ -266,6 +276,9 @@ export function redirectMachineState(): MachineStateRedirect {
     env,
     socketPathFor(installationRoot: string): string {
       return join(roots.runtimeDir, STORE_SUBDIR, storeKey(installationRoot) + SOCKET_SUFFIX);
+    },
+    get durableDir(): string {
+      return locateMachineState(resolveInstallation(process.cwd()).root).durableDir;
     },
     dispose(): void {
       if (disposed) return;

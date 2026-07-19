@@ -62,14 +62,19 @@ function baseInput(): EnvelopeInput {
     schemaVersion: 1,
     type: 'run.started',
     classification: 'durable',
+    sessionId: null,
   };
 }
+
+/** A real, existing installation-root dir for tests that don't assert on the
+ * derived host/path — `constructEnvelope` calls `realpathSync.native` on it. */
+const TEST_INSTALLATION_ROOT = process.cwd();
 
 describe('constructEnvelope (T014/T015, data-model § Event → Envelope)', () => {
   it('builds a well-formed EventEnvelope using the injected Clock', () => {
     const clock = new FakeClock('2026-07-17T00:00:00.000Z', 1000);
     const input = baseInput();
-    const envelope = constructEnvelope(clock, 1000, input);
+    const envelope = constructEnvelope(clock, 1000, input, TEST_INSTALLATION_ROOT);
 
     expect(envelope.installationId).toBe(input.installationId);
     expect(typeof envelope.eventId).toBe('string');
@@ -83,8 +88,8 @@ describe('constructEnvelope (T014/T015, data-model § Event → Envelope)', () =
   it('mints a fresh eventId on every construction (never supplied by the caller)', () => {
     const clock = new FakeClock('2026-07-17T00:00:00.000Z', 0);
     const input = baseInput();
-    const a = constructEnvelope(clock, 0, input);
-    const b = constructEnvelope(clock, 0, input);
+    const a = constructEnvelope(clock, 0, input, TEST_INSTALLATION_ROOT);
+    const b = constructEnvelope(clock, 0, input, TEST_INSTALLATION_ROOT);
     expect(a.eventId).not.toBe(b.eventId);
   });
 
@@ -94,7 +99,7 @@ describe('constructEnvelope (T014/T015, data-model § Event → Envelope)', () =
     // SAME injected Clock, not carried in from outside.
     const clock = new FakeClock('2026-07-17T00:00:00.000Z', 5000);
     const origin = 4000; // invocation started 1000ms of monotonic time ago
-    const envelope = constructEnvelope(clock, origin, baseInput());
+    const envelope = constructEnvelope(clock, origin, baseInput(), TEST_INSTALLATION_ROOT);
     expect(envelope.monotonicOffsetMs).toBe(1000);
   });
 
@@ -102,21 +107,21 @@ describe('constructEnvelope (T014/T015, data-model § Event → Envelope)', () =
     // A clock frozen far in the past proves the envelope did not fall back
     // to real wall/monotonic time.
     const clock = new FakeClock('2000-01-01T00:00:00.000Z', 42);
-    const envelope = constructEnvelope(clock, 42, baseInput());
+    const envelope = constructEnvelope(clock, 42, baseInput(), TEST_INSTALLATION_ROOT);
     expect(envelope.wallClock).toBe('2000-01-01T00:00:00.000Z');
     expect(envelope.monotonicOffsetMs).toBe(0);
   });
 
   it('passes runId through as null for non-run invocations', () => {
     const clock = new FakeClock('2026-07-17T00:00:00.000Z', 0);
-    const envelope = constructEnvelope(clock, 0, { ...baseInput(), runId: null });
+    const envelope = constructEnvelope(clock, 0, { ...baseInput(), runId: null }, TEST_INSTALLATION_ROOT);
     expect(envelope.runId).toBeNull();
   });
 
   it('passes runId through as a UUIDv7 for run-scoped invocations', () => {
     const clock = new FakeClock('2026-07-17T00:00:00.000Z', 0);
     const runId = mintUuidV7();
-    const envelope = constructEnvelope(clock, 0, { ...baseInput(), runId });
+    const envelope = constructEnvelope(clock, 0, { ...baseInput(), runId }, TEST_INSTALLATION_ROOT);
     expect(envelope.runId).toBe(runId);
   });
 });
@@ -124,7 +129,7 @@ describe('constructEnvelope (T014/T015, data-model § Event → Envelope)', () =
 describe('validateEnvelope (T014/T015 — reject missing/wrong-typed fields)', () => {
   function validEnvelopeLiteral(): Record<string, unknown> {
     const clock = new FakeClock('2026-07-17T00:00:00.000Z', 0);
-    return { ...constructEnvelope(clock, 0, baseInput()) };
+    return { ...constructEnvelope(clock, 0, baseInput(), TEST_INSTALLATION_ROOT) };
   }
 
   it('accepts a well-formed envelope and returns it typed', () => {
@@ -252,7 +257,7 @@ describe('validateSnapshot / validateTelemetryEvent — bounded snapshot contrac
 
   it('validateTelemetryEvent validates both the envelope and the snapshot together', () => {
     const clock = new FakeClock('2026-07-17T00:00:00.000Z', 0);
-    const envelope = constructEnvelope(clock, 0, baseInput());
+    const envelope = constructEnvelope(clock, 0, baseInput(), TEST_INSTALLATION_ROOT);
     const event = validateTelemetryEvent({
       envelope: { ...envelope },
       snapshot: { status: 'running' },
@@ -263,7 +268,7 @@ describe('validateSnapshot / validateTelemetryEvent — bounded snapshot contrac
 
   it('validateTelemetryEvent rejects when the snapshot carries a history array, even if the envelope is valid', () => {
     const clock = new FakeClock('2026-07-17T00:00:00.000Z', 0);
-    const envelope = constructEnvelope(clock, 0, baseInput());
+    const envelope = constructEnvelope(clock, 0, baseInput(), TEST_INSTALLATION_ROOT);
     expect(() =>
       validateTelemetryEvent({
         envelope: { ...envelope },
@@ -274,7 +279,7 @@ describe('validateSnapshot / validateTelemetryEvent — bounded snapshot contrac
 
   it('validateTelemetryEvent rejects when the envelope is invalid, even if the snapshot is fine', () => {
     const clock = new FakeClock('2026-07-17T00:00:00.000Z', 0);
-    const envelope = constructEnvelope(clock, 0, baseInput());
+    const envelope = constructEnvelope(clock, 0, baseInput(), TEST_INSTALLATION_ROOT);
     const badEnvelope: Record<string, unknown> = { ...envelope };
     delete badEnvelope.eventId;
     expect(() =>
