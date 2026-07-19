@@ -33,6 +33,7 @@ import { locateMachineState } from '../machine-state/locate.js';
 import { openTokenCustody } from '../machine-state/token.js';
 import { mintOrReadInstallationId } from '../machine-state/identity.js';
 import { createPlaneRuntime } from '../plane/runtime.js';
+import { buildServeRuntimeOptions } from './plane-serve-options.js';
 import type { SubactionGrammar } from './document-verb-shared.js';
 
 const USAGE = 'usage: plane provision-token --token <value>';
@@ -161,11 +162,16 @@ function parseServeArgs(args: string[]): ServeArgs {
 
 /**
  * `plane serve --port <n> --token <accepted>` — start the runnable plane the
- * dogfood drives. Seeds the runtime's accepted-token set with the single
- * `--token` mapped to THIS installation's id (`mintOrReadInstallationId`),
- * roots the durable command + late-event stores under the machine-local
- * durable dir, and listens on `--port`. The process stays alive holding the
- * server open (Ctrl-C / SIGTERM to stop).
+ * dogfood drives. Builds the runtime options via `buildServeRuntimeOptions`
+ * (the shared, tested assembly), which seeds the runtime's accepted-token set
+ * with the single `--token` mapped to THIS installation's id
+ * (`mintOrReadInstallationId`) AND binds that token to this installation's
+ * `host:path` instance identity (`deriveInstanceId(installationRoot)`, D8) so
+ * the T038 instance-mismatch check (`refuseInstanceMismatch`) is LIVE on the
+ * real serve path — an ingest claiming a DIFFERENT `host:path` is refused 403
+ * (AUDIT-20260719-01). Roots the durable command + late-event stores under the
+ * machine-local durable dir, and listens on `--port`. The process stays alive
+ * holding the server open (Ctrl-C / SIGTERM to stop).
  *
  * SEAM (flagged, not silently deferred): the accepted-token source is a
  * SINGLE `--token`. A multi-installation fleet needs a per-installation
@@ -182,10 +188,14 @@ async function runServe(args: string[]): Promise<void> {
   const installationId = mintOrReadInstallationId(installationRoot);
   const commandStoreDir = join(location.durableDir, 'plane', 'commands');
 
-  const runtime = createPlaneRuntime({
-    acceptedTokens: new Map([[token, installationId]]),
-    commandStoreDir,
-  });
+  const runtime = createPlaneRuntime(
+    buildServeRuntimeOptions({
+      tokens: [token],
+      installationId,
+      installationRoot,
+      commandStoreDir,
+    }),
+  );
   const server = runtime.createServer();
 
   await new Promise<void>((resolve, reject) => {
