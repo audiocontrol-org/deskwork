@@ -17,14 +17,13 @@
 // No `any`, no `as`, no `@ts-ignore`.
 
 import { afterEach, describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { AddressInfo } from 'node:net';
 import type { Server } from 'node:http';
 import { createPlaneRuntime } from '../../src/plane/runtime.js';
+import { ROUTE_TABLE } from '../../src/plane/http/server.js';
+import { boundPort } from '../_bound-port.js';
 
 const TOKEN = 'token-route-ordering';
 const INST = '77777777-7777-7777-8777-777777777777';
@@ -52,11 +51,7 @@ async function startPlane(): Promise<RunningPlane> {
       resolve();
     });
   });
-  const address = server.address() as AddressInfo | string | null;
-  if (address === null || typeof address === 'string') {
-    throw new Error('startPlane: expected a bound TCP AddressInfo');
-  }
-  const running: RunningPlane = { server, baseUrl: `http://127.0.0.1:${address.port}` };
+  const running: RunningPlane = { server, baseUrl: `http://127.0.0.1:${boundPort(server)}` };
   activePlanes.push(running);
   return running;
 }
@@ -77,31 +72,10 @@ afterEach(async () => {
 
 describe('Route-ordering contract (T035, RED)', () => {
   it('ROUTE_TABLE: /v1/instances/stream appears BEFORE /v1/instances/:id (prevents param swallowing)', () => {
-    // Read server.ts and extract ROUTE_TABLE route patterns.
-    const serverFilePath = resolve(__dirname, '../../src/plane/http/server.ts');
-    const serverSource = readFileSync(serverFilePath, 'utf-8');
-
-    // Simple pattern: match `{ method: '...', pattern: '...', handler: '...' }` lines
-    // within the ROUTE_TABLE const declaration (between `const ROUTE_TABLE:` and `];`).
-    const routeTableMatch = serverSource.match(
-      /const ROUTE_TABLE:\s*readonly RouteDefinition\[\]\s*=\s*\[([\s\S]*?)\];/,
-    );
-    // `.match()` returns null (not undefined) on no-match, and toBeDefined()
-    // accepts null — so a drifted ROUTE_TABLE annotation would silently pass this
-    // guard and then TypeError on the `[1]` deref below (AUDIT-20260719-07).
-    expect(routeTableMatch, 'ROUTE_TABLE should be present in server.ts').not.toBeNull();
-
-    const routeTableBlock = routeTableMatch![1];
-
-    // Extract all route patterns in order.
-    const routePattern = /pattern:\s*['"]([^'"]+)['"]/g;
-    const patterns: string[] = [];
-    let match: RegExpExecArray | null;
-    while ((match = routePattern.exec(routeTableBlock)) !== null) {
-      patterns.push(match[1]);
-    }
-
-    // Find indices of /v1/instances/stream and /v1/instances/:id.
+    // Assert against the REAL imported ROUTE_TABLE data structure — not a regex
+    // over server.ts source text, which can silently under-extract on a format
+    // drift (same fragility flagged for read-only-surface.test.ts, AUDIT-11).
+    const patterns = ROUTE_TABLE.map((route) => route.pattern);
     const streamIndex = patterns.indexOf('/v1/instances/stream');
     const detailIndex = patterns.indexOf('/v1/instances/:id');
 

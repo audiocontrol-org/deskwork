@@ -3,111 +3,49 @@
 // INVARIANT: The instances query surface (/v1/instances*) is entirely read-only
 // (FR-024, contracts/instance-query-api.md § No route mutates). Every route
 // whose path starts with /v1/instances MUST have method: 'GET'. No POST, PUT,
-// PATCH, DELETE. This test codifies that invariant by reading ROUTE_TABLE
-// statically.
+// PATCH, DELETE.
 //
-// If this test PASSES, the invariant holds (no state-changing operations on
-// instances). If it FAILS, a violation was introduced and must be flagged.
+// AUDIT-20260719-11: this guard now asserts against the REAL, imported
+// `ROUTE_TABLE` data structure — NOT a regex over server.ts source text. A
+// text-scraping regex can silently under-extract routes (a multi-line entry, a
+// comment, a formatting change, or an unmatched method token drops the route
+// from the parsed set), defeating the very invariant it exists to enforce.
+// Importing the typed array makes every declared route unavoidably visible to
+// the assertion, and TypeScript keeps the check in sync with the route shape.
 //
 // Relative `.js` imports. No `any`, no `as`, no `@ts-ignore`.
 
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
+import { ROUTE_TABLE } from '../../src/plane/http/server.js';
 
-interface RouteEntry {
-  method: string;
-  pattern: string;
-}
+const INSTANCE_PREFIX = '/v1/instances';
 
-/**
- * Parse ROUTE_TABLE from server.ts by text extraction. Returns array of
- * { method, pattern } for each route entry. This is a static guard that
- * verifies the source code itself carries the invariant.
- */
-function extractInstanceRoutes(): RouteEntry[] {
-  const currentFile = fileURLToPath(import.meta.url);
-  const currentDir = dirname(currentFile);
-  const serverPath = join(currentDir, '../../src/plane/http/server.ts');
-
-  const source = readFileSync(serverPath, 'utf8');
-
-  // Extract the ROUTE_TABLE const block. The table spans multiple lines.
-  // Pattern: const ROUTE_TABLE: ... = [ ... ];
-  const routeTableMatch = source.match(
-    /const\s+ROUTE_TABLE\s*:\s*readonly\s+RouteDefinition\[\]\s*=\s*\[([\s\S]*?)^\]/m,
-  );
-  if (!routeTableMatch) {
-    throw new Error(
-      'extractInstanceRoutes: could not find ROUTE_TABLE in server.ts. ' +
-        'Verify the const declaration exists and follows the expected structure.',
-    );
-  }
-
-  const tableContent = routeTableMatch[1];
-
-  // Extract each route entry: { method: 'GET'|'POST', pattern: '...', handler: '...' }
-  // Pattern handles leading whitespace and newlines. We only care about method and pattern.
-  // Capture ANY uppercase method token — not just GET|POST — so a mutating route
-  // declared as DELETE/PUT/PATCH is captured and asserted, never silently skipped
-  // by the regex (AUDIT-20260719-05: the guard exists to catch exactly that).
-  const routePattern =
-    /\{\s*method:\s*'([A-Z]+)',\s*pattern:\s*'([^']+)',\s*handler:\s*'[^']+'\s*\}/g;
-
-  const routes: RouteEntry[] = [];
-  let match: RegExpExecArray | null;
-
-  // eslint-disable-next-line no-cond-assign
-  while ((match = routePattern.exec(tableContent)) !== null) {
-    const method = match[1];
-    const pattern = match[2];
-    routes.push({ method, pattern });
-  }
-
-  if (routes.length === 0) {
-    throw new Error(
-      'extractInstanceRoutes: parsed ROUTE_TABLE but found zero routes. ' +
-        'Check regex or table format.',
-    );
-  }
-
-  return routes;
+function instanceRoutes(): readonly { readonly method: string; readonly pattern: string }[] {
+  return ROUTE_TABLE.filter((route) => route.pattern.startsWith(INSTANCE_PREFIX)).map((route) => ({
+    method: route.method,
+    pattern: route.pattern,
+  }));
 }
 
 describe('read-only surface invariant (FR-024, instance-query-api.md)', () => {
   it('every /v1/instances* route is GET (no state-changing operations)', () => {
-    const allRoutes = extractInstanceRoutes();
+    const routes = instanceRoutes();
 
-    // Filter to instance routes: those whose pattern starts with /v1/instances.
-    const instanceRoutes = allRoutes.filter((route) => route.pattern.startsWith('/v1/instances'));
+    // At least the two currently-wired routes exist.
+    expect(routes.length).toBeGreaterThanOrEqual(2);
 
-    // Verify: must find at least the two documented routes.
-    expect(instanceRoutes.length).toBeGreaterThanOrEqual(2);
-
-    // Assert: each instance route must be GET.
-    for (const route of instanceRoutes) {
-      expect(route.method).toBe('GET');
+    // EVERY declared instance route — whatever method it carries — must be GET.
+    // (Iterating the imported table means a future DELETE/PUT/PATCH/POST entry is
+    // caught here, not silently dropped by a text parser.)
+    for (const route of routes) {
+      expect(route.method, `${route.method} ${route.pattern} must be GET (FR-024)`).toBe('GET');
     }
-
-    // Report the routes found for traceability.
-    const routeDescriptions = instanceRoutes.map((r) => `${r.method} ${r.pattern}`).join(', ');
-    console.log(`Instance routes verified as read-only: ${routeDescriptions}`);
   });
 
   it('documents the enumerated instance routes for audit', () => {
-    const allRoutes = extractInstanceRoutes();
-    const instanceRoutes = allRoutes.filter((route) => route.pattern.startsWith('/v1/instances'));
-
-    // Expected routes per contracts/instance-query-api.md § Routes:
-    // - GET /v1/instances
-    // - GET /v1/instances/:id
-    // - GET /v1/instances/:id/runs (future, T037)
-    // - GET /v1/instances/stream (future, T036)
-
-    const patterns = instanceRoutes.map((r) => r.pattern).sort();
-    console.log('Instance routes enumerated from ROUTE_TABLE:', patterns);
-
+    const patterns = instanceRoutes()
+      .map((r) => r.pattern)
+      .sort();
     // At minimum, the two currently-wired routes must be present.
     expect(patterns).toContain('/v1/instances');
     expect(patterns).toContain('/v1/instances/:id');

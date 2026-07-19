@@ -110,7 +110,7 @@ interface RouteDefinition {
   readonly handler: keyof PlaneRouteHandlers;
 }
 
-const ROUTE_TABLE: readonly RouteDefinition[] = [
+export const ROUTE_TABLE: readonly RouteDefinition[] = [
   { method: 'GET', pattern: '/v1/fleet', handler: 'fleetSnapshot' },
   { method: 'GET', pattern: '/v1/fleet/stream', handler: 'fleetStream' },
   { method: 'GET', pattern: '/v1/runs/:runId', handler: 'runDetail' },

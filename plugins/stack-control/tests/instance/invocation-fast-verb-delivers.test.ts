@@ -38,9 +38,9 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { AddressInfo, Server as NetServer } from 'node:net';
 import type { Server } from 'node:http';
 import { useMachineStateStore } from '../fleet/_machine-state-harness.js';
+import { boundPort } from '../_bound-port.js';
 import { createPlaneRuntime } from '../../src/plane/runtime.js';
 import type { IntervalScheduler } from '../../src/plane/http/stream.js';
 import { runSidecarDaemon, type SidecarDaemonHandle } from '../../src/sidecar/daemon.js';
@@ -134,13 +134,9 @@ describe('D-B (FR-027 Scenario 1): a FAST short verb delivers invocation.complet
         resolve();
       });
     });
-    const address = server.address();
-    if (address === null || typeof address === 'string') {
-      throw new Error('startPlane: expected a bound TCP AddressInfo');
-    }
     const running: RunningPlane = {
       server,
-      baseUrl: `http://127.0.0.1:${(address as AddressInfo).port}`,
+      baseUrl: `http://127.0.0.1:${boundPort(server)}`,
       dir,
     };
     planes.push(running);

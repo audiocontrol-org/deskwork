@@ -50,8 +50,8 @@ import { chmodSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { createServer, type Server as NetServer, type Socket } from 'node:net';
-import type { AddressInfo } from 'node:net';
 import type { Server } from 'node:http';
+import { boundPort } from '../_bound-port.js';
 import { useMachineStateStore, type MachineStateStore } from '../fleet/_machine-state-harness.js';
 import { splitFrameLines } from '../../src/telemetry/protocol.js';
 import { validateTelemetryEvent } from '../../src/fleet/event.js';
@@ -257,12 +257,10 @@ describe('D-E (FR-027 Scenario 3): a committed `workflow advance --apply` delive
         resolve();
       });
     });
-    const address = server.address();
-    if (address === null || typeof address === 'string') throw new Error('startPlane: expected a bound TCP AddressInfo');
-    const boundPort = (address as AddressInfo).port;
-    const running: RunningPlane = { server, baseUrl: `http://127.0.0.1:${boundPort}`, dir };
+    const boundTcpPort = boundPort(server);
+    const running: RunningPlane = { server, baseUrl: `http://127.0.0.1:${boundTcpPort}`, dir };
     planes.push(running);
-    return { ...running, port: boundPort };
+    return { ...running, port: boundTcpPort };
   }
 
   it('RED discriminator: phase.entered is delivered to the sidecar BY THE TIME emitAdvance returns, and currentBearing derives {phase,item}', async () => {

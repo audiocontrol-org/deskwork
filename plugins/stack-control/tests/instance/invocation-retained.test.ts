@@ -21,10 +21,10 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { AddressInfo } from 'node:net';
 import type { Server } from 'node:http';
 import { mintUuidV7 } from '../../src/fleet/types.js';
 import { createPlaneRuntime } from '../../src/plane/runtime.js';
+import { boundPort } from '../_bound-port.js';
 
 const TOKEN = 'token-invocation-retained';
 const INST = '33333333-3333-4333-8333-333333333333';
@@ -56,11 +56,7 @@ async function startPlane(): Promise<RunningPlane> {
       resolve();
     });
   });
-  const address = server.address() as AddressInfo | string | null;
-  if (address === null || typeof address === 'string') {
-    throw new Error('startPlane: expected a bound TCP AddressInfo');
-  }
-  const running: RunningPlane = { server, baseUrl: `http://127.0.0.1:${address.port}` };
+  const running: RunningPlane = { server, baseUrl: `http://127.0.0.1:${boundPort(server)}` };
   activePlanes.push(running);
   return running;
 }

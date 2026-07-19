@@ -23,12 +23,12 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { AddressInfo } from 'node:net';
 import type { Server } from 'node:http';
 import { mintUuidV7 } from '../../src/fleet/types.js';
 import { createPlaneRuntime } from '../../src/plane/runtime.js';
 import { deriveInstanceId } from '../../src/machine-state/instance-id.js';
 import { buildServeRuntimeOptions } from '../../src/subcommands/plane-serve-options.js';
+import { boundPort } from '../_bound-port.js';
 
 const TOKEN = 'served-token';
 const INSTALLATION_ID = '11111111-1111-4111-8111-111111111111';
@@ -72,11 +72,7 @@ async function startServedPlane(): Promise<{ plane: RunningPlane; servedInstance
       resolve();
     });
   });
-  const address = server.address() as AddressInfo | string | null;
-  if (address === null || typeof address === 'string') {
-    throw new Error('startServedPlane: expected a bound TCP AddressInfo');
-  }
-  const plane: RunningPlane = { server, baseUrl: `http://127.0.0.1:${address.port}` };
+  const plane: RunningPlane = { server, baseUrl: `http://127.0.0.1:${boundPort(server)}` };
   activePlanes.push(plane);
   return { plane, servedInstance: deriveInstanceId(installationRoot) };
 }
