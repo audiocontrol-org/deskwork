@@ -19,13 +19,13 @@ deriveInstanceId(installationRoot):
 
 ## EventEnvelope (EXTEND — `fleet/types.ts:73`, `event.ts:59-68`)
 
-Add three fields (populated in the single `constructEnvelope` site; validated in `validateEnvelope`):
+Add three fields (validated in `validateEnvelope`):
 
-| Field | Type | Meaning |
+| Field | Type | Source |
 |---|---|---|
-| `host` | `string` | Instance Identity component |
-| `path` | `string` | Instance Identity component (canonicalized) |
-| `sessionId` | `string \| null` | the open session's id, or `null` when no session is open (same shape as `runId`) |
+| `host` | `string` | **derived inside `constructEnvelope`** from `installationRoot` (via `deriveInstanceId`) — never caller-supplied, so every event carries it by construction (FR-011, analyze M2) |
+| `path` | `string` | same — derived internally (canonicalized) |
+| `sessionId` | `string \| null` | on `EnvelopeInput` (caller-supplied); the emit site reads it from the `current-session` record; `null` when no session is open (same shape as `runId`) |
 
 `schemaVersion` increments; older events read `sessionId: null` and derive `host`/`path` absent → not attributable to an instance (pre-feature events are simply not projected). Existing fields (`installationId`, `invocationId`, `runId`, sequences, `type`, `classification`, `eventId`, `wallClock`, `monotonicOffsetMs`) unchanged.
 
@@ -48,7 +48,7 @@ Three new `durable` types (D2). Each envelope carries identity (`host`,`path`,`s
 |---|---|---|---|
 | `session.started` | durable | `{ sessionId, startedAt }` | `session-start` verb (D9) |
 | `session.ended` | durable | `{ sessionId, endedAt, reason: 'ended' \| 'abandoned' }` | `session-end` verb; also on supersede (FR-009a) |
-| `phase.entered` | durable | `{ phase, from, item, bearing }` | `workflow-advance` seam (D4) |
+| `phase.entered` | durable | `{ phase, from, item }` (currentBearing `{phase,item}` derived) | `workflow-advance` seam (D4) |
 
 `invocation.completed` (existing, `aggregated`) is unchanged in class but now (a) stamped with `host`/`path`/`sessionId` and (b) **retained** by the plane (folded into the instance registry) instead of discarded. `session.heartbeat` (existing, `live-only`) feeds the `liveness` axis.
 
@@ -92,7 +92,7 @@ No `waiting` field (FR-017).
 
 The mutable per-instance fold state `buildInstanceRegistry` maintains (mirrors `registry.ts:291-321`): keyed by `InstanceId`; no-regress + effectively-once by `invocationSequence` and `eventId` dedupe (reused discipline); tracks the phase-entry timestamp to accrue `phaseDurations` cumulatively (on the next `phase.entered` or a terminal, add `now - phaseEnteredAt` to the leaving phase's total). `toInstanceState(acc)` projects it to the served shape.
 
-## Plan-time constants (NEW — `plane-time-constants` seam; each pinned by a RED test — D1)
+## Plan-time constants (NEW — `liveness-constants.ts` seam; each pinned by a RED test — D1)
 
 | Constant | Value | Note |
 |---|---|---|

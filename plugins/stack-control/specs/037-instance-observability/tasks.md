@@ -18,7 +18,7 @@ description: "Task list for instance-observability implementation"
 
 ## Phase 1: Setup
 
-- [ ] T001 [tier:fast] Create the new source module stubs (empty, typed, exported) so later tasks land in files under the size cap: `src/machine-state/instance-id.ts`, `src/machine-state/current-session.ts`, `src/plane/instance-registry.ts`, `src/plane/http/instance-api.ts`, `src/fleet/instance/types.ts`, and `src/fleet/plane-time-constants.ts` (or extend the nearest existing constants seam). Add a `tests/instance/` dir.
+- [ ] T001 [tier:fast] Create the new source module stubs (empty, typed, exported) so later tasks land in files under the size cap: `src/machine-state/instance-id.ts`, `src/machine-state/current-session.ts`, `src/plane/instance-registry.ts`, `src/plane/http/instance-api.ts`, `src/fleet/instance/types.ts`, and `src/fleet/liveness-constants.ts` (or extend the nearest existing constants seam). Add a `tests/instance/` dir.
 
 ---
 
@@ -29,7 +29,7 @@ description: "Task list for instance-observability implementation"
 ### Plan-time constants (D1)
 
 - [ ] T002 [P] [tier:fast] RED: `tests/instance/constants.test.ts` — assert the five plan-time contracts and derived boundaries: heartbeat `45_000`, liveness window `90_000` (live↔stale at 90 s), reconciliation grace `600_000` (stale↔gone at 10 min), `recentActivity` cap `N=50` (eviction at N+1), and that historical retention has no separate eviction clock (follows the log).
-- [ ] T003 [tier:balanced] Implement the constants + the `deriveLiveness(lastSignalAgeMs)` boundary helper in `src/fleet/plane-time-constants.ts`, reusing 036's `DEFAULT_LIVENESS_INTERVAL_MS`. Make T002 green.
+- [ ] T003 [tier:balanced] Implement the constants + the `deriveLiveness(lastSignalAgeMs)` boundary helper in `src/fleet/liveness-constants.ts`, reusing 036's `DEFAULT_LIVENESS_INTERVAL_MS`. Make T002 green.
 
 ### Instance Identity — host:path (D8)
 
@@ -38,8 +38,8 @@ description: "Task list for instance-observability implementation"
 
 ### Extended envelope — host/path/sessionId (D3)
 
-- [ ] T006 [P] [tier:fast] RED: `tests/fleet/envelope-instance-fields.test.ts` — `constructEnvelope` sets `host`,`path`,`sessionId`; `validateEnvelope` fail-louds on wrong types; `sessionId:null` accepted; schemaVersion bumped.
-- [ ] T007 [tier:powerful] Add `host`,`path`,`sessionId` to `EventEnvelope` (`src/fleet/types.ts`) and `EnvelopeInput` (`src/fleet/event.ts`), set them in `constructEnvelope` (single site), add `require*` validation in `validateEnvelope`, bump `schemaVersion`. Touches the emit hot path — keep additive, no behavior change to existing fields. Make T006 green + full suite green.
+- [ ] T006 [P] [tier:fast] RED: `tests/fleet/envelope-instance-fields.test.ts` — **`constructEnvelope` derives `host`/`path` internally from `installationRoot` so EVERY constructed envelope carries identity even with minimal caller input (FR-011 by construction, analyze M2)**; `sessionId` is caller-supplied and nullable; `validateEnvelope` fail-louds on wrong types; `sessionId:null` accepted; schemaVersion bumped.
+- [ ] T007 [tier:powerful] Add `host`,`path`,`sessionId` to `EventEnvelope` (`src/fleet/types.ts`); add ONLY `sessionId` to `EnvelopeInput` (`src/fleet/event.ts`) and pass `installationRoot` to `constructEnvelope`, which **derives `host:path` via `deriveInstanceId` itself** (not caller-supplied — FR-011 holds by construction); add `require*` validation in `validateEnvelope`; bump `schemaVersion`. Touches the emit hot path — keep additive, no behavior change to existing fields. Depends on T005 (deriver). Make T006 green + full suite green.
 
 ### Classification catalog — 3 new durable types (D2)
 
@@ -72,7 +72,7 @@ description: "Task list for instance-observability implementation"
 - [ ] T016 [P] [US1] [tier:balanced] RED: `tests/instance/registry-instances.test.ts` — `buildInstanceRegistry` folds `invocation.completed` (+`session.heartbeat`) into one `InstanceState` per host:path: existence, `lastActivityAt`/`lastActivity`, `connection`, `liveness`; no-regress + effectively-once by sequence/eventId; two hosts → two instances.
 - [ ] T017 [P] [US1] [tier:fast] RED: `tests/instance/instance-state-shape.test.ts` — `toInstanceState` projects the FR-016 field set (no `waiting` field, FR-017).
 - [ ] T018 [US1] [tier:balanced] Implement `buildInstanceRegistry` + accumulator + `toInstanceState` in `src/plane/instance-registry.ts` (parallels `registry.ts` trio). Make T016/T017 green.
-- [ ] T019 [P] [US1] [tier:powerful] Stamp `host`/`path` (+`sessionId` via current-session read, null-safe) onto every emitted event in `src/telemetry/invocation-telemetry.ts`; keep fail-open (no new failure/latency on the invocation path). RED first: `tests/instance/emit-stamps-identity.test.ts`.
+- [ ] T019 [P] [US1] [tier:powerful] Ensure `src/telemetry/invocation-telemetry.ts` passes `installationRoot` to `constructEnvelope` (host/path derive there per T007) and reads `sessionId` from the `current-session` record (null-safe) to pass on `EnvelopeInput`; keep fail-open (no new failure/latency on the invocation path). RED first: `tests/instance/emit-stamps-identity.test.ts` (asserts host/path present + sessionId threaded).
 - [ ] T020 [US1] [tier:balanced] Stop discarding `invocation.completed` plane-side: fold it into the instance registry (retain in the in-memory event stream that feeds `buildInstanceRegistry`). RED first: `tests/instance/invocation-retained.test.ts`.
 - [ ] T021 [P] [US1] [tier:fast] RED: `tests/instance/api-instances-snapshot.test.ts` — `instanceSnapshot` returns `{instances:[...]}` each once; `?include=all` includes disconnected/gone; `instanceDetail` returns full state + `recentActivity`; unknown id → 404 `{found:false}`.
 - [ ] T022 [US1] [tier:balanced] Implement `instanceSnapshot` + `instanceDetail` in `src/plane/http/instance-api.ts`; add `GET /v1/instances` + `GET /v1/instances/:id` to `ROUTE_TABLE`/`PlaneRouteHandlers` (`src/plane/http/server.ts`), each `withAuth`-wrapped. Make T021 green.
@@ -101,8 +101,8 @@ description: "Task list for instance-observability implementation"
 
 **Goal**: `currentBearing` and cumulative `phaseDurations` (design/spec/execution/governance) from real workflow phase transitions. **Independent test**: drive a real phase transition → bearing updates; re-enter a phase → its duration accrues; unobserved phase → absent.
 
-- [ ] T030 [P] [US3] [tier:powerful] RED: `tests/instance/phase-emit.test.ts` — a committed `applyTransition` emits `phase.entered{phase,from,item,bearing}` (fail-open); a dry-run emits nothing.
-- [ ] T031 [US3] [tier:powerful] Implement the fail-open `phase.entered` side emission after the committed `applyTransition` in `src/subcommands/workflow-advance.ts` (thread a `Clock`; resolve the bearing via the compass resolver). Do NOT add it to `EFFECT_VERBS`. Make T030 green.
+- [ ] T030 [P] [US3] [tier:powerful] RED: `tests/instance/phase-emit.test.ts` — a committed `applyTransition` emits `phase.entered{phase,from,item}` (fail-open); a dry-run emits nothing.
+- [ ] T031 [US3] [tier:powerful] Implement the fail-open `phase.entered` side emission after the committed `applyTransition` in `src/subcommands/workflow-advance.ts` (thread a `Clock`; NO compass resolution — `currentBearing` derives from `{phase,item}`, L2). Do NOT add it to `EFFECT_VERBS`. Make T030 green.
 - [ ] T032 [P] [US3] [tier:balanced] RED: `tests/instance/registry-bearing-durations.test.ts` — folding `phase.entered`: `currentBearing` = latest and **persists through `session.ended`** (FR-016c); `phaseDurations` accrue **cumulatively across re-entries** (FR-018); an unobserved phase is **absent, never 0** (SC-009).
 - [ ] T033 [US3] [tier:balanced] Extend `buildInstanceRegistry` to fold `phase.entered` into `currentBearing` + cumulative `phaseDurations`. Make T032 green.
 - [ ] T034 [P] [US3] [tier:powerful] RED: `tests/instance/phase-payload-e2e.test.ts` — a real `phase.entered` ingested end-to-end appears in `currentBearing` AND survives a rehydrate (exercises the D5 snapshot-threading through the full path).

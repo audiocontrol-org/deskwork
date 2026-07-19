@@ -30,7 +30,7 @@ Registered by adding to the `EventType` union (`types.ts`) + one `EVENT_CLASSIFI
 - **Producer**: the `session-end` verb; and the `session-start` verb when superseding an open session.
 
 ### `phase.entered`
-- **Snapshot**: `{ phase, from, item, bearing }` where `phase`/`from` ∈ the workflow `PhaseId` set (`designing|specifying|implementing|governing|…`), `item` = roadmap item identifier, `bearing` = the resolved compass snapshot.
+- **Snapshot**: `{ phase, from, item }` where `phase`/`from` ∈ the workflow `PhaseId` set (`designing|specifying|implementing|governing|…`) and `item` = the roadmap item identifier. The instance's `currentBearing` is **derived** as `{ phase, item }` from this event — no separate `bearing` field is carried (analyze L2), which also frees the phase-emit seam from resolving the compass.
 - **Producer**: a fail-open side emission after the committed `applyTransition` in the `workflow-advance` subcommand (D4). Never emitted on a dry-run.
 
 ## Changed handling of existing events
