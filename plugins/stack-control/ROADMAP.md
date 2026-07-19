@@ -679,6 +679,7 @@ The operator-facing dashboard over the fleet plane: fleet table of commandable r
 
 ## design:feature/instance-observability
 - status: planned
+- analyze-clean: yes
 - spec: specs/037-instance-observability
 - ref: docs/superpowers/specs/2026-07-18-instance-observability-design.md
 
