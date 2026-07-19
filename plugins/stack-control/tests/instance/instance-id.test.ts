@@ -19,10 +19,16 @@
 //      resolves to the same real dir yields the same id as the canonical path.
 
 import { describe, it, expect } from 'vitest';
-import { mkdtempSync, rmSync, readdirSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+  mkdtempSync,
+  rmSync,
+  readdirSync,
+  symlinkSync,
+  mkdirSync,
+  realpathSync,
+} from 'node:fs';
 import { tmpdir, hostname } from 'node:os';
-import { join, relative } from 'node:path';
-import { realpathSync } from 'node:fs';
+import { join } from 'node:path';
 import { deriveInstanceId } from '../../src/machine-state/instance-id.js';
 
 describe('deriveInstanceId', () => {
@@ -108,8 +114,7 @@ describe('deriveInstanceId', () => {
         // Create the nested structure
         rmSync(nestedDir, { recursive: true, force: true });
         const actualDir = join(baseDir, 'a', 'b', 'c');
-        const fs = require('node:fs');
-        fs.mkdirSync(actualDir, { recursive: true });
+        mkdirSync(actualDir, { recursive: true });
 
         const canonicalPath = actualDir;
         const pathWithDotDot = join(actualDir, '..', 'c');
@@ -130,8 +135,7 @@ describe('deriveInstanceId', () => {
         const linkDir = join(baseDir, 'link');
 
         // Create target directory
-        const fs = require('node:fs');
-        fs.mkdirSync(targetDir, { recursive: true });
+        mkdirSync(targetDir, { recursive: true });
 
         // Create symlink pointing to target
         try {

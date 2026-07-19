@@ -83,7 +83,7 @@ function makeRawEvent(snapshot: Record<string, unknown>, options: RawEventOption
       runId: 'run-1',
       installationSequence: invocationSequence,
       invocationSequence,
-      schemaVersion: 1,
+      schemaVersion: 2, // 037 identity-bearing (AUDIT-20260719-16)
       type: options.type ?? 'run.started',
       wallClock: new Date().toISOString(),
       monotonicOffsetMs: 12,

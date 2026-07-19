@@ -120,7 +120,7 @@ async function ingestStale(plane: RunningPlane, wallClock: string): Promise<void
         runId: null,
         installationSequence: 1,
         invocationSequence: 1,
-        schemaVersion: 1,
+        schemaVersion: 2, // 037 identity-bearing (AUDIT-20260719-16)
         type: 'invocation.completed',
         wallClock,
         monotonicOffsetMs: 1,

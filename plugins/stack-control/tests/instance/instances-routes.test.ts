@@ -68,7 +68,7 @@ function invocationBody(host: string, path: string, wallClock: string): string {
       runId: null,
       installationSequence: 1,
       invocationSequence: 1,
-      schemaVersion: 1,
+      schemaVersion: 2, // 037 identity-bearing (AUDIT-20260719-16)
       type: 'invocation.completed',
       wallClock,
       monotonicOffsetMs: 1,

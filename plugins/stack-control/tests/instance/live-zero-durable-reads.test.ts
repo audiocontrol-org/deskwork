@@ -43,6 +43,7 @@
 import { describe, expect, it } from 'vitest';
 import type { EventEnvelope } from '../../src/fleet/types.js';
 import { mintInstallationId, mintUuidV7 } from '../../src/fleet/types.js';
+import type { SnapshotPayload } from '../../src/fleet/event.js';
 import type { InstanceRegistry } from '../../src/plane/instance-registry.js';
 import { buildInstanceRegistry } from '../../src/plane/instance-registry.js';
 import type { InstanceState } from '../../src/plane/http/instance-api.js';
@@ -54,11 +55,15 @@ import type { ObjectMetadata, ObjectStorePort, PutObjectInput } from '../../src/
 import { createCdnReader, createInMemoryCache } from '../../src/storage/cdn-reader.js';
 
 /** Minimal test double of a classified event, mirrored from registry.test.ts /
- * api-snapshot.test.ts for consistency across this feature's test suite. */
+ * api-snapshot.test.ts for consistency across this feature's test suite —
+ * matches the CURRENT `ClassifiedEvent` shape (src/plane/instance-accumulator.ts
+ * ~L63-68 / src/plane/instance-registry.ts) which additionally carries the
+ * bounded `snapshot` payload (specs/037 D5). */
 interface ClassifiedEvent {
   readonly envelope: EventEnvelope;
   readonly classification: 'live-only' | 'aggregated' | 'durable';
   readonly type: string;
+  readonly snapshot: SnapshotPayload;
 }
 
 function mkEvent(
@@ -82,13 +87,13 @@ function mkEvent(
     sessionId,
     installationSequence: invocationSequence,
     invocationSequence,
-    schemaVersion: 1,
+    schemaVersion: 2, // 037 identity-bearing (AUDIT-20260719-16)
     type,
     wallClock: new Date().toISOString(),
     monotonicOffsetMs: Date.now(),
     classification,
   };
-  return { envelope, classification, type };
+  return { envelope, classification, type, snapshot: {} };
 }
 
 /**

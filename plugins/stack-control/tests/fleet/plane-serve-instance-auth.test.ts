@@ -93,7 +93,7 @@ function runStartedBody(runId: string, host: string, path: string): string {
       runId,
       installationSequence: 1,
       invocationSequence: 1,
-      schemaVersion: 1,
+      schemaVersion: 2, // 037 identity-bearing (AUDIT-20260719-16)
       type: 'run.started',
       wallClock: new Date().toISOString(),
       monotonicOffsetMs: 5,
