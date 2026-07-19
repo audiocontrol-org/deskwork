@@ -110,5 +110,13 @@ export interface InstanceAccumulator {
   firstSeenSequence: number;
   firstSessionAt: string | null;
   phaseDurations: Record<string, number>;
+  /**
+   * `wallClock` of the CURRENT (last-entered, not-yet-left) phase — internal
+   * bookkeeping for accruing `phaseDurations` cumulatively (FR-018). On the NEXT
+   * `phase.entered`, `(next.wallClock - phaseEnteredAt)` is added to the LEAVING
+   * phase's running total, then this advances to the new entry. `null` until the
+   * first `phase.entered` folds. Never projected onto the served `InstanceState`.
+   */
+  phaseEnteredAt: string | null;
   recentActivity: RecentActivityItem[];
 }

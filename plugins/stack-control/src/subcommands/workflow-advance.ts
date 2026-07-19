@@ -16,6 +16,7 @@ import type { EffectContext } from '../workflow/effects.js';
 import { applyTransition, previewTransition } from '../workflow/transition-engine.js';
 import { reenterDesign } from '../workflow/redesign.js';
 import { WorkflowError, type Transition } from '../workflow/workflow-types.js';
+import { emitPhaseEntered } from '../telemetry/phase-entered.js';
 import { failUsage, forwardTransition, phaseById, resolve, type Resolved } from './workflow-shared.js';
 
 /** Build the effect context for a forward transition out of the current phase. */
@@ -111,6 +112,15 @@ export function emitAdvance(itemId: string, apply: boolean, values: Record<strin
     return;
   }
   const outcome = applyTransition(t, ctx);
+  // 037 US3 / D4: the ONE instrumentation seam for the design→spec→execute→govern
+  // timeline. A COMMITTED transition emits a single fail-open `phase.entered` side
+  // event; a dry-run (returned above) emits nothing. Never a governed effect — this
+  // is a side emission, so it is NOT in EFFECT_VERBS and never touches the
+  // transition-engine's Effect/Transition/git contract. Fail-open: any telemetry
+  // failure is swallowed inside `emitPhaseEntered` and never perturbs the advance.
+  if (outcome.committed) {
+    emitPhaseEntered(r.root, { phase: t.to, from: t.from, item: r.item.identifier });
+  }
   process.stdout.write(`workflow advance ${itemId}: applied ${t.codename} (${t.from} -> ${t.to})\n`);
   process.stdout.write(
     outcome.committed
