@@ -34,7 +34,12 @@
 // No `any`, no `as`, no `@ts-ignore` (Principle VI). Relative `.js` imports
 // under node16 resolution (no `@/` alias).
 
-import { LIVENESS_WINDOW_MS, RECENT_ACTIVITY_CAP, deriveLiveness } from '../fleet/liveness-constants.js';
+import {
+  FUTURE_SKEW_TOLERANCE_MS,
+  LIVENESS_WINDOW_MS,
+  RECENT_ACTIVITY_CAP,
+  deriveLiveness,
+} from '../fleet/liveness-constants.js';
 import type { SnapshotPayload } from '../fleet/event.js';
 import type {
   EventClassification,
@@ -88,7 +93,9 @@ export function newInstanceAccumulator(
     lastHeartbeatAt: null,
     lastHeartbeatSequence: Number.NEGATIVE_INFINITY,
     currentSession: null,
+    currentSessionSequence: Number.NEGATIVE_INFINITY,
     currentBearing: null,
+    currentBearingSequence: Number.NEGATIVE_INFINITY,
     lastActivityAt: null,
     lastActivity: null,
     lastActivitySequence: Number.NEGATIVE_INFINITY,
@@ -125,36 +132,54 @@ function readSnapshotString(snapshot: SnapshotPayload | undefined, key: string):
  * Fold a `session.started` / `session.ended` event into the instance's session
  * fields (data-model.md § InstanceState; FR-009/FR-009a). The identity fields
  * (host/path) keyed the accumulator already; the session payload itself rides
- * the snapshot. Counts (`sessionsStarted`/`sessionsEnded`) accrue on the event
- * TYPE alone (payload-independent). `session.started` additionally opens
- * `currentSession` and pulls `firstSessionAt` earlier from its snapshot; a
- * `session.ended` whose sessionId matches the open session clears
- * `currentSession`. An UNCLOSED session stays "open since X" (FR-009). Never
- * touches `currentBearing` (FR-016c).
+ * the snapshot.
+ *
+ * TWO axes with different ordering discipline (AUDIT-20260719-09):
+ *  - Order-INDEPENDENT: counts (`sessionsStarted`/`sessionsEnded`) accrue on the
+ *    event TYPE alone — the caller's eventId-dedup already guarantees
+ *    effectively-once, and a count doesn't depend on arrival order. `firstSessionAt`
+ *    stays the earliest `startedAt` by timestamp (low-water). Neither is gated.
+ *  - LATEST-WINS by `installationSequence` (no-regress, mirrors the T049
+ *    `lastActivitySequence` pattern): `currentSession` is governed by the
+ *    highest-`installationSequence` session-lifecycle event. A `session.started`
+ *    opens it only when strictly newer than the governing mark; a `session.ended`
+ *    advances the mark and clears `currentSession` only when it matches the open
+ *    session. This blocks a stale started from re-opening a closed session and a
+ *    stale ended from clearing a newer open one. An UNCLOSED session stays "open
+ *    since X" (FR-009). Never touches `currentBearing` (FR-016c).
  */
 function applySessionEvent(acc: InstanceAccumulator, event: ClassifiedEvent): void {
-  const { type, snapshot } = event;
+  const { envelope, type, snapshot } = event;
+  const sequence = envelope.installationSequence;
   if (type === 'session.started') {
     acc.sessionsStarted += 1;
     const sessionId = readSnapshotString(snapshot, 'sessionId');
     const startedAt = readSnapshotString(snapshot, 'startedAt');
     if (sessionId !== null && startedAt !== null) {
-      acc.currentSession = { sessionId, startedAt };
+      // firstSessionAt: earliest startedAt by timestamp (order-independent).
       if (acc.firstSessionAt === null || Date.parse(startedAt) < Date.parse(acc.firstSessionAt)) {
         acc.firstSessionAt = startedAt;
+      }
+      // currentSession: only the newest session.started by installationSequence
+      // opens it — a stale/out-of-order lower-sequence started never clobbers a
+      // newer open (or re-opens a newer-closed) session.
+      if (sequence > acc.currentSessionSequence) {
+        acc.currentSessionSequence = sequence;
+        acc.currentSession = { sessionId, startedAt };
       }
     }
     return;
   }
-  // session.ended: clear the open session only when its id matches (FR-009a).
+  // session.ended: advance the governing mark (blocking any lower-sequence
+  // started that arrives later from re-opening), clearing the open session only
+  // when its id matches (FR-009a). A stale ended (lower sequence) is ignored.
   acc.sessionsEnded += 1;
   const endedSessionId = readSnapshotString(snapshot, 'sessionId');
-  if (
-    endedSessionId !== null &&
-    acc.currentSession !== null &&
-    acc.currentSession.sessionId === endedSessionId
-  ) {
-    acc.currentSession = null;
+  if (endedSessionId !== null && sequence > acc.currentSessionSequence) {
+    acc.currentSessionSequence = sequence;
+    if (acc.currentSession !== null && acc.currentSession.sessionId === endedSessionId) {
+      acc.currentSession = null;
+    }
   }
 }
 
@@ -167,9 +192,18 @@ function applySessionEvent(acc: InstanceAccumulator, event: ClassifiedEvent): vo
  * running total — re-entries ADD to the same total rather than resetting it. A
  * phase entered-but-not-yet-left is ABSENT from `phaseDurations` (never `0`). A
  * payload-less event is a no-op (honest absence — see `readSnapshotString`).
+ *
+ * LATEST-WINS by `installationSequence` (no-regress, AUDIT-20260719-09, mirrors
+ * the T049 `lastActivitySequence` pattern): only a phase.entered whose
+ * `installationSequence` is STRICTLY newer than the one that set the current
+ * bearing advances `currentBearing`/`phaseEnteredAt` and accrues the leaving
+ * phase's span. A stale/out-of-order lower-sequence event is skipped entirely,
+ * so it can't set a stale bearing or accrue a negative/double-counted duration.
  */
 function applyPhaseEnteredEvent(acc: InstanceAccumulator, event: ClassifiedEvent): void {
   const { envelope, snapshot } = event;
+  const sequence = envelope.installationSequence;
+  if (sequence <= acc.currentBearingSequence) return; // stale/out-of-order — no-regress
   const phase = readSnapshotString(snapshot, 'phase');
   const item = readSnapshotString(snapshot, 'item');
   if (phase === null || item === null) return;
@@ -183,6 +217,7 @@ function applyPhaseEnteredEvent(acc: InstanceAccumulator, event: ClassifiedEvent
 
   acc.currentBearing = { phase, item };
   acc.phaseEnteredAt = envelope.wallClock;
+  acc.currentBearingSequence = sequence;
 }
 
 /** The later of two optional epoch-ms readings, or `null` when both are absent. */
@@ -190,6 +225,34 @@ function maxDefined(a: number | null, b: number | null): number | null {
   if (a === null) return b;
   if (b === null) return a;
   return Math.max(a, b);
+}
+
+/**
+ * Parse an ISO instant to epoch-ms, or `null` when absent/unparseable
+ * (AUDIT-20260719-10). A garbage timestamp must degrade to "no signal" — never a
+ * raw `NaN`, which would poison `maxDefined`/`deriveLiveness` (`Math.max(x, NaN)`
+ * is `NaN`, and every comparison against `NaN` is false) and corrupt the derived
+ * liveness for the WHOLE instance until plane restart.
+ */
+function parseInstantMs(iso: string | null): number | null {
+  if (iso === null) return null;
+  const ms = Date.parse(iso);
+  return Number.isNaN(ms) ? null : ms;
+}
+
+/**
+ * Reduce a stored heartbeat to a valid LIVE-signal epoch-ms, or `null` when it
+ * must NOT count as one (AUDIT-20260719-10). A heartbeat is a live signal only
+ * when it parses AND is not dated in the future beyond `FUTURE_SKEW_TOLERANCE_MS`.
+ * A future-dated heartbeat (clock-skewed or malicious sidecar) is rejected here so
+ * it can NEVER pin an instance `live`/`attached` indefinitely — the load-bearing
+ * belt that keeps the poison-resistance invariant even if a bad value reaches the
+ * store or arrives on an event-carried `session.heartbeat`.
+ */
+function liveHeartbeatMs(iso: string | null, now: number): number | null {
+  const ms = parseInstantMs(iso);
+  if (ms === null) return null;
+  return ms > now + FUTURE_SKEW_TOLERANCE_MS ? null : ms;
 }
 
 /**
@@ -214,8 +277,11 @@ function maxDefined(a: number | null, b: number | null): number | null {
  */
 function refreshConnectionAndLiveness(acc: InstanceAccumulator): void {
   const now = Date.now();
-  const activityMs = acc.lastActivityAt === null ? null : Date.parse(acc.lastActivityAt);
-  const heartbeatMs = acc.lastHeartbeatAt === null ? null : Date.parse(acc.lastHeartbeatAt);
+  // Defensive parse (AUDIT-20260719-10): an unparseable or future-dated heartbeat
+  // is reduced to `null` (NOT a live signal), so it can never NaN-poison the
+  // freshest-signal max nor pin liveness/connection with a year-3000 timestamp.
+  const activityMs = parseInstantMs(acc.lastActivityAt);
+  const heartbeatMs = liveHeartbeatMs(acc.lastHeartbeatAt, now);
   const freshestMs = maxDefined(activityMs, heartbeatMs);
   acc.liveness = freshestMs === null ? 'gone' : deriveLiveness(now - freshestMs);
   acc.connection =
@@ -231,6 +297,14 @@ function refreshConnectionAndLiveness(acc: InstanceAccumulator): void {
  * (1:1 with `host:path`) at the `buildInstanceRegistry` call site.
  */
 export function applyHeartbeatSignal(acc: InstanceAccumulator, emittedAt: string): void {
+  // Never ADOPT an implausible heartbeat (unparseable, or future beyond skew): a
+  // bad value must not become the served `lastHeartbeatAt` nor the live signal that
+  // pins the instance live forever (AUDIT-20260719-10). Still recompute so the
+  // axes stay current off the (unpoisoned) event-fold signals.
+  if (liveHeartbeatMs(emittedAt, Date.now()) === null) {
+    refreshConnectionAndLiveness(acc);
+    return;
+  }
   if (acc.lastHeartbeatAt === null || Date.parse(emittedAt) > Date.parse(acc.lastHeartbeatAt)) {
     acc.lastHeartbeatAt = emittedAt;
   }

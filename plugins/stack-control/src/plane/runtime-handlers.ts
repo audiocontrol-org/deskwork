@@ -45,6 +45,7 @@ import { buildInstanceObservabilityHandlers } from './instance-handlers.js';
 import type { HeartbeatStore } from './heartbeat-store.js';
 import type { EventLog } from './event-log.js';
 import {
+  assertPlausibleHeartbeatInstant,
   assertSessionLiveness,
   computeFleetTickGuarded,
   ingestClaimedInstallationId,
@@ -438,6 +439,10 @@ export function buildPlaneHandlers(ctx: PlaneHandlerContext): PlaneHandlers {
     try {
       const body = await readJsonBody(routeCtx.req);
       assertSessionLiveness(body);
+      // Reject a malformed or implausibly-future emittedAt at the boundary
+      // (AUDIT-20260719-10) — a garbage/year-3000 heartbeat must never be recorded,
+      // else it would pin the instance live/attached until the plane restarts.
+      assertPlausibleHeartbeatInstant(body.emittedAt, Date.now());
       // AUTHED-INSTALLATION ENFORCEMENT (AUDIT-20260718-45): as with ingest, the
       // heartbeat's claimed installationId must equal the token's authenticated
       // one — else installation-A's token could record liveness as installation B.

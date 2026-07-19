@@ -26,6 +26,17 @@ export const LIVENESS_WINDOW_MS = HEARTBEAT_INTERVAL_MS * 2;
 /** stale -> gone boundary; 10 minutes. */
 export const RECONCILIATION_GRACE_MS = 600_000;
 
+/**
+ * Clock-skew tolerance for a heartbeat's `emittedAt` (AUDIT-20260719-10). A
+ * heartbeat dated more than this far in the FUTURE is implausible — a skewed or
+ * malicious sidecar clock — and is NOT accepted as a live signal: a future
+ * timestamp must never pin an instance `live`/`attached` indefinitely (the
+ * recency check `now - emittedAt` would otherwise always fall within-window).
+ * Reuses the live->stale window (2x the heartbeat interval) rather than inventing
+ * an unrelated number — a generous-but-bounded skew allowance.
+ */
+export const FUTURE_SKEW_TOLERANCE_MS = LIVENESS_WINDOW_MS;
+
 /** Recent-activity ring cap; eviction is asserted at N+1 elsewhere. */
 export const RECENT_ACTIVITY_CAP = 50;
 

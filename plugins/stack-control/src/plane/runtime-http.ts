@@ -16,6 +16,7 @@ import type { RouteContext } from './http/server.js';
 import type { CommandKind } from '../fleet/command.js';
 import { buildRegistry, type ClassifiedEvent, type FleetEntry } from './registry.js';
 import { computeFleetDeltas, type FleetDelta } from './http/api.js';
+import { FUTURE_SKEW_TOLERANCE_MS } from '../fleet/liveness-constants.js';
 
 /** Write a JSON body with an explicit status. */
 export function respondJson(res: ServerResponse, status: number, body: unknown): void {
@@ -162,6 +163,36 @@ export function assertSessionLiveness(body: unknown): asserts body is SessionLiv
   ) {
     throw new Error(
       'session-liveness heartbeat must carry { kind: "session-liveness", installationId, emittedAt }.',
+    );
+  }
+}
+
+/**
+ * Reject an implausible heartbeat `emittedAt` at the HTTP boundary
+ * (AUDIT-20260719-10) — throwing so the caller 400s it (a malformed body is a
+ * client error, consistent with the existing shape-error 400s):
+ *
+ *  - UNPARSEABLE (`Date.parse` -> `NaN`): a garbage timestamp cannot be a heartbeat.
+ *  - FUTURE beyond `FUTURE_SKEW_TOLERANCE_MS`: a clock-skewed or malicious sidecar
+ *    sending `emittedAt` in the far future must not be recorded — otherwise the
+ *    recency check `now - emittedAt` stays within-window and pins the instance
+ *    `live`/`attached` until the plane restarts.
+ *
+ * Time-relative, so `now` is injected (never read internally) — keeps it a pure,
+ * deterministically-testable check. This is the fail-loud boundary arm; the store
+ * and liveness derivation are ALSO defensive (belt-and-suspenders) so a bad value
+ * can never poison liveness even if it slips past here.
+ */
+export function assertPlausibleHeartbeatInstant(emittedAt: string, now: number): void {
+  const ms = Date.parse(emittedAt);
+  if (Number.isNaN(ms)) {
+    throw new Error(
+      `session-liveness "emittedAt" must be a parseable ISO timestamp; got ${JSON.stringify(emittedAt)}.`,
+    );
+  }
+  if (ms > now + FUTURE_SKEW_TOLERANCE_MS) {
+    throw new Error(
+      'session-liveness "emittedAt" is implausibly far in the future (beyond clock-skew tolerance); refusing to record it.',
     );
   }
 }

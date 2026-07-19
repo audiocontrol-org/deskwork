@@ -127,6 +127,55 @@ describe('instance liveness folds the live session-liveness heartbeat (dogfood T
     expect(instance.lastHeartbeatAt).toBeNull();
   });
 
+  // AUDIT-20260719-10 (HIGH): a single malformed/implausible heartbeat must NOT
+  // poison an instance's liveness. The derivation is the load-bearing belt — even
+  // if a bad emittedAt slips into the store, it can never be a valid live signal.
+  it('a FAR-FUTURE heartbeat is NOT a live signal — it cannot pin an idle instance live (poison resistance)', () => {
+    const installationId = mintUuidV7();
+    // Only activity is 5 min stale (-> would derive 'stale' off activity alone).
+    const events = [
+      mkEvent({
+        installationId,
+        type: 'invocation.completed',
+        classification: 'aggregated',
+        invocationSequence: 1,
+        wallClock: isoAgo(300_000),
+      }),
+    ];
+    // A clock-skewed / malicious sidecar sends emittedAt ~= year 3000.
+    const farFuture = new Date(Date.now() + 1000 * 60 * 60 * 24 * 365 * 975).toISOString();
+    const heartbeats = new Map<string, string>([[installationId, farFuture]]);
+
+    const instance = buildInstanceRegistry(events, heartbeats).instance(ID);
+    if (instance === undefined) throw new Error('expected the instance to exist');
+    // The future heartbeat is rejected as a live signal: liveness derives off the
+    // (stale) activity, NOT the future timestamp — it can never sit 'live' forever.
+    expect(instance.liveness).toBe('stale');
+    expect(instance.connection).toBe('disconnected'); // a future heartbeat is not real uplink presence
+    expect(instance.lastHeartbeatAt).toBeNull(); // an implausible heartbeat is never adopted
+  });
+
+  it('an UNPARSEABLE heartbeat does not corrupt liveness — fresh activity still reads live', () => {
+    const installationId = mintUuidV7();
+    // Fresh activity 1s ago keeps liveness live UNLESS a garbage heartbeat poisons it.
+    const events = [
+      mkEvent({
+        installationId,
+        type: 'invocation.completed',
+        classification: 'aggregated',
+        invocationSequence: 1,
+        wallClock: isoAgo(1_000),
+      }),
+    ];
+    const heartbeats = new Map<string, string>([[installationId, 'not-a-timestamp']]);
+
+    const instance = buildInstanceRegistry(events, heartbeats).instance(ID);
+    if (instance === undefined) throw new Error('expected the instance to exist');
+    expect(instance.liveness).toBe('live'); // activity governs; garbage heartbeat ignored, not NaN-poisoned to 'gone'
+    expect(instance.connection).toBe('disconnected'); // a garbage heartbeat is not a valid uplink
+    expect(instance.lastHeartbeatAt).toBeNull(); // an unparseable heartbeat is never adopted
+  });
+
   it('connection lapses to disconnected once the heartbeat ages out, even with fresh activity (axes independent)', () => {
     const installationId = mintUuidV7();
     // fresh activity 1s ago (keeps liveness live) ...

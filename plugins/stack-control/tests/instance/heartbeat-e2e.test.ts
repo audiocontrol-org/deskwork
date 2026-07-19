@@ -20,10 +20,10 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { AddressInfo } from 'node:net';
 import type { Server } from 'node:http';
 import { mintUuidV7 } from '../../src/fleet/types.js';
 import { createPlaneRuntime } from '../../src/plane/runtime.js';
+import { boundPort } from '../_bound-port.js';
 import { createCdnReader, createInMemoryCache } from '../../src/storage/cdn-reader.js';
 import type { ObjectMetadata, ObjectStorePort, PutObjectInput } from '../../src/storage/port.js';
 
@@ -92,13 +92,9 @@ async function startPlane(): Promise<RunningPlane> {
       resolve();
     });
   });
-  const address = server.address() as AddressInfo | string | null;
-  if (address === null || typeof address === 'string') {
-    throw new Error('startPlane: expected a bound TCP AddressInfo');
-  }
   const running: RunningPlane = {
     server,
-    baseUrl: `http://127.0.0.1:${address.port}`,
+    baseUrl: `http://127.0.0.1:${boundPort(server)}`,
     countingStore,
   };
   activePlanes.push(running);
@@ -195,6 +191,38 @@ describe('POST /v1/sidecar/liveness feeds instance liveness end-to-end (dogfood 
     expect(after.liveness).toBe('live'); // heartbeat holds the idle instance alive
     expect(after.connection).toBe('attached'); // recent heartbeat = real uplink presence
     expect(after.lastActivityAt).toBe(before.lastActivityAt); // no new activity — heartbeat did it
+  });
+
+  // AUDIT-20260719-10 (HIGH): a single malformed/implausible heartbeat POST must
+  // NOT poison the instance's liveness. The HTTP boundary 400s the bad body; the
+  // producer fires-and-forgets so a 400 never crashes it (fail-open producer side).
+  it('rejects an UNPARSEABLE emittedAt with 400 and leaves liveness uncorrupted', async () => {
+    const plane = await startPlane();
+    await ingestStale(plane, new Date(Date.now() - 300_000).toISOString());
+
+    const before = await getInstance(plane);
+    expect(before.liveness).toBe('stale');
+
+    const res = await postHeartbeat(plane, 'not-a-real-timestamp');
+    expect(res.status).toBe(400); // malformed timestamp is a client error, like a shape error
+
+    const after = await getInstance(plane);
+    expect(after.lastHeartbeatAt).toBeNull(); // garbage never recorded
+    expect(after.liveness).toBe('stale'); // unchanged — not NaN-poisoned to 'gone'
+  });
+
+  it('rejects an implausibly FAR-FUTURE emittedAt with 400 — it can never pin an instance live', async () => {
+    const plane = await startPlane();
+    await ingestStale(plane, new Date(Date.now() - 300_000).toISOString());
+
+    const farFuture = new Date(Date.now() + 1000 * 60 * 60 * 24 * 365 * 975).toISOString();
+    const res = await postHeartbeat(plane, farFuture);
+    expect(res.status).toBe(400); // future beyond clock-skew tolerance is refused at the boundary
+
+    const after = await getInstance(plane);
+    expect(after.lastHeartbeatAt).toBeNull(); // never recorded
+    expect(after.liveness).toBe('stale'); // still derives off (stale) activity, not the future timestamp
+    expect(after.connection).toBe('disconnected'); // a future heartbeat is not real uplink presence
   });
 
   it('the live instance query makes ZERO durable-store reads even after a heartbeat (SC-007)', async () => {

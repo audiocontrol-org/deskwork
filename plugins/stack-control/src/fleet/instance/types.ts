@@ -110,7 +110,24 @@ export interface InstanceAccumulator {
   /** `installationSequence` of the event that set `lastHeartbeatAt` (no-regress). */
   lastHeartbeatSequence: number;
   currentSession: CurrentSession | null;
+  /**
+   * `installationSequence` of the session-lifecycle event that last GOVERNED
+   * `currentSession` (the opening `session.started` or the closing/ending
+   * `session.ended`). Latest-wins no-regress: a stale (lower-sequence)
+   * `session.started` can't re-open a closed session, and a stale
+   * `session.ended` can't clear a newer open one (AUDIT-20260719-09, mirrors the
+   * T049 `lastActivitySequence` pattern). Internal bookkeeping — never projected.
+   */
+  currentSessionSequence: number;
   currentBearing: CurrentBearing | null;
+  /**
+   * `installationSequence` of the `phase.entered` that last set `currentBearing`
+   * (and `phaseEnteredAt`). `currentBearing` / `phaseDurations` only advance on a
+   * STRICTLY-newer `phase.entered` (AUDIT-20260719-09) so an out-of-order event
+   * can't set a stale bearing or mis-accrue a negative/double-counted duration.
+   * Internal bookkeeping — never projected.
+   */
+  currentBearingSequence: number;
   lastActivityAt: string | null;
   lastActivity: string | null;
   /** `installationSequence` of the event that set `lastActivityAt`/`lastActivity` (no-regress). */

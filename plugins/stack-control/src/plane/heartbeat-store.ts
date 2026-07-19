@@ -42,8 +42,18 @@ export function createHeartbeatStore(): HeartbeatStore {
   const latestByInstallation = new Map<string, string>();
   return {
     record(installationId: string, emittedAt: string): void {
+      // Never persist an UNPARSEABLE heartbeat (AUDIT-20260719-10): a `NaN` time
+      // would break this latest-wins comparison (every `NaN >` is false, so with
+      // no prior it would still store garbage) and later NaN-poison the liveness
+      // derivation. A garbage timestamp is simply dropped — the freshest VALID
+      // heartbeat stays authoritative. (The HTTP boundary already 400s these; this
+      // is the defensive belt for any value that reaches the store another way.)
+      const ms = Date.parse(emittedAt);
+      if (Number.isNaN(ms)) {
+        return;
+      }
       const prior = latestByInstallation.get(installationId);
-      if (prior === undefined || Date.parse(emittedAt) > Date.parse(prior)) {
+      if (prior === undefined || ms > Date.parse(prior)) {
         latestByInstallation.set(installationId, emittedAt);
       }
     },
