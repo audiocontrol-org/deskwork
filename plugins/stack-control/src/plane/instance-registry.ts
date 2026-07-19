@@ -22,6 +22,7 @@
 
 import type { InstanceAccumulator, InstanceId, InstanceState } from '../fleet/instance/types.js';
 import {
+  applyHeartbeatSignal,
   applyInstanceEvent,
   newInstanceAccumulator,
   toInstanceState,
@@ -57,8 +58,21 @@ export interface InstanceRegistry {
  * `registry.ts`'s `seenEventIds`); no-regress by `installationSequence` (the
  * instance-monotonic key — enforced per-field inside `applyInstanceEvent`).
  * Entries preserve first-seen order.
+ *
+ * `heartbeats` is the plane's in-memory, live-only session-liveness map
+ * (`heartbeat-store.ts`) keyed by installationId -> latest heartbeat ISO time
+ * (dogfood T050). After folding, each instance's heartbeat is injected by
+ * installationId (1:1 with `host:path`) so an idle-but-connected instance stays
+ * `live` on heartbeat recency and `lastHeartbeatAt` populates — instead of
+ * aging off `lastActivityAt` alone. The map is in-memory/live-only; consulting
+ * it here adds ZERO durable-store reads (FR-023/SC-007, T024). Defaults to an
+ * empty map so pure event-only folds (tests, non-heartbeat callers) are
+ * unchanged.
  */
-export function buildInstanceRegistry(events: readonly ClassifiedEvent[]): InstanceRegistry {
+export function buildInstanceRegistry(
+  events: readonly ClassifiedEvent[],
+  heartbeats: ReadonlyMap<string, string> = new Map(),
+): InstanceRegistry {
   const accumulatorsById = new Map<InstanceId, InstanceAccumulator>();
   const orderedAccumulators: InstanceAccumulator[] = [];
   const seenEventIds = new Set<string>();
@@ -76,12 +90,22 @@ export function buildInstanceRegistry(events: readonly ClassifiedEvent[]): Insta
     const id: InstanceId = `${envelope.host}:${envelope.path}`;
     let acc = accumulatorsById.get(id);
     if (acc === undefined) {
-      acc = newInstanceAccumulator(id, envelope.host, envelope.path);
+      acc = newInstanceAccumulator(id, envelope.host, envelope.path, envelope.installationId);
       accumulatorsById.set(id, acc);
       orderedAccumulators.push(acc);
     }
 
     applyInstanceEvent(acc, event);
+  }
+
+  // Inject the live session-liveness heartbeat per installation (dogfood T050),
+  // AFTER the event fold so it wins on recency. Keyed by the accumulator's
+  // captured installationId (1:1 with host:path).
+  for (const acc of orderedAccumulators) {
+    const emittedAt = heartbeats.get(acc.installationId);
+    if (emittedAt !== undefined) {
+      applyHeartbeatSignal(acc, emittedAt);
+    }
   }
 
   const built: InstanceState[] = orderedAccumulators.map(toInstanceState);

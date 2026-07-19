@@ -32,6 +32,7 @@ import {
 import { respondJson, requireParam } from './runtime-http.js';
 import type { RouteContext, RouteHandler } from './http/server.js';
 import { KEEPALIVE_INTERVAL_MS, type IntervalScheduler } from './http/stream.js';
+import type { HeartbeatStore } from './heartbeat-store.js';
 
 // ---------------------------------------------------------------------------
 // Instance SSE helpers (pure — no closure state), mirroring the fleet stream's
@@ -69,9 +70,12 @@ interface InstanceTickResult {
 function computeInstanceTickGuarded(
   events: readonly ClassifiedEvent[],
   previous: readonly InstanceState[],
+  heartbeats: HeartbeatStore,
 ): InstanceTickResult {
   try {
-    const next = buildInstanceRegistry(events).instances();
+    // Snapshot the live heartbeat map per tick so a heartbeat that arrives
+    // between ticks holds an idle instance `live` in the stream too (T050).
+    const next = buildInstanceRegistry(events, heartbeats.snapshot()).instances();
     return { next, deltas: computeInstanceDeltas(previous, next) };
   } catch (error) {
     return { next: previous, deltas: [], error };
@@ -96,6 +100,7 @@ export interface InstanceObservabilityHandlers {
 export function buildInstanceObservabilityHandlers(
   events: ClassifiedEvent[],
   scheduler: IntervalScheduler,
+  heartbeats: HeartbeatStore,
 ): InstanceObservabilityHandlers {
   const instanceStream: RouteHandler = (routeCtx: RouteContext): void => {
     routeCtx.res.writeHead(200, {
@@ -105,7 +110,7 @@ export function buildInstanceObservabilityHandlers(
     });
     routeCtx.res.flushHeaders();
     let last: readonly InstanceState[] = [];
-    const initial = computeInstanceTickGuarded(events, last);
+    const initial = computeInstanceTickGuarded(events, last, heartbeats);
     if (initial.error === undefined) {
       for (const delta of initial.deltas) {
         writeInstanceDelta(routeCtx.res, delta);
@@ -115,7 +120,7 @@ export function buildInstanceObservabilityHandlers(
       logInstanceTickError(initial.error);
     }
     const timer = scheduler.setInterval(() => {
-      const tick = computeInstanceTickGuarded(events, last);
+      const tick = computeInstanceTickGuarded(events, last, heartbeats);
       if (tick.error === undefined) {
         for (const delta of tick.deltas) {
           writeInstanceDelta(routeCtx.res, delta);

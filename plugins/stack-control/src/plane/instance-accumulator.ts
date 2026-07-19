@@ -34,7 +34,7 @@
 // No `any`, no `as`, no `@ts-ignore` (Principle VI). Relative `.js` imports
 // under node16 resolution (no `@/` alias).
 
-import { RECENT_ACTIVITY_CAP, deriveLiveness } from '../fleet/liveness-constants.js';
+import { LIVENESS_WINDOW_MS, RECENT_ACTIVITY_CAP, deriveLiveness } from '../fleet/liveness-constants.js';
 import type { SnapshotPayload } from '../fleet/event.js';
 import type {
   EventClassification,
@@ -76,11 +76,13 @@ export function newInstanceAccumulator(
   id: InstanceId,
   host: string,
   path: string,
+  installationId: string,
 ): InstanceAccumulator {
   return {
     id,
     host,
     path,
+    installationId,
     connection: 'disconnected',
     liveness: 'gone',
     lastHeartbeatAt: null,
@@ -183,24 +185,56 @@ function applyPhaseEnteredEvent(acc: InstanceAccumulator, event: ClassifiedEvent
   acc.phaseEnteredAt = envelope.wallClock;
 }
 
+/** The later of two optional epoch-ms readings, or `null` when both are absent. */
+function maxDefined(a: number | null, b: number | null): number | null {
+  if (a === null) return b;
+  if (b === null) return a;
+  return Math.max(a, b);
+}
+
 /**
- * Recompute `connection`/`liveness` from the instance's freshest known signal
- * (`lastActivityAt`, which no-regress above has already settled to the
- * highest-`installationSequence` event's wallClock). Per D1/D6 (task-scoped
- * derivation for the pure event fold, no separate uplink tracker at this
- * layer): a signal within the liveness window means the uplink is currently
- * delivering, so `connection` tracks `liveness === 'live'` directly.
- * Idempotent — safe to call after every fold.
+ * Recompute `connection`/`liveness` as TWO DISTINCT axes (research.md D1,
+ * FR-016a). Both derive from the freshest settled signals on the accumulator —
+ * `lastActivityAt` (highest-`installationSequence` event) and `lastHeartbeatAt`
+ * (the live session-liveness heartbeat, injected after the fold by
+ * `applyHeartbeatSignal`):
+ *
+ *  - `liveness` tracks the MOST-RECENT signal of EITHER axis. A fresh heartbeat
+ *    keeps an activity-idle-but-connected instance `live` instead of wrongly
+ *    aging it off `lastActivityAt` alone (dogfood T050) — this is the whole bug
+ *    fix. `live` <= LIVENESS_WINDOW_MS, `stale` up to RECONCILIATION_GRACE_MS,
+ *    else `gone`.
+ *  - `connection` is real uplink presence: `attached` ONLY while a heartbeat is
+ *    recent (within LIVENESS_WINDOW_MS = one missed-beat tolerance), else
+ *    `disconnected`. Independent of `liveness` — an instance with fresh activity
+ *    but a lapsed heartbeat is `live` + `disconnected`; an open uplink to a hung
+ *    instance is `attached` + `stale`.
+ *
+ * Idempotent — safe to call after every fold and after the heartbeat injection.
  */
 function refreshConnectionAndLiveness(acc: InstanceAccumulator): void {
-  if (acc.lastActivityAt === null) {
-    acc.liveness = 'gone';
-    acc.connection = 'disconnected';
-    return;
+  const now = Date.now();
+  const activityMs = acc.lastActivityAt === null ? null : Date.parse(acc.lastActivityAt);
+  const heartbeatMs = acc.lastHeartbeatAt === null ? null : Date.parse(acc.lastHeartbeatAt);
+  const freshestMs = maxDefined(activityMs, heartbeatMs);
+  acc.liveness = freshestMs === null ? 'gone' : deriveLiveness(now - freshestMs);
+  acc.connection =
+    heartbeatMs !== null && now - heartbeatMs <= LIVENESS_WINDOW_MS ? 'attached' : 'disconnected';
+}
+
+/**
+ * Inject the live session-liveness heartbeat (from `/v1/sidecar/liveness`, held
+ * in the in-memory `HeartbeatStore`) into an instance AFTER its event fold, then
+ * recompute the two liveness/connection axes. Adopt `emittedAt` when it is newer
+ * than any event-carried heartbeat (latest wins — best-effort heartbeats may
+ * arrive out of order). Keyed by the accumulator's `installationId`
+ * (1:1 with `host:path`) at the `buildInstanceRegistry` call site.
+ */
+export function applyHeartbeatSignal(acc: InstanceAccumulator, emittedAt: string): void {
+  if (acc.lastHeartbeatAt === null || Date.parse(emittedAt) > Date.parse(acc.lastHeartbeatAt)) {
+    acc.lastHeartbeatAt = emittedAt;
   }
-  const ageMs = Date.now() - Date.parse(acc.lastActivityAt);
-  acc.liveness = deriveLiveness(ageMs);
-  acc.connection = acc.liveness === 'live' ? 'attached' : 'disconnected';
+  refreshConnectionAndLiveness(acc);
 }
 
 /**

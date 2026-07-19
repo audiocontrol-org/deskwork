@@ -42,6 +42,7 @@ import {
   instanceSnapshot as projectInstanceSnapshot,
 } from './http/instance-api.js';
 import { buildInstanceObservabilityHandlers } from './instance-handlers.js';
+import type { HeartbeatStore } from './heartbeat-store.js';
 import type { EventLog } from './event-log.js';
 import {
   assertSessionLiveness,
@@ -95,6 +96,10 @@ export interface PlaneHandlerContext {
   readonly durableStore: DurableEventStore;
   /** Durable accepted-event log — appended before an event is admitted. */
   readonly eventLog: EventLog;
+  /** In-memory, live-only session-liveness heartbeat store (dogfood T050) —
+   * `livenessHandler` records into it; the instance registry reads it to hold an
+   * idle-but-connected instance `live`. Never durable (FR-023/SC-007, T024). */
+  readonly heartbeats: HeartbeatStore;
   /** SSE keepalive scheduler (test seam). */
   readonly scheduler: IntervalScheduler;
   /** Injected CDN-fronted archive reader (C7); absent → honest "no archive". */
@@ -175,7 +180,7 @@ export function buildPlaneHandlers(ctx: PlaneHandlerContext): PlaneHandlers {
   // the Constitution VI file cap. Both handlers fold the SAME `events` array on
   // every read (pure recompute-on-read, FR-023/SC-007); the SSE keepalive
   // scheduler is the same injected test seam the fleet stream uses.
-  const instanceObservability = buildInstanceObservabilityHandlers(events, ctx.scheduler);
+  const instanceObservability = buildInstanceObservabilityHandlers(events, ctx.scheduler, ctx.heartbeats);
 
   // --- fleet SSE (C2 deltas) ---------------------------------------------
   const fleetStreamHandler: RouteHandler = (routeCtx: RouteContext): void => {
@@ -335,12 +340,16 @@ export function buildPlaneHandlers(ctx: PlaneHandlerContext): PlaneHandlers {
     instanceSnapshot: (routeCtx) => {
       const opts =
         routeCtx.url.searchParams.get('include') === 'all' ? { include: 'all' as const } : undefined;
-      respondJson(routeCtx.res, 200, projectInstanceSnapshot(buildInstanceRegistry(events), opts));
+      respondJson(
+        routeCtx.res,
+        200,
+        projectInstanceSnapshot(buildInstanceRegistry(events, ctx.heartbeats.snapshot()), opts),
+      );
     },
     instanceDetail: (routeCtx) => {
       // `:id` is a URL-encoded `host:path` (contracts/instance-query-api.md).
       const id = decodeURIComponent(requireParam(routeCtx, 'id'));
-      const detail = projectInstanceDetail(buildInstanceRegistry(events), id);
+      const detail = projectInstanceDetail(buildInstanceRegistry(events, ctx.heartbeats.snapshot()), id);
       // Unknown id → 404 with the pure not-found body verbatim ({ found:false, id }).
       respondJson(routeCtx.res, detail.found ? 200 : 404, detail);
     },
@@ -437,6 +446,11 @@ export function buildPlaneHandlers(ctx: PlaneHandlerContext): PlaneHandlers {
       ) {
         return;
       }
+      // Record the heartbeat into the in-memory, live-only store (dogfood T050):
+      // this is what lets an idle-but-connected instance stay `live` and populates
+      // `lastHeartbeatAt`. Ephemeral — never durable (FR-023/SC-007, T024). Before
+      // this, the plane authenticated the heartbeat and then DROPPED it.
+      ctx.heartbeats.record(body.installationId, body.emittedAt);
       respondJson(routeCtx.res, 200, { kind: 'session-liveness', accepted: true });
     } catch (error) {
       respondJson(routeCtx.res, 400, { error: error instanceof Error ? error.message : String(error) });

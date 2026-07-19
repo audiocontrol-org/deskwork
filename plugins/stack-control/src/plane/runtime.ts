@@ -68,6 +68,7 @@ import {
 } from './http/server.js';
 import type { TelemetryEvent } from '../fleet/event.js';
 import { buildPlaneHandlers } from './runtime-handlers.js';
+import { createHeartbeatStore, type HeartbeatStore } from './heartbeat-store.js';
 
 // ---------------------------------------------------------------------------
 // Options + public surface.
@@ -187,6 +188,13 @@ export function createPlaneRuntime(options: PlaneRuntimeOptions): PlaneRuntime {
   };
   const durableStore = createFileDurableEventStore(options.commandStoreDir, archiveSignals);
 
+  // In-memory, live-only session-liveness heartbeat store (dogfood T050):
+  // `livenessHandler` records the sidecar's ~45s heartbeat here; the instance
+  // registry reads it so an idle-but-connected instance stays `live` and
+  // `lastHeartbeatAt` populates. Ephemeral by contract — a plane restart empties
+  // it and the next heartbeat refills it; reading it adds ZERO durable reads.
+  const heartbeats: HeartbeatStore = createHeartbeatStore();
+
   // The authenticated installation for the in-flight request, keyed by the
   // request object — set by the auth guard, read by handlers (e.g. the SSE
   // stream's `installationIdOf`) that must not re-derive identity.
@@ -250,6 +258,7 @@ export function createPlaneRuntime(options: PlaneRuntimeOptions): PlaneRuntime {
       archiveSignals,
       durableStore,
       eventLog,
+      heartbeats,
       scheduler,
       cdnReader: options.cdnReader,
       requireAuthedInstallation,

@@ -248,6 +248,48 @@ else
 fi
 
 # ============================================================================
+section "SCENARIO 5 (US1/D1) — an IDLE instance stays live on the sidecar heartbeat (T050)"
+# ============================================================================
+# THE T050 FIX: before this, the plane authenticated the sidecar's ~45s
+# session-liveness heartbeat and then DROPPED it, so lastHeartbeatAt was ALWAYS
+# null and liveness/connection derived only from lastActivityAt recency — an
+# idle-but-connected instance wrongly aged live -> stale -> gone. Now the plane
+# records the heartbeat (in-memory, live-only) and the instance registry holds
+# an idle instance `live` on heartbeat recency, populating lastHeartbeatAt.
+#
+# producer: the REAL sidecar's session-liveness heartbeat. NO verbs run during
+# the wait, so lastActivityAt FREEZES while heartbeats keep arriving.
+ID="$(first_id)"
+IDLE_WAIT="${IDLE_WAIT:-95}"   # must EXCEED the 90s LIVENESS_WINDOW to isolate the heartbeat's contribution
+if [ -z "$ID" ]; then
+  note "S5 VERDICT: SKIP — no instance present to observe idle (earlier producers surfaced no instance)."
+else
+  note "instance: $ID; waiting ${IDLE_WAIT}s with ZERO verbs (the sidecar keeps heartbeating)"
+  BEFORE_JSON="$(curl -s "${AUTH[@]}" "$BASE/v1/instances/$(enc "$ID")")"
+  echo "-- before idle wait --"
+  printf '%s' "$BEFORE_JSON" | jq '.instance | {liveness,connection,lastHeartbeatAt,lastActivityAt}'
+  sleep "$IDLE_WAIT"
+  AFTER_JSON="$(curl -s "${AUTH[@]}" "$BASE/v1/instances/$(enc "$ID")")"
+  echo "-- after ${IDLE_WAIT}s idle (no verbs; only heartbeats) --"
+  printf '%s' "$AFTER_JSON" | jq '.instance | {liveness,connection,lastHeartbeatAt,lastActivityAt}'
+  # Ages derived against the API's OWN timestamps via jq (portable; no GNU date).
+  # Strip fractional seconds first — jq's fromdateiso8601 (%Y-%m-%dT%H:%M:%SZ)
+  # rejects the millis the ISO timestamps carry.
+  ACT_AGE="$(printf '%s' "$AFTER_JSON" | jq -r 'if .instance.lastActivityAt then (now - (.instance.lastActivityAt|sub("\\.[0-9]+Z$";"Z")|fromdateiso8601)|floor) else -1 end')"
+  HB_AGE="$(printf '%s' "$AFTER_JSON" | jq -r 'if .instance.lastHeartbeatAt then (now - (.instance.lastHeartbeatAt|sub("\\.[0-9]+Z$";"Z")|fromdateiso8601)|floor) else -1 end')"
+  LV="$(printf '%s' "$AFTER_JSON" | jq -r '.instance.liveness // "null"')"
+  HB="$(printf '%s' "$AFTER_JSON" | jq -r '.instance.lastHeartbeatAt // "null"')"
+  note "lastActivity age: ${ACT_AGE}s (LIVENESS_WINDOW is 90s); lastHeartbeat age: ${HB_AGE}s; liveness: ${LV}"
+  if [ "$HB" != "null" ] && [ "$ACT_AGE" -gt 90 ] && [ "$LV" = "live" ]; then
+    note "S5 VERDICT: PASS — activity is ${ACT_AGE}s stale (>90s) yet liveness=live because the REAL heartbeat (${HB_AGE}s old) holds it; lastHeartbeatAt populated (was ALWAYS null before T050)."
+  elif [ "$HB" != "null" ] && [ "$LV" = "live" ]; then
+    note "S5 VERDICT: PARTIAL — lastHeartbeatAt populated and liveness=live, but activity age ${ACT_AGE}s did not exceed the 90s window this run (raise IDLE_WAIT to isolate the heartbeat)."
+  else
+    note "S5 VERDICT: FAIL — lastHeartbeatAt=${HB}, activity age=${ACT_AGE}s, liveness=${LV} (expected a populated heartbeat holding an idle instance live)."
+  fi
+fi
+
+# ============================================================================
 section "SUPPORTING EVIDENCE — sidecar + plane logs, on-disk store shape"
 # ============================================================================
 echo "-- sidecar log --"; sed 's/^/  /' "$TMPROOT/sidecar.log"
