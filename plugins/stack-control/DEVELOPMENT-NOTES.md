@@ -2,21 +2,34 @@
 
 ---
 
-## 2026-07-19: <!-- session title -->
+## 2026-07-19: 036 dogfood exposes unbuilt producers → design + spec 037 instance-observability (run-centric → instance-centric)
 
-**Goal:** <!-- compose: what we set out to do -->
+### Item: `design:feature/instance-observability` (spec `specs/037-instance-observability`, authored this session)
+
+**Goal:** "Let's see if what we built works" — dogfood the graduated 036 fleet control plane. On discovering it doesn't (no real producers), decide the fix; per the operator, **design and spec a corrected architecture** through the full spec-kit chain, stopping at the orchestrator/implementation boundary.
 
 **Accomplished:**
-- <!-- compose -->
+- **Live dogfood of 036**: booted the real plane + sidecar with a redirected machine-local store, ran real verbs, drove the dashboard-facing API. Established the plane's internals are real and tested but **no real producer exists** — `GET /v1/fleet` stays empty after real verbs; timings/history serve absent data; the mandated end-to-end verification (FR-087/SC-018) was signed off against **synthetic events**, not real runs.
+- **Filed the gaps honestly**: TASK-470 (run-lifecycle producer unwired — the load-bearing one), TASK-471 (short-verb delivery undemonstrated), and TASK-472 (a self-hosted `backlog capture` dedupe-on-ref bug I hit *while filing the first two*). Three parallel evidence audits confirmed the gaps are **mandated MUST requirements 036 never built** (FR-012/013/085/086/087), spanning five clusters.
+- **Designed the corrected architecture** (brainstorming → approved design record `2026-07-18-instance-observability-design.md`): instance-centric (the observable unit is the instance = `host:path`, a sidecar/worktree), observability-only (control deferred), built on 036's reused plumbing.
+- **Authored 037 through the full spec-kit chain** via the stack-control front door with capability mediation: `specify → clarify → plan → checklist → tasks → analyze`, every artifact grounded in 036's real source (two code-reading agent passes for the plan). 43 tasks, RED-first, tier-tagged; analyze reported 100% FR/SC coverage, 0 CRITICAL; applied refinements M1/M2/L2. **`spec-check`: spec=yes plan=yes tasks=yes (runnable).**
 
 **Didn't Work:**
-- <!-- compose -->
+- **036 cannot honestly be considered delivered against its own spec.** Its graduation (govern convergence record) rests on a floor that isn't there — the producers that make `execute`/`govern` register as commandable runs, and that produce phase-duration/history, were never wired. The completion signals (138/138 tasks, T128 "drive every scenario", govern-graduated) all measured the plane half only.
+- The `backlog capture` verb silently refused a genuine second finding sharing a spec-file `--ref` (success-shaped stdout, exit 0) — nearly lost TASK-471. Worked around by re-pointing the ref; captured as TASK-472.
 
 **Course Corrections:**
-- <!-- compose -->
+- [PROCESS] Answered "did you file a bug?" honestly — I'd *asked* instead of filing. Corrected: capture ≠ scope, so a found bug gets captured immediately (TASK-472), and prioritization is the separate operator call.
+- [PROCESS] Operator: "if the spec didn't get implemented, it can't graduate — we have to actually implement the spec." Reframed from "backlog hygiene" to "unmet mandated requirements of a graduated feature."
+- [SCOPE] Operator drove the reframes I did not pre-decide: observability-first ("control starts at observability"); the observable unit is the **sidecar/worktree**, not per-installation; identity granule **per-sidecar** now, per-worktree later; **`host:path`** as the derived identifier (dodges the git-branch-global/merge-conflict trap); a **session = the `session-start`..`session-end` span**, NOT the Claude Code session; drop the `waiting` field until its telemetry is defined.
+- [QUALITY] Engaged a third-party review with real pushback: kept identity **legible** (rejected "opaque"), kept `aggregated` (rejected a rename that churns shipped 036 code), kept the "registry" name while adopting the projection *definition* — and kept the factual 036 relationship while removing the governance/blame narrative.
+- [PROCESS] Deviated from the brainstorming skill's default terminal (`writing-plans`) to the stack-control spec-kit lifecycle, since a superpowers plan can't feed `/stack-control:execute`.
 
 **Insights:**
-- <!-- compose -->
+- **Observability is the foundation of control** — the run-centric 036 model was the wrong root; making the *instance* the root object makes sessions, runs, health, and (later) commands all have a natural home. The dogfood, not the green suite, is what exposed the gap — exactly the FR-027 discipline this new spec makes first-class.
+- **Derived identity beats minted identity** for a fleet: `host:path` is git-safe (nothing to commit → nothing to go branch-global or merge-conflict), stable-across-restart for free, collision-free (host disambiguates), legible, and forward-compatible with the shared-sidecar per-worktree future — all from one choice.
+- **The sharpest implementation seam is 036's dropped snapshot** (TASK-457): identity must ride the envelope; event payload must be threaded through the ClassifiedEvent+log boundary. Grounding the plan in real code (two agent passes) caught this before it became a dogfood surprise.
+- The full spec-kit chain applied faithfully (no skipped step — I backfilled the passed-over `/speckit-checklist`) is the up-front-design investment the thesis calls for; the payoff is a runnable, 100%-covered, RED-first task list a fresh implementation session can execute without re-derivation.
 
 **Quantitative (auto-derived from git; verify before publishing):**
 - Commits: 10
