@@ -86,14 +86,16 @@ function bearer(): Record<string, string> {
  * Construct a session.started event (durable type). Per contracts/telemetry-events.md,
  * the envelope carries host/path/sessionId, and the snapshot carries { sessionId, startedAt }.
  */
-function sessionStartedBody(sessionId: string, startedAt: string): string {
+function sessionStartedBody(sessionId: string, startedAt: string, installationSequence: number): string {
   return JSON.stringify({
     envelope: {
       eventId: mintUuidV7(),
       installationId: INST,
       invocationId: mintUuidV7(),
       runId: null,
-      installationSequence: 1,
+      // installationSequence is the instance-monotonic ordering key (per-installation,
+      // monotonic across invocations); each event carries a strictly-increasing value.
+      installationSequence,
       invocationSequence: 1,
       schemaVersion: 2,
       type: 'session.started',
@@ -116,14 +118,16 @@ function sessionStartedBody(sessionId: string, startedAt: string): string {
  * the envelope carries host/path/sessionId, and the snapshot carries
  * { sessionId, endedAt, reason: 'ended' | 'abandoned' }.
  */
-function sessionEndedBody(sessionId: string, startedAt: string, endedAt: string): string {
+function sessionEndedBody(sessionId: string, startedAt: string, endedAt: string, installationSequence: number): string {
   return JSON.stringify({
     envelope: {
       eventId: mintUuidV7(),
       installationId: INST,
       invocationId: mintUuidV7(),
       runId: null,
-      installationSequence: 1,
+      // installationSequence is the instance-monotonic ordering key; strictly
+      // greater than the paired session.started's value.
+      installationSequence,
       invocationSequence: 2,
       schemaVersion: 2,
       type: 'session.ended',
@@ -213,7 +217,7 @@ describe('session lifetime counters survive a plane restart (T029, SC-006)', () 
     const ingest1 = await fetch(`${first.baseUrl}/v1/ingest`, {
       method: 'POST',
       headers: bearer(),
-      body: sessionStartedBody(session1, session1StartedAt),
+      body: sessionStartedBody(session1, session1StartedAt, 1),
     });
     expect(ingest1.status).toBe(200);
 
@@ -221,7 +225,7 @@ describe('session lifetime counters survive a plane restart (T029, SC-006)', () 
     const ingest2 = await fetch(`${first.baseUrl}/v1/ingest`, {
       method: 'POST',
       headers: bearer(),
-      body: sessionEndedBody(session1, session1StartedAt, session1EndedAt),
+      body: sessionEndedBody(session1, session1StartedAt, session1EndedAt, 2),
     });
     expect(ingest2.status).toBe(200);
 
@@ -229,7 +233,7 @@ describe('session lifetime counters survive a plane restart (T029, SC-006)', () 
     const ingest3 = await fetch(`${first.baseUrl}/v1/ingest`, {
       method: 'POST',
       headers: bearer(),
-      body: sessionStartedBody(session2, session2StartedAt),
+      body: sessionStartedBody(session2, session2StartedAt, 3),
     });
     expect(ingest3.status).toBe(200);
 
@@ -237,7 +241,7 @@ describe('session lifetime counters survive a plane restart (T029, SC-006)', () 
     const ingest4 = await fetch(`${first.baseUrl}/v1/ingest`, {
       method: 'POST',
       headers: bearer(),
-      body: sessionEndedBody(session2, session2StartedAt, session2EndedAt),
+      body: sessionEndedBody(session2, session2StartedAt, session2EndedAt, 4),
     });
     expect(ingest4.status).toBe(200);
 

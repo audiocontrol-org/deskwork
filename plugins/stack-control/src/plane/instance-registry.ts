@@ -54,8 +54,9 @@ export interface InstanceRegistry {
  * keyed by MACHINE, and retains `invocation.completed` rather than discarding
  * it, data-model.md § Event types). Effectively-once by `eventId` (deduped
  * HERE, before an event ever reaches the per-instance accumulator — mirrors
- * `registry.ts`'s `seenEventIds`); no-regress by `invocationSequence` (enforced
- * per-field inside `applyInstanceEvent`). Entries preserve first-seen order.
+ * `registry.ts`'s `seenEventIds`); no-regress by `installationSequence` (the
+ * instance-monotonic key — enforced per-field inside `applyInstanceEvent`).
+ * Entries preserve first-seen order.
  */
 export function buildInstanceRegistry(events: readonly ClassifiedEvent[]): InstanceRegistry {
   const accumulatorsById = new Map<InstanceId, InstanceAccumulator>();

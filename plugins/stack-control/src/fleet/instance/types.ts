@@ -80,8 +80,11 @@ export interface RecentActivityItem {
  * The mutable per-instance fold state `buildInstanceRegistry` maintains,
  * keyed by `InstanceId`. Carries every served `InstanceState` field PLUS the
  * internal no-regress high-water marks (`*Sequence`) that keep folding
- * effectively-once + no-regress by `invocationSequence` (mirrors
- * `registry.ts`'s `statusSequence` / `latestInvocationSequence`). These
+ * effectively-once + no-regress by `installationSequence` — the
+ * instance-monotonic, per-installation outbound counter (NOT `invocationSequence`,
+ * which is per-invocation and resets; keying on it froze the fields at the first
+ * event, a dogfood finding). Mirrors `registry.ts`'s `statusSequence` /
+ * `latestInvocationSequence` no-regress shape. These
  * sequence fields are internal bookkeeping ONLY — `toInstanceState` never
  * projects them onto the served shape.
  *
@@ -95,18 +98,18 @@ export interface InstanceAccumulator {
   connection: Connection;
   liveness: Liveness;
   lastHeartbeatAt: string | null;
-  /** `invocationSequence` of the event that set `lastHeartbeatAt` (no-regress). */
+  /** `installationSequence` of the event that set `lastHeartbeatAt` (no-regress). */
   lastHeartbeatSequence: number;
   currentSession: CurrentSession | null;
   currentBearing: CurrentBearing | null;
   lastActivityAt: string | null;
   lastActivity: string | null;
-  /** `invocationSequence` of the event that set `lastActivityAt`/`lastActivity` (no-regress). */
+  /** `installationSequence` of the event that set `lastActivityAt`/`lastActivity` (no-regress). */
   lastActivitySequence: number;
   sessionsStarted: number;
   sessionsEnded: number;
   firstSeenAt: string | null;
-  /** `invocationSequence` of the event that set `firstSeenAt` (earliest wins). */
+  /** `installationSequence` of the event that set `firstSeenAt` (earliest wins). */
   firstSeenSequence: number;
   firstSessionAt: string | null;
   phaseDurations: Record<string, number>;

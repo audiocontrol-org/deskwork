@@ -22,8 +22,14 @@
 //
 //   DELIVERY SEMANTICS (mirrors registry.ts, data-model.md § InstanceAccumulator):
 //   effectively-once (a re-delivered event, same `eventId`, applies at most
-//   once) and no-regress (an older `invocationSequence` never walks
-//   `lastActivityAt`/`lastActivity` backward).
+//   once) and no-regress (an older event never walks `lastActivityAt`/
+//   `lastActivity` backward). The instance registry orders by
+//   `installationSequence` — the instance-monotonic, per-installation outbound
+//   counter (monotonic across invocations AND sidecar restarts) — NOT
+//   `invocationSequence`, which is per-invocation (resets to 0 for session/phase
+//   events, restarts each invocation). Keying no-regress on `invocationSequence`
+//   was the WRONG contract: it froze `lastActivityAt` at the first
+//   high-`invocationSequence` event (dogfood finding).
 //
 // Repo convention: relative `.js` imports under node16 resolution (no `@/`
 // alias). Real fixtures, no mocks, no `any`/`as`/`@ts-ignore`.
@@ -56,7 +62,10 @@ interface ClassifiedEvent {
 /**
  * Helper to mint a classified event carrying host/path/sessionId identity
  * fields (specs/037 EventEnvelope EXTEND) with predictable, controllable
- * wallClock + invocationSequence for ordering/dedupe assertions.
+ * wallClock + sequences for ordering/dedupe assertions. `installationSequence`
+ * (the instance-monotonic ORDERING key the registry uses) defaults to
+ * `invocationSequence` for the identity/dedupe cases where they coincide, but
+ * the no-regress case sets it INDEPENDENTLY so the test pins the correct key.
  */
 function mkEvent(opts: {
   host: string;
@@ -65,6 +74,7 @@ function mkEvent(opts: {
   type: EventType;
   classification: EventClassification;
   invocationSequence: number;
+  installationSequence?: number;
   wallClock: string;
   eventId?: string;
 }): ClassifiedEvent {
@@ -73,7 +83,7 @@ function mkEvent(opts: {
     installationId: mintUuidV7(),
     invocationId: mintUuidV7(),
     runId: null,
-    installationSequence: opts.invocationSequence,
+    installationSequence: opts.installationSequence ?? opts.invocationSequence,
     invocationSequence: opts.invocationSequence,
     schemaVersion: 2,
     type: opts.type,
@@ -230,7 +240,14 @@ describe('instance registry — folds events into one InstanceState per host:pat
     expect(instance.lastActivity).toBe('invocation.completed');
   });
 
-  it('no-regress: an out-of-order event with a LOWER invocationSequence never regresses lastActivityAt/lastActivity', () => {
+  it('no-regress: an out-of-order event with a LOWER installationSequence never regresses lastActivityAt/lastActivity', () => {
+    // The registry orders by installationSequence (instance-monotonic), NOT
+    // invocationSequence (per-invocation). To pin that contract, the two events
+    // DISAGREE on the two keys: the newer event has the higher installationSequence
+    // but a LOWER invocationSequence, and the out-of-order redelivery has a lower
+    // installationSequence but a HIGHER invocationSequence. If the fold keyed on
+    // invocationSequence (the shipped bug), the redelivery would win and regress
+    // lastActivityAt to 12:05; keying on installationSequence, it does not.
     const events: ClassifiedEvent[] = [
       mkEvent({
         host: 'orion-mbp',
@@ -238,18 +255,21 @@ describe('instance registry — folds events into one InstanceState per host:pat
         sessionId: null,
         type: 'invocation.completed',
         classification: 'aggregated',
-        invocationSequence: 5,
+        installationSequence: 5,
+        invocationSequence: 1,
         wallClock: '2026-07-18T12:10:00.000Z',
       }),
-      // Arrives AFTER the above in the stream, but carries a LOWER sequence
-      // (out-of-order redelivery) and an EARLIER wallClock — must not regress.
+      // Arrives AFTER the above in the stream, but carries a LOWER
+      // installationSequence (out-of-order redelivery) and an EARLIER wallClock —
+      // must not regress. Its HIGHER invocationSequence must be ignored.
       mkEvent({
         host: 'orion-mbp',
         path: '/Users/orion/work/proj-a',
         sessionId: null,
         type: 'session.heartbeat',
         classification: 'live-only',
-        invocationSequence: 3,
+        installationSequence: 3,
+        invocationSequence: 9,
         wallClock: '2026-07-18T12:05:00.000Z',
       }),
     ];

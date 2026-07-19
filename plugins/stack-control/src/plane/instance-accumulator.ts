@@ -18,9 +18,15 @@
 // (`phase.entered`) fold into them later; this module is their seam.
 //
 // DELIVERY SEMANTICS (mirrors registry.ts, data-model.md § InstanceAccumulator):
-// no-regress (an older `invocationSequence` never walks a field backward) is
+// no-regress (an older `installationSequence` never walks a field backward) is
 // enforced HERE, per-field, via the `*Sequence` high-water/low-water marks on
-// `InstanceAccumulator`. Effectively-once (dedupe by `eventId`) is enforced by
+// `InstanceAccumulator`. The ordering key is `installationSequence` — the
+// sidecar's durable, per-installation outbound counter, monotonic across
+// invocations AND across sidecar restarts — NOT `invocationSequence`, which is
+// per-invocation (session/phase events set it to 0 and every fresh `stackctl`
+// invocation restarts its own count), so it would freeze the fields at the
+// first high-`invocationSequence` event (dogfood finding). Effectively-once
+// (dedupe by `eventId`) is enforced by
 // the caller, `buildInstanceRegistry` (`instance-registry.ts`), before an event
 // ever reaches `applyInstanceEvent` — mirrors `registry.ts`'s `seenEventIds`
 // Set living in `buildRegistry`, not in the per-run accumulator.
@@ -180,7 +186,7 @@ function applyPhaseEnteredEvent(acc: InstanceAccumulator, event: ClassifiedEvent
 /**
  * Recompute `connection`/`liveness` from the instance's freshest known signal
  * (`lastActivityAt`, which no-regress above has already settled to the
- * highest-`invocationSequence` event's wallClock). Per D1/D6 (task-scoped
+ * highest-`installationSequence` event's wallClock). Per D1/D6 (task-scoped
  * derivation for the pure event fold, no separate uplink tracker at this
  * layer): a signal within the liveness window means the uplink is currently
  * delivering, so `connection` tracks `liveness === 'live'` directly.
@@ -201,23 +207,29 @@ function refreshConnectionAndLiveness(acc: InstanceAccumulator): void {
  * Fold one event into its instance accumulator, honoring no-regress ordering
  * (mirrors `registry.ts`'s `applyRunEvent`, data-model.md § InstanceAccumulator).
  * `lastActivityAt`/`lastActivity` and `lastHeartbeatAt` advance only on a
- * STRICTLY-newer `invocationSequence`; `firstSeenAt` only regresses EARLIER
- * (a strictly-lower sequence). Caller (`buildInstanceRegistry`) has already
- * deduped by `eventId` — effectively-once is not re-checked here.
+ * STRICTLY-newer `installationSequence`; `firstSeenAt` only regresses EARLIER
+ * (a strictly-lower sequence). The ordering key is `installationSequence` (the
+ * instance-monotonic, per-installation outbound counter — monotonic across
+ * invocations AND sidecar restarts), NOT `invocationSequence` (per-invocation,
+ * resets to 0 for session/phase events and restarts each invocation — keying on
+ * it froze the fields at the first high-`invocationSequence` event, a dogfood
+ * finding). Caller (`buildInstanceRegistry`) has already deduped by `eventId` —
+ * effectively-once is not re-checked here.
  */
 export function applyInstanceEvent(acc: InstanceAccumulator, event: ClassifiedEvent): void {
   const { envelope, type } = event;
-  const sequence = envelope.invocationSequence;
+  const sequence = envelope.installationSequence;
 
   // Bounded convenience view (FR-016b, RECENT_ACTIVITY_CAP = 50, D1). Stored
-  // oldest-pushed-first; toInstanceState reverses to newest-first on read.
+  // oldest-pushed-first; toInstanceState reverses to newest-first on read. NOT
+  // sequence-gated — every folded event is recorded.
   acc.recentActivity.push({ eventId: envelope.eventId, type, wallClock: envelope.wallClock });
   if (acc.recentActivity.length > RECENT_ACTIVITY_CAP) {
     acc.recentActivity.shift();
   }
 
   // No-regress: lastActivityAt/lastActivity advance only on a strictly-newer
-  // invocationSequence — a duplicate or out-of-order older event never walks
+  // installationSequence — a duplicate or out-of-order older event never walks
   // them backward.
   if (sequence > acc.lastActivitySequence) {
     acc.lastActivitySequence = sequence;
@@ -225,13 +237,13 @@ export function applyInstanceEvent(acc: InstanceAccumulator, event: ClassifiedEv
     acc.lastActivity = type;
   }
 
-  // firstSeenAt: earliest-sequence wallClock across the whole fold.
+  // firstSeenAt: earliest-installationSequence wallClock across the whole fold.
   if (sequence < acc.firstSeenSequence) {
     acc.firstSeenSequence = sequence;
     acc.firstSeenAt = envelope.wallClock;
   }
 
-  // lastHeartbeatAt: latest session.heartbeat by sequence (feeds liveness, D1).
+  // lastHeartbeatAt: latest session.heartbeat by installationSequence (feeds liveness, D1).
   if (type === 'session.heartbeat' && sequence > acc.lastHeartbeatSequence) {
     acc.lastHeartbeatSequence = sequence;
     acc.lastHeartbeatAt = envelope.wallClock;
