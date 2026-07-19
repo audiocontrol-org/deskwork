@@ -665,7 +665,7 @@ Second-wave scope-discovery expansion beyond the migrated v1: additional discove
 - status: planned
 
 ## design:feature/fleet-control-plane
-- status: planned
+- status: shipped
 - analyze-clean: yes
 - spec: specs/036-fleet-control-plane
 - design-approved: yes
