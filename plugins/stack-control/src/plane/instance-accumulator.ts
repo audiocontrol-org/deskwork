@@ -127,6 +127,24 @@ function readSnapshotString(snapshot: SnapshotPayload | undefined, key: string):
 }
 
 /**
+ * The short human-readable "what happened" for a `recentActivity` row, read off
+ * the event's already-validated snapshot. `null` when the type carries no
+ * meaningful detail (honest absence — never a fabricated label). Kept in sync
+ * with the producers: `phase.entered` snapshots `{phase, from, item}`;
+ * `invocation.completed` snapshots `{outcome, verb}`.
+ */
+function recentActivityDetail(type: string, snapshot: SnapshotPayload | undefined): string | null {
+  switch (type) {
+    case 'phase.entered':
+      return readSnapshotString(snapshot, 'phase');
+    case 'invocation.completed':
+      return readSnapshotString(snapshot, 'verb') ?? readSnapshotString(snapshot, 'outcome');
+    default:
+      return null;
+  }
+}
+
+/**
  * Fold a `session.started` / `session.ended` event into the instance's session
  * fields (data-model.md § InstanceState; FR-009/FR-009a). The identity fields
  * (host/path) keyed the accumulator already; the session payload itself rides
@@ -366,13 +384,20 @@ export function applyHeartbeatSignal(acc: InstanceAccumulator, emittedAt: string
  * effectively-once is not re-checked here.
  */
 export function applyInstanceEvent(acc: InstanceAccumulator, event: ClassifiedEvent): void {
-  const { envelope, type } = event;
+  const { envelope, type, snapshot } = event;
   const sequence = envelope.installationSequence;
 
   // Bounded convenience view (FR-016b, RECENT_ACTIVITY_CAP = 50, D1). Stored
   // oldest-pushed-first; toInstanceState reverses to newest-first on read. NOT
-  // sequence-gated — every folded event is recorded.
-  acc.recentActivity.push({ eventId: envelope.eventId, type, wallClock: envelope.wallClock });
+  // sequence-gated — every folded event is recorded. `detail` records WHAT
+  // happened (the phase, the verb, …) so the timeline is legible, not a wall of
+  // bare event types.
+  acc.recentActivity.push({
+    eventId: envelope.eventId,
+    type,
+    wallClock: envelope.wallClock,
+    detail: recentActivityDetail(type, snapshot),
+  });
   if (acc.recentActivity.length > RECENT_ACTIVITY_CAP) {
     acc.recentActivity.shift();
   }

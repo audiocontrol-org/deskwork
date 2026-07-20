@@ -133,8 +133,11 @@ export interface RawInvocationEvent {
 }
 
 /**
- * The specs/037 durable event types whose BARE status snapshot survives to the
- * plane INTACT. A CLOSED set, so the passthrough does NOT open a general "bare
+ * The event types whose BARE, already-safe status snapshot survives to the plane
+ * INTACT — the specs/037 durable-identity types (`{phase,from,item}` /
+ * `{sessionId,startedAt}`) plus `invocation.completed`'s `{outcome, verb}` (the
+ * verb name is a stackctl subcommand, not user content, so the fleet timeline can
+ * show WHAT ran). A CLOSED set, so the passthrough does NOT open a general "bare
  * snapshot bypasses redaction" hole — every OTHER type still travels the 036
  * `{content,allowlist}` deny-by-default redaction path (FR-047/048).
  */
@@ -142,6 +145,7 @@ const BARE_SNAPSHOT_EVENT_TYPES: ReadonlySet<EventType> = new Set<EventType>([
   'session.started',
   'session.ended',
   'phase.entered',
+  'invocation.completed',
 ]);
 
 /**

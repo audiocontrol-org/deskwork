@@ -196,11 +196,16 @@
     }
     const rows = activity
       .map((item) => {
-        const type = item && typeof item === 'object' && 'type' in item ? item.type : String(item);
-        const when = item && typeof item === 'object' && 'wallClock' in item ? item.wallClock : null;
+        const obj = item && typeof item === 'object' ? item : {};
+        const type = 'type' in obj ? obj.type : String(item);
+        const when = 'wallClock' in obj ? obj.wallClock : null;
+        const detail = 'detail' in obj && obj.detail ? obj.detail : null;
+        const what = detail
+          ? `${escapeHtml(type)} <span class="muted">· ${escapeHtml(detail)}</span>`
+          : escapeHtml(type);
         return (
           `<div class="activity-row"><div class="t">${relativeTime(when)}</div>` +
-          `<div class="mono">${escapeHtml(type)}</div></div>`
+          `<div class="mono">${what}</div></div>`
         );
       })
       .join('');

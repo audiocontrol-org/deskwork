@@ -251,7 +251,7 @@ async function main(): Promise<void> {
   // wrapper emits exactly one invocation.completed event (FR-012) and closes
   // the emit client even when the handler throws, then re-throws the handler's
   // original error unchanged so exit behavior is preserved (AUDIT-20260717-08).
-  await runInvocationWithTelemetry(handler, args);
+  await runInvocationWithTelemetry(handler, args, { verb });
 }
 
 main().catch((err: unknown) => {
