@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Fleet Dashboard</title>
+    <link rel="stylesheet" href="/dashboard/styles.css" />
+    <!-- Server-injected config (inert JSON — never executable script text). -->
+    <script id="dashboard-config" type="application/json">__DASHBOARD_CONFIG__</script>
+  </head>
+  <body>
+    <header class="masthead">
+      <h1>Fleet Dashboard</h1>
+      <div class="masthead-right">
+        <label class="toggle">
+          <input type="checkbox" id="show-all" />
+          <span>Show all known instances</span>
+        </label>
+        <span id="stream-status" class="stream-status" data-state="connecting">connecting…</span>
+      </div>
+    </header>
+
+    <main>
+      <!-- Grid (home) -->
+      <section id="grid-view">
+        <table class="grid">
+          <thead>
+            <tr>
+              <th>State</th>
+              <th>Instance</th>
+              <th>Bearing</th>
+              <th>Last activity</th>
+              <th class="num">Sessions</th>
+            </tr>
+          </thead>
+          <tbody id="grid-body"></tbody>
+        </table>
+        <p id="grid-empty" class="empty">No instances yet. Waiting for telemetry…</p>
+      </section>
+
+      <!-- Detail (drill-down) -->
+      <section id="detail-view" hidden>
+        <button id="back-to-grid" class="back">← Fleet</button>
+        <div id="detail-body"></div>
+      </section>
+    </main>
+
+    <script src="/dashboard/app.js"></script>
+  </body>
+</html>
