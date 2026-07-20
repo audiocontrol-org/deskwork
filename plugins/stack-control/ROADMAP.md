@@ -665,7 +665,7 @@ Second-wave scope-discovery expansion beyond the migrated v1: additional discove
 - status: planned
 
 ## design:feature/fleet-control-plane
-- status: shipped
+- status: closed
 - validated: yes
 - analyze-clean: yes
 - spec: specs/036-fleet-control-plane
@@ -679,7 +679,7 @@ Second-wave scope-discovery expansion beyond the migrated v1: additional discove
 Stays `planned`: a **validation build** of this dashboard was merged to main via [PR #529](https://github.com/audiocontrol-org/deskwork/pull/529) (2026-07-20, design record `docs/superpowers/specs/2026-07-19-fleet-dashboard-design.md`) — a plane-embedded, read-only live view built OUTSIDE the governed lifecycle (no spec/execute/govern, injected-token auth stand-in) to validate the 036/037 plane end to end. That throwaway is not the governed feature; the real product surface still re-enters at `design` and runs the full lifecycle. The operator-facing dashboard over the fleet plane: fleet table of commandable runs, tabbed instance drawer, live deltas, historical views. Cut from `design:feature/fleet-control-plane`'s scope by operator decision 2026-07-16 — get the plumbing right before slapping a frontend on it; pick this up once the plane is shipped and producing real fleet state for the dashboard to be *about*. The design record referenced above sketches the surface (table columns, drawer tabs, delta-not-full-push, plane-as-only-reader); it is a starting point, not a finished frontend design, so this item re-enters at `design`. Supersedes the removed `multi:feature/control-plane-frontend` (2026-06-07), which predated the fleet-plane design and was retired as the weaker idea.
 
 ## design:feature/instance-observability
-- status: shipped
+- status: closed
 - validated: yes
 - analyze-clean: yes
 - spec: specs/037-instance-observability
