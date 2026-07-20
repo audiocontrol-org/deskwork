@@ -2,6 +2,160 @@
 
 ---
 
+## 2026-07-20: <!-- session title -->
+
+**Goal:** <!-- compose: what we set out to do -->
+
+**Accomplished:**
+- <!-- compose -->
+
+**Didn't Work:**
+- <!-- compose -->
+
+**Course Corrections:**
+- <!-- compose -->
+
+**Insights:**
+- <!-- compose -->
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 133
+  - chore: release v0.59.0
+  - roadmap(control-plane): close 036 + 037 (validated first version)
+  - roadmap(037): design-record pointer is 'design:', not 'ref:'
+  - roadmap(fleet-dashboard): note validation build merged (PR #529); node stays planned
+  - Merge pull request #529 from audiocontrol-org/feature/fleet-dashboard
+  - feat(037): record WHAT happened in recentActivity, not just that it did
+  - docs(fleet-dashboard): bring design record in line with what was built
+  - feat(fleet-dashboard): plane-embedded live instance mission-control (validation build)
+  - design(fleet-dashboard): round-2 review — settle external-auth serving mode, stream-authoritative updates (no revision needed), completed-only phase bars, hash routing; verified against 037 stream/projection
+  - design(fleet-dashboard): revise after review — auth delegated to infra, corrected instance states, verified host:path routing, packaging + SSE + security hardening
+  - design(fleet-dashboard): design record — plane-embedded live instance mission-control (v1 read-only)
+  - workflow(graduate): design:feature/instance-observability merging -> validating
+  - workflow(graduate): design:feature/fleet-control-plane merging -> validating
+  - Merge pull request #525 from audiocontrol-org/feature/fleet-control-plane
+  - fix(037): pin captured heartbeat instants in heartbeat-liveness test
+  - govern(037): graduated by operator override after 5 convergence rounds
+  - AUDIT-20260719-18/20/21(037): daemon frame-guard resilience; heartbeat keyed by host:path; connection channels documented
+  - AUDIT-20260719-19(037): emit-drain waits for delivery-confirmed, not just buffer-empty
+  - AUDIT-20260719-15/16/17(037): test fixture hygiene (ESM import, schemaVersion, ClassifiedEvent shape)
+  - AUDIT-20260719-13/14(037): clamp negative phase durations; dogfood exits non-zero on FAIL
+  - AUDIT-20260719-11/12(037): assert route guards against imported ROUTE_TABLE; drop `as AddressInfo`
+  - AUDIT-20260719-09/10(037): no-regress ordering for session/phase folds + heartbeat-poison resistance
+  - AUDIT-20260719-05/06/07/08(037): harden test assertions the barrage flagged
+  - chore(037): write the missing clone-detection baseline (75 groups)
+  - AUDIT-20260719-03(037): tolerate pre-037 durable logs on replay (upgrade path)
+  - AUDIT-20260719-02(037): --at session commands operate on the target's current-session store
+  - AUDIT-20260719-01(037): enable host:path auth on the real plane serve path
+  - AUDIT-20260719-04(037): make phase-advance fail-open guards non-vacuous
+  - tasks(037): reconcile T051 — connection/liveness fixed (T050); runs facet is 036 TASK-470, out of scope
+  - T050(037): wire the sidecar heartbeat into instance liveness/connection
+  - T049(037): fix frozen lastActivityAt — no-regress keyed on the wrong sequence
+  - tasks(037): mark all tasks complete — execute + FR-027 producer-path fix done
+  - chore(037): restore execute ledger T041/T044-T048 (uncommitted appends wiped by a subagent git-restore)
+  - T047/T048(037): dogfood S3 was a harness artifact — plane restart stranded the sidecar
+  - T048(037): deliver phase.entered + session.* from the CLI (D-E) + shared emit-drain
+  - tasks(037): scope T048 — phase.entered CLI delivery (dogfood S3)
+  - T046(037): deliver a short verb's invocation.completed (D-B) so a bare verb makes an instance
+  - T044/T045(037): preserve instance identity through the sidecar re-mint
+  - tasks(037): scope Phase 7 — FR-027 producer-path fix (sidecar strips identity)
+  - T041(037): real-producer dogfood harness — reveals the sidecar re-mint strips instance identity
+  - T035-T040(037 Phase 6): instance stream + runs facet + host:path auth + guards
+  - fix(037): make session emit delivery robust (drop fixed connect budget)
+  - T025-T034(037 US2+US3): session lifecycle + bearing/phase-duration observability
+  - T020/T022/T023(037 US1 integration): wire GET /v1/instances into the plane
+  - chore(037): dedup instance test harness
+  - T016-T024(037 US1 core): instance registry projection + query API + producer
+  - T003/T005/T007/T009/T011/T013/T014/T015(037): GREEN foundational spine
+  - T002/T004/T006/T008/T010/T012(037): RED foundational contract tests
+  - T001(037-instance-observability): scaffold instance-observability module stubs
+  - workflow(037-instance-observability): record analyze-clean, advance specifying -> implementing
+  - docs(session): compose 2026-07-19 journal narrative
+  - docs(session): session-end record
+  - refine(037-instance-observability): apply /speckit-analyze findings M1, M2, L2
+  - checklist(037-instance-observability): /speckit-checklist — correctness (requirements-quality gate)
+  - tasks(037-instance-observability): /speckit-tasks — 43 tasks, RED-first, tier-tagged
+  - plan(037-instance-observability): /speckit-plan — plan + design artifacts grounded in 036 source
+  - spec(037-instance-observability): /speckit-clarify — record 4 spec-derived clarifications
+  - spec(037-instance-observability): incorporate third-party review refinements
+  - spec(037-instance-observability): author spec via /stack-control:define
+  - design(instance-observability): design record for the instance-centric observability plane
+  - chore(backlog): capture dedupe-on-ref self-hosted bug (TASK-472)
+  - chore(036-fleet-control-plane): capture two live-dogfood gaps to backlog
+  - docs(session): session-end record
+  - chore(036-fleet-control-plane): govern graduated via substantive override — feature governed (see convergence record + audit-log)
+  - fix(036-fleet-control-plane): fix round-4 security + crash-safety findings (RED-first)
+  - chore(036-fleet-control-plane): re-govern round-4 refused — lift 15 findings (18->24->17->15, plateau)
+  - fix(036-fleet-control-plane): resolve round-3 verified-harmful govern findings (RED-first)
+  - chore(036-fleet-control-plane): re-govern round-3 refused — lift 17 findings to audit-log (18->24->17 converging)
+  - fix(036-fleet-control-plane): resolve round-2 govern findings (21 must-fix, RED-first)
+  - chore(036-fleet-control-plane): re-govern refused — lift round-2 findings (24) to audit-log
+  - fix(036-fleet-control-plane): resolve all 18 whole-feature govern findings (RED-first)
+  - chore(036-fleet-control-plane): govern refused — lift 18 whole-feature findings to audit-log + convergence record
+  - chore(036-fleet-control-plane): mark tasks complete (137 done, T129 [~] scoped out) + ledger T126-T134
+  - feat(036-fleet-control-plane): dogfood loop + isolation bound + Scenario-1 crash fix (T126, T128, T130)
+  - chore(036-fleet-control-plane): ledger T120-T125 + backlog TASK-460..463 (found-mid-build gaps)
+  - feat(036-fleet-control-plane): runnable plane + sidecar daemons + front door (T120-T125)
+  - feat(036-fleet-control-plane): Phase 8 US6 — hostile-network uplink (T112-T119)
+  - test(036-fleet-control-plane): Phase 8 US6 RED — hostile-network uplink suite (T103-T111)
+  - docs(session): compose fleet-control-plane execute Phases 4-7 session narrative
+  - docs(session): session-end record
+  - chore(036-fleet-control-plane): backlog TASK-459 — run-history summary.json producer gap
+  - feat(036-fleet-control-plane): Phase 7 US5 — serve history without amplifying the capped store (T089-T102)
+  - feat(036-fleet-control-plane): Phase 6 US4 — trust what the fleet says, incl. about failure (T074-T088, T139)
+  - chore(036-fleet-control-plane): backlog TASK-458 — fleet-wide command replay held-map keying gap
+  - feat(036-fleet-control-plane): Phase 5 US3 — commands, the operator-promise surface (T056-T073)
+  - chore(036-fleet-control-plane): backlog TASK-457 — registry drops snapshot payload, per-run facets deferred
+  - feat(036-fleet-control-plane): Phase 4 US2 — live fleet aggregation over the plane API (T045-T055)
+  - feat(036-fleet-control-plane): T044 CLI emit wiring + T138 supervised sidecar (US1)
+  - docs(session): compose fleet-control-plane execute session narrative
+  - docs(session): session-end record
+  - feat(036-fleet-control-plane): T031+T032+T039 fail-open emit client (C1/SC-001/002)
+  - feat(036-fleet-control-plane): T035+T036+T041+T043 sidecar bind-wins election + stale recovery (C6/PT-002)
+  - feat(036-fleet-control-plane): T042 detached sidecar spawn (C6)
+  - feat(036-fleet-control-plane): T037+T040 bounded buffer with short/long asymmetry (FR-007/C4)
+  - feat(036-fleet-control-plane): T033+T034+T038 local wire protocol + version handshake
+  - feat(036-fleet-control-plane): T027+T028 installationSequence high-water mark (R-02)
+  - feat(036-fleet-control-plane): T025+T026+T029+T030 installationId mint/read/reattach
+  - feat(036-fleet-control-plane): T023+T024 machine-state store location (PT-001)
+  - feat(036-fleet-control-plane): T135+T136 event classification seam (FR-015/016)
+  - feat(036-fleet-control-plane): T019+T020 two sequences + gap classification (R-04)
+  - test(036-fleet-control-plane): T137 metadata-is-never-identity guard (FR-036)
+  - feat(036-fleet-control-plane): T021+T022 deny-by-default telemetry redaction (PT-008)
+  - feat(036-fleet-control-plane): T017+T018 three status axes, never collapsed
+  - feat(036-fleet-control-plane): T014+T015+T016 event envelope construct/validate + ordering guard
+  - test(036-fleet-control-plane): T011 real socket/process fixture (spawn/SIGKILL/stale/PID-reuse)
+  - test(036-fleet-control-plane): T010 cruel in-process SSE/HTTP server fixture
+  - feat(036-fleet-control-plane): T008 vendor-free object-store port (RED-first)
+  - feat(036-fleet-control-plane): T007 SseTransport DI seam (RED-first)
+  - feat(036-fleet-control-plane): T006 ProcessProbe PID+start-time liveness (RED-first)
+  - feat(036-fleet-control-plane): T004+T005 injectable Clock seam (RED-first)
+  - feat(036-fleet-control-plane): T012+T013 identity + envelope types (RED-first)
+  - test(036-fleet-control-plane): T009 machine-local store redirect harness
+  - feat(036-fleet-control-plane): T003 add plane settings to installation config type
+  - feat(036-fleet-control-plane): T001 (cont) declare the deps in the installation manifest
+  - feat(036-fleet-control-plane): T001 add eventsource-parser + uuidv7 deps
+  - roadmap(fleet-control-plane): record analyze-clean marker (speckit-analyze ran; 4 coverage gaps closed in 3a6b5e76)
+  - docs(session): compose session narrative; correct the auto-derived counts
+  - docs(session): session-end record
+  - tasks(fleet-control-plane): close 4 coverage gaps found by analyze
+  - tasks(fleet-control-plane): 134 tier-annotated tasks, RED-first throughout
+  - checklist(fleet-control-plane): correctness + honesty-under-failure; fix 4 real conflicts it caught
+  - plan(fleet-control-plane): Phase 0 research + Phase 1 design artifacts
+  - spec(fleet-control-plane): clarify — auth mechanism is a per-installation bearer token
+  - spec(fleet-control-plane): operator scope pass — cut the dashboard UI, keep the plane's API
+  - roadmap(fleet-dashboard): record the dashboard as its own item, blocked on the plane
+  - chore(backlog): capture TASK-455 — git.feature hook misdetects a worktree as a non-repo
+  - spec(fleet-control-plane): author specs/036 from the approved design record
+  - roadmap(fleet-control-plane): record design-approved marker
+  - design(fleet-control-plane): editorial cleanup — no architectural change
+  - design(fleet-control-plane): reverse read path; plane is the only CDN reader
+  - design(fleet-control-plane): rework design record — sidecar comms, global plane
+  - design(fleet-control-plane): design record for fleet control plane feature
+  - roadmap(design:feature/fleet-control-plane): add planned item
+- Files changed: 311
+- Backlog touched: TASK-244, TASK-455, TASK-456, TASK-457, TASK-458, TASK-459, TASK-460, TASK-461, TASK-465, TASK-466, TASK-467, TASK-468, TASK-469, TASK-470, TASK-471, TASK-472
+
 ## 2026-07-19: 036 dogfood exposes unbuilt producers → design + spec 037 instance-observability (run-centric → instance-centric)
 
 ### Item: `design:feature/instance-observability` (spec `specs/037-instance-observability`, authored this session)

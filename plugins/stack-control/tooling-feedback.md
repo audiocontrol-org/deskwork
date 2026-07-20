@@ -161,3 +161,6 @@
 
 ## session-end 2026-07-19
 - backlog capture dedupes on --ref alone: a second distinct finding sharing a spec/source-file ref is silently refused (stdout success-shaped, exit 0). Hit while filing TASK-470/471; worked around by re-pointing the ref. Captured as TASK-472.
+
+## session-end 2026-07-20
+- roadmap close cascade fails loud when a node's 'ref:' field holds a design-doc PATH: the cascade treats ref values as backlog ids to close, so 037's 'ref: docs/.../…-design.md' blocked 'roadmap advance --to closed' until changed to 'design:'. 'ref:' is overloaded (backlog ids AND doc pointers); either validate ref values at authoring time or have the cascade skip obvious non-id paths.
