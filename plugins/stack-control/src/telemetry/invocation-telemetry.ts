@@ -104,6 +104,10 @@ export interface InvocationTelemetryOptions {
   readonly clock?: Clock;
   /** Injected emit-client factory (default the real `createEmitClient`). */
   readonly createEmit?: typeof createEmitClient;
+  /** The dispatched verb name (e.g. `workflow`) — recorded on the
+   * `invocation.completed` snapshot so the fleet timeline shows WHAT ran, not
+   * just that something ran. Absent → the snapshot carries no `verb`. */
+  readonly verb?: string;
 }
 
 /**
@@ -177,8 +181,13 @@ export async function runInvocationWithTelemetry(
             installationRoot, // host/path derived by construction (FR-011)
           ),
           // Carry a success/failure signal so a fleet monitor can distinguish a
-          // clean invocation from a failing one (AUDIT-20260717-08).
-          snapshot: { outcome: handlerThrew ? 'error' : 'ok' },
+          // clean invocation from a failing one (AUDIT-20260717-08), plus the
+          // verb name so the fleet timeline shows WHAT ran (not just that
+          // something did). `verb` is omitted when the caller didn't supply one.
+          snapshot:
+            options.verb === undefined
+              ? { outcome: handlerThrew ? 'error' : 'ok' }
+              : { outcome: handlerThrew ? 'error' : 'ok', verb: options.verb },
         };
         emitClient.emit(event);
         // specs/037 D-B: give the eager connect a SMALL BOUNDED window to

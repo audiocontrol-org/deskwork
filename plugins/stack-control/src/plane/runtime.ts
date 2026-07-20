@@ -68,6 +68,7 @@ import {
 } from './http/server.js';
 import type { TelemetryEvent } from '../fleet/event.js';
 import { buildPlaneHandlers } from './runtime-handlers.js';
+import { buildDashboardRoutes } from '../dashboard/serve.js';
 import { createHeartbeatStore, type HeartbeatStore } from './heartbeat-store.js';
 
 // ---------------------------------------------------------------------------
@@ -287,6 +288,7 @@ export function createPlaneRuntime(options: PlaneRuntimeOptions): PlaneRuntime {
         { method: 'POST', pattern: '/v1/ingest', handler: withAuth(ingestHandler) },
         { method: 'GET', pattern: '/v1/sidecar/stream', handler: withAuth(sidecarStreamHandler) },
         { method: 'POST', pattern: '/v1/sidecar/liveness', handler: withAuth(livenessHandler) },
+        ...buildDashboardRoutes(options.acceptedTokens),
       ];
       return createPlaneServer(guardedConsumer, sidecarRoutes);
     },

@@ -71,6 +71,14 @@ export interface RecentActivityItem {
   readonly eventId: string;
   readonly type: string;
   readonly wallClock: string;
+  /**
+   * A short human-readable "what happened" derived from the event's snapshot —
+   * the phase for `phase.entered`, the verb for `invocation.completed`, etc. —
+   * or `null` when the event type carries no meaningful detail. Records WHAT
+   * happened alongside THAT it happened, so an activity timeline is legible
+   * rather than a wall of bare event types.
+   */
+  readonly detail: string | null;
 }
 
 /**
