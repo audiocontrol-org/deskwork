@@ -666,6 +666,7 @@ Second-wave scope-discovery expansion beyond the migrated v1: additional discove
 
 ## design:feature/fleet-control-plane
 - status: shipped
+- validated: yes
 - analyze-clean: yes
 - spec: specs/036-fleet-control-plane
 - design-approved: yes
@@ -679,7 +680,8 @@ Stays `planned`: a **validation build** of this dashboard was merged to main via
 
 ## design:feature/instance-observability
 - status: shipped
+- validated: yes
 - analyze-clean: yes
 - spec: specs/037-instance-observability
-- ref: docs/superpowers/specs/2026-07-18-instance-observability-design.md
+- design: docs/superpowers/specs/2026-07-18-instance-observability-design.md
 
