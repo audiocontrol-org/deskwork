@@ -2,11 +2,13 @@
 // rewired 037 Task 5; FR-003 non-drift). Two multi-subaction verbs:
 //
 //   - `plane` (src/subcommands/plane.ts) — `serve` (start the runnable plane
-//     HTTP endpoint, boot against the fleet registry). The prior
-//     `provision-token` subaction was DELETED (clean break, no back-compat
-//     alias) when `serve` moved onto the fleet registry (037 Task 5):
-//     accepted tokens now come from enrollment (`POST /v1/enroll`), not an
-//     operator-run CLI verb.
+//     HTTP endpoint, boot against the fleet registry), `issue-enrollment`
+//     (mint + register a fresh host enrollment credential, printed once),
+//     and `revoke` (revoke a telemetry token or an enrollment credential,
+//     effective at the next `serve`). The prior `provision-token` subaction
+//     was DELETED (clean break, no back-compat alias) when `serve` moved
+//     onto the fleet registry (037 Task 5): accepted tokens now come from
+//     enrollment (`POST /v1/enroll`), not an operator-run CLI verb.
 //   - `sidecar` (src/subcommands/sidecar.ts) — `run` (elect + run the
 //     sidecar daemon for this installation) and `set-enrollment` (store the
 //     operator-issued enrollment credential in host-level custody, for a
