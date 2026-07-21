@@ -674,6 +674,7 @@ Second-wave scope-discovery expansion beyond the migrated v1: additional discove
 
 ## design:feature/fleet-dashboard
 - status: planned
+- design-approved: yes
 - design: docs/superpowers/specs/2026-07-21-fleet-dashboard-design.md
 - depends-on: design:feature/fleet-control-plane
 - ref: docs/superpowers/specs/2026-07-16-fleet-control-plane-design.md
@@ -685,4 +686,10 @@ Stays `planned`: **build a properly-architected, standalone dashboard applicatio
 - analyze-clean: yes
 - spec: specs/037-instance-observability
 - design: docs/superpowers/specs/2026-07-18-instance-observability-design.md
+
+## design:feature/sidecar-zero-trust-auth
+- status: planned
+- depends-on: design:feature/fleet-control-plane
+- ref: docs/superpowers/specs/2026-07-21-sidecar-zero-trust-posture-brief.md
+Revisit the sidecar↔plane C6 auth under the zero-trust posture adopted for the fleet dashboard (`design:feature/fleet-dashboard`, decision 13). The brief (the `ref`, converged through three review rounds) is the starting point: it establishes the three-way separation (transport security / workload identity / application-installation identity), reframes the one real gap as **transport-security enforcement** (authenticated traffic must not bypass the TLS-termination boundary — today the plane is plain `node:http` with the per-installation bearer as the *only* client auth), and lands the working posture — infrastructure owns transport + (where available) workload identity; stack-control owns only application authorization + the minimal opaque per-installation credential (kept for installation identity + selective revocation, which infra identity can't express). Non-goal: stack-control never becomes an IdP / CA / auth gateway / browser-auth system. The design phase settles: the enforcement mechanism for "telemetry ingress unreachable except through the enforced transport boundary," whether/how the plane consumes deployment-provided workload identity, and the open input the team still owes — whether a common identity fabric spans the sidecar hosts. Runs the full lifecycle from `design`.
 
