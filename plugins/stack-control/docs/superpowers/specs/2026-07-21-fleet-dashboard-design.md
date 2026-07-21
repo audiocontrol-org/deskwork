@@ -47,6 +47,10 @@ under `plugins/stack-control/src/dashboard/` is removed when this ships.
   button, no command-authority credential scope. This is deliberately *not*
   carried as a "for later" open question — it is simply not part of the fleet
   roadmap right now.
+- **Human authentication and browser session security.** No login page, password
+  handling, OAuth/OIDC flow, browser session, cookie-security scheme, token
+  refresh, user database, authorization role, or identity-provider integration.
+  Browser-facing trust is delegated to deployment infrastructure (decision 13).
 
 ## solution-space
 
@@ -157,8 +161,10 @@ Five axes, each with the chosen option and the rejected alternative(s) + reason.
    deferred.
 9. **Deployable-process boundary (concrete, testable):** the package ships a
    server entrypoint started by a single documented command; it serves HTTP on a
-   configurable port; it reads the **plane base URL** and its **read credential**
-   from its own configuration/environment; it is an ordinary HTTP client of
+   configurable port (**loopback by default** — decision 13 bind safeguard); it
+   reads the **plane base URL** and its **read credential** (`FLEET_PLANE_URL`,
+   `FLEET_PLANE_READ_TOKEN`) from its own configuration/environment; it is an
+   ordinary HTTP client of
    `/v1/*` and **may run on a different host from the plane**. Single-plane target
    is the default (multi-plane is an open question). Whether the package is
    distributed with the stack-control plugin or separately is an open question; it
@@ -189,6 +195,33 @@ Five axes, each with the chosen option and the rejected alternative(s) + reason.
     match no route and return the plane's standard **404** (no diagnostic-redirect
     surface) — the expected 404 is itself a testable contract. Per
     `.claude/rules/agent-discipline.md` § "Zero backwards compatibility."
+13. **Browser-facing trust boundary — delegated to deployment infrastructure
+    (settled, not an open question).** The dashboard implements **no** human
+    authentication, browser session management, identity-provider integration, or
+    application-level user authorization. Browser-facing authentication and access
+    policy are delegated to deployment infrastructure — an ingress proxy,
+    service-mesh gateway, identity-aware proxy, mTLS boundary, or equivalent. The
+    dashboard server **assumes requests reaching its browser-facing listener have
+    already crossed that trusted perimeter**, and MUST NOT expose a secondary or
+    fallback application authentication mechanism. The *specific* proxy (Istio,
+    Envoy, an ingress controller, Cloudflare Access, oauth2-proxy, …) is deployment
+    policy and is **not** selected by this design.
+    - **Two separate trust relationships.** *Human → perimeter → dashboard* belongs
+      entirely to infrastructure. *Dashboard → plane* is a deliberately simple
+      configured machine secret (`FLEET_PLANE_URL`, `FLEET_PLANE_READ_TOKEN`, per
+      decision 9): the BFF attaches the read token **only** to its allowlisted
+      upstream read requests; browser JavaScript never sees it. The plane's
+      reader-vs-telemetry invariant (decision 6) is authorization at an API
+      boundary, **not** a human-security system.
+    - **Bind safeguard (concrete, testable).** The dashboard binds to **loopback by
+      default** where the topology permits. A non-loopback bind MUST be **explicit**
+      and MUST be paired with infrastructure that prevents untrusted clients from
+      reaching the listener directly. The general invariant (covers container /
+      mesh, where a sidecar proxy reaches the dashboard over the pod network so
+      loopback may not apply): *the dashboard listener MUST either be locally
+      constrained or protected from direct untrusted access by deployment-level
+      network policy; the application provides no fallback browser-authentication
+      mechanism.*
 
 ### Surface → endpoint mapping (Decision 5 detail)
 
@@ -247,6 +280,11 @@ that is a **new** plane projection — flagged here, not silently assumed.
   settles topology (BFF), entity root (instance), lifecycle (static-minimal), the
   invariants (decision 6), the mapping (above), SSE (BFF same-origin), the process
   boundary (decision 9), and cutover (decision 12).
+- **Third-party follow-on review (2026-07-21):** argued the browser-facing trust
+  boundary should be delegated to deployment infrastructure (identity-aware proxy /
+  mesh), so the dashboard implements no human auth at all, holds only the machine
+  read credential for the plane, and binds to loopback by default. Adopted verbatim
+  in intent as decision 13 and the expanded out-of-scope list.
 - **Superseded sketch:** `docs/superpowers/specs/2026-07-19-fleet-dashboard-design.md`
   — its surface sketch (columns, drawer tabs, delta-not-full-push) remains a
   starting point; its plane-embedded / plane-as-only-reader architecture is the
