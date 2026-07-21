@@ -70,11 +70,13 @@
 
 import { join } from 'node:path';
 import { SystemClock, type Clock } from '../fleet/clock.js';
-import { locateMachineState } from '../machine-state/locate.js';
+import { locateMachineState, locateHostState } from '../machine-state/locate.js';
 import { mintOrReadInstallationId } from '../machine-state/identity.js';
 import { deriveInstanceFields } from '../machine-state/instance-id.js';
 import { openTokenCustody } from '../machine-state/token.js';
+import { openEnrollmentCustody } from '../machine-state/enrollment-custody.js';
 import { createPipeline, type SidecarPipeline } from './pipeline.js';
+import { enrollInstance, type EnrollArgs, type EnrollResult } from './enroll-client.js';
 import { openWal, type WalHandle } from './spool/wal.js';
 import { BackoffSchedule } from './spool/drain.js';
 import { createTelemetryPoster, type TelemetryPoster } from './uplink/post.js';
@@ -121,6 +123,12 @@ export interface SidecarDaemonOptions {
   readonly transport?: SseTransport;
   /** Injected telemetry/liveness POST seam (default real fetch-backed poster). */
   readonly poster?: TelemetryPoster;
+  /** Injected self-enrollment seam (default real `enrollInstance`, ./enroll-
+   * client.js — POST /v1/enroll). Exchanges the HOST-level enrollment
+   * credential (`sidecar set-enrollment`, Task 8) for a per-instance
+   * telemetry token when this installation has a credential but no token
+   * yet (Task 10 auto-enroll). Tests inject a fake so no network is hit. */
+  readonly enroll?: (args: EnrollArgs) => Promise<EnrollResult>;
   /** The LOCAL-RUN delivery sink: fired for each command delivered over the
    * plane's SSE stream so the daemon can route it onward to the target run.
    * When this is provided, the daemon considers the command DELIVERED. Full
@@ -264,8 +272,14 @@ export function runSidecarDaemon(options: SidecarDaemonOptions): SidecarDaemonHa
   const walDir = join(location.durableDir, 'spool');
 
   const planeUrl = options.planeUrl ?? process.env.STACKCTL_CP_URL;
-  const token = openTokenCustody(location.durableDir).read();
-  const uplinkReady = planeUrl !== undefined && planeUrl.length > 0 && token !== undefined;
+  const enroll = options.enroll ?? enrollInstance;
+  // The effective telemetry token (custody read, else auto-enroll) is resolved
+  // ASYNCHRONOUSLY inside the `started` election flow below, BEFORE
+  // `uplinkReady`/`bearerHeaders` are computed and before `startUplink()` runs
+  // (Task 10). It cannot be resolved here synchronously: auto-enroll is an
+  // async HTTP exchange (Task 9's `enroll` seam), and it must never block or
+  // replace the synchronous election/local-socket/WAL startup this module
+  // guarantees even with no plane URL, no token, and no enrollment credential.
 
   // Redact+spool every received `event` frame through the pipeline. The
   // pipeline mints its own eventId+sequences and redacts BEFORE spooling.
@@ -302,7 +316,12 @@ export function runSidecarDaemon(options: SidecarDaemonOptions): SidecarDaemonHa
   let drainTimer: NodeJS.Timeout | undefined;
   let livenessTimer: NodeJS.Timeout | undefined;
 
-  const bearerHeaders: Readonly<Record<string, string>> = { authorization: `Bearer ${token ?? ''}` };
+  // Placeholder until the async election flow resolves the effective token
+  // (custody read, else auto-enroll) and reassigns this BEFORE `startUplink()`
+  // runs — every closure below (`drainTick`, the liveness `send`) reads this
+  // binding at CALL time, never at closure-creation time, so the reassignment
+  // is visible to them (Task 10).
+  let bearerHeaders: Readonly<Record<string, string>> = { authorization: 'Bearer ' };
   const ingestUrl = `${planeUrl ?? ''}/v1/ingest`;
   const streamUrl = `${planeUrl ?? ''}/v1/sidecar/stream`;
   const livenessUrl = `${planeUrl ?? ''}/v1/sidecar/liveness`;
@@ -451,6 +470,37 @@ export function runSidecarDaemon(options: SidecarDaemonOptions): SidecarDaemonHa
     if (stopped) {
       return { kind: 'won', socketPath: outcome.socketPath };
     }
+
+    // --- resolve the effective telemetry token (Task 10 auto-enroll) --------
+    // Custody read is the common, already-provisioned path. When it is ABSENT
+    // and a plane URL is configured, check the HOST-level enrollment
+    // credential (`sidecar set-enrollment`, Task 4/8) — shared across every
+    // installation on this host. If present, self-enroll via the injected
+    // `enroll` seam (default: Task 9's real `enrollInstance`, POST /v1/enroll)
+    // and persist the issued per-instance token into the SAME custody every
+    // other path reads. A DECLINED credential, a FAILED enroll exchange, or no
+    // plane URL at all all leave `token` undefined — the uplink simply stays
+    // idle (the existing "spool now, transmit when reachable" posture); the
+    // local socket + WAL keep running regardless (preserved from before this
+    // task).
+    let token = openTokenCustody(location.durableDir).read();
+    if (token === undefined && planeUrl !== undefined && planeUrl.length > 0) {
+      const credential = openEnrollmentCustody(locateHostState().durableDir).read();
+      if (credential !== undefined) {
+        const result = await enroll({
+          planeUrl,
+          credential,
+          identity: { installationId, host: instanceHost, path: instancePath },
+        });
+        if (result.ok) {
+          openTokenCustody(location.durableDir).write(result.token);
+          token = result.token;
+        }
+      }
+    }
+    const uplinkReady = planeUrl !== undefined && planeUrl.length > 0 && token !== undefined;
+    bearerHeaders = { authorization: `Bearer ${token ?? ''}` };
+
     if (uplinkReady) {
       await startUplink();
     }
