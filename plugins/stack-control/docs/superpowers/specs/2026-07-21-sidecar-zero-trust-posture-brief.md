@@ -1,7 +1,7 @@
 # Brief — sidecar↔plane auth under a zero-trust posture
 
-**Status:** discussion brief for team review (not a design decision).
-**Date:** 2026-07-21.
+**Status:** discussion brief, revised after team review (2026-07-21). A converged
+**working posture**, still pre-implementation — not yet a design decision.
 **Related:** fleet-dashboard design record (`2026-07-21-fleet-dashboard-design.md`,
 decision 13), where we adopted the zero-trust posture that prompts this review.
 
@@ -9,92 +9,116 @@ decision 13), where we adopted the zero-trust posture that prompts this review.
 
 While designing the fleet dashboard we settled a **security posture lean**: build
 as little novel security code as possible (no one on the team is a security
-expert), delegate authentication to a mature service mesh / proxy, and frame it as
-**zero trust** — *there is no safe inner network behind a secure perimeter; every
-hop is authenticated and authorized by identity, nothing is trusted for its network
-location.*
+expert), rely on mature infrastructure wherever practical, and frame it as **zero
+trust** — *nothing is trusted for its network location; every accepted request must
+have crossed the intended authenticated transport boundary.*
 
-Applying that same lens to the **sidecar → plane** channel surfaces a gap between
-what the protocol *says* and what the code *does*, plus a genuine design tension we
-want the team's read on before committing.
+Applying that lens to the **sidecar → plane** channel surfaces one real gap and a
+clarifying separation of concerns the team review sharpened.
+
+## Three separate concerns (keep them separate)
+
+The discussion stays clean only if we do not merge these:
+
+1. **Transport security** — is the channel confidential and its integrity assured
+   (TLS)?
+2. **Workload identity** — *which machine / workload* is connecting? (mTLS, SPIFFE,
+   service mesh, tailnet node identity, …)
+3. **Application identity** — *which stack-control installation* is connecting?
+
+These are different questions with different owners, and (2) and (3) are **not
+substitutes**: multiple installations can run on one host, revoking one installation
+must not revoke the whole machine, and installation identity can outlive
+infrastructure changes. Even with mesh-based workload identity later, we may still
+want an application-level notion of installation identity.
 
 ## How it works today
 
-The sidecar↔plane protocol (contract `specs/036-fleet-control-plane/contracts/
-sidecar-plane-protocol.md` § C6) states: **TLS + authentication mandatory;
-long-lived bearer token, per installation; credentials live in the sidecar only;
-unknown/revoked token ⇒ refused.**
+Protocol contract (`specs/036-fleet-control-plane/contracts/sidecar-plane-protocol.md`
+§ C6): **TLS + authentication mandatory; long-lived bearer token, per installation;
+credentials live in the sidecar only; unknown/revoked token ⇒ refused.**
 
 In the implementation:
 
-- The plane is a **plain `node:http` server** — not `node:https`. There is **no
-  in-process TLS, no mTLS, no client-certificate check, no network-fabric identity
-  (e.g. Tailscale) check.**
-- TLS is expected to be **terminated by an external proxy** in front of the plane
-  (the protocol's own timeout notes size against ALB / nginx / Cloudflare).
-- The **hand-rolled bearer token is therefore the *only* thing authenticating
-  which sidecar is calling** — a token→installation map with enroll / mint /
-  revoke (`src/plane/http/auth.ts`, `src/plane/fleet-registry.ts`).
+- The plane is a **plain `node:http` server** — not `node:https`. **No in-process
+  TLS, no mTLS, no workload-identity check.**
+- TLS is expected to be **terminated by an external proxy** (the protocol's timeout
+  notes size against ALB / nginx / Cloudflare).
+- The **per-installation bearer token is the application-identity mechanism** — a
+  token→installation map with enroll / mint / revoke (`src/plane/http/auth.ts`,
+  `src/plane/fleet-registry.ts`).
 
-So transport security is already delegated to infrastructure; client identity is
-not.
+So concern (1) is delegated to infrastructure; concern (3) is the bearer; concern
+(2) is currently not established at all.
 
-## The two gaps zero-trust surfaces
+## The one real gap: transport-security *enforcement*
 
-1. **Implicit trust in the plane's own listener.** Anyone who can reach the
-   plain-HTTP port *directly* — bypassing the TLS terminator — skips TLS entirely
-   and needs only a valid bearer token. That is "the network is safe" thinking: the
-   plane assumes its listener is only reachable via the terminator. Under zero
-   trust, it must not.
+The concern is **not** that TLS terminates outside the application, and **not** that
+bearer auth is weak. Bearer-over-TLS is a reasonable authentication mechanism. The
+gap is that **authenticated traffic can bypass the required secure transport**:
 
-2. **The bearer registry is the one piece of hand-rolled security code.** That cuts
-   against "build as little novel security code as possible." *But* it is **simple**
-   (a token map + revoke), and it provides a property we do not want to lose:
-   **per-host revocation without re-crediting the rest of the fleet** (C6). Removing
-   it in favor of mesh / mTLS identity means adding certificate issuance + rotation
-   (a CA or SPIFFE) — arguably *more* novel security surface, unless we can lean on
-   an identity fabric these hosts already have.
+- the bearer can be transmitted without confidentiality if TLS is bypassed,
+- traffic can reach the plane without passing the intended TLS-termination point,
+- so the deployment no longer *guarantees* the protocol-required TLS is in use.
 
-## The tension we want reviewed
+Zero trust's operative property here: **the plane must be unreachable except through
+the authenticated transport boundary** — via a private listener, a trusted-proxy-only
+accept policy, network policy that prevents bypass, or equivalent. Externally
+terminated TLS is fully compatible with zero trust *when that boundary is actually
+enforced.*
 
-Three goals pull against each other for the sidecar channel:
+## The application credential is legitimate — keep it minimal
 
-- **Minimal novel security code** → lean on an existing identity fabric, don't
-  hand-roll.
-- **Zero trust** → authenticate every connection by identity; never trust network
-  presence.
-- **Deployment reality** → sidecars are **long-lived machine agents scattered
-  across hosts** (our live dogfood ran the plane on one machine, a sidecar on
-  another). This is *not* a single Kubernetes cluster with a mesh spanning
-  everything.
+Avoiding custom security infrastructure does **not** mean eliminating every
+application credential. A small, opaque, per-installation bearer is a very different
+thing from inventing an identity platform. It is legitimate when it:
 
-The dashboard's "punt to a mesh" was clean because it is human→app inside a deploy
-environment. Sidecars are machine→plane, cross-host, and long-lived — there may be
-no single mesh spanning them.
+- is randomly generated,
+- is transmitted only over authenticated, encrypted transport,
+- identifies exactly one installation,
+- can be revoked independently (no fleet re-crediting).
 
-## The question for the team
+Those are application-authorization semantics stack-control legitimately owns. What
+we must **not** grow: certificate lifecycle / custom PKI, OAuth/OIDC, browser login,
+custom cryptographic protocols, or identity-provider integration — all of which have
+mature existing solutions.
 
-**What identity fabric, if any, spans the hosts sidecars run on?**
+## Working posture (team recommendation)
 
-- If there **is** one (e.g. a single tailnet / WireGuard network, or a shared mTLS
-  CA), zero trust can lean on **per-connection fabric identity that the plane
-  verifies on every request** — *not* "it arrived over the tailnet," which would
-  just re-import the perimeter we are rejecting. The bearer could then be retired,
-  or kept only for the per-host revocation property.
-- If the hosts are **heterogeneous** (no common fabric), the pragmatic zero-trust
-  endpoint may be to **keep the simple bearer as app-level identity + revocation**
-  and instead close **Gap 1** — make the plane authenticate every connection and
-  never trust listener reachability, and make the terminator/mesh assumption
-  explicit rather than implied.
+Until a common identity fabric is available across all supported sidecar hosts:
+
+- **Infrastructure owns transport security and workload identity** — service mesh,
+  reverse proxy, mTLS, identity-aware access, existing workload-identity systems,
+  used whenever available.
+- **stack-control owns only application-specific identity + authorization** — the
+  minimal per-installation credential and its revocation.
+- **Require the plane to be reachable only through the trusted transport boundary**
+  (closes the enforcement gap above).
+- **Build no** custom PKI, certificate lifecycle, browser authentication, or
+  identity-management code inside stack-control.
+
+Clean separation of responsibility: **infrastructure** owns transport + workload
+identity; **stack-control** owns application authorization decisions.
+
+## Remaining input we still want
+
+**What identity fabric, if any, spans the hosts sidecars run on** (single tailnet /
+WireGuard, shared mTLS CA, or heterogeneous)?
+
+- This decides what is available for concerns (1) and (2) — where a fabric exists,
+  the plane can verify **per-connection workload identity on every request** (not
+  "it arrived over the tailnet," which would re-import the perimeter we reject).
+- It does **not** decide concern (3): the minimal installation credential is
+  retained regardless, because infrastructure identity generally cannot express
+  "which installation" or give per-installation revocation.
 
 ## Scope notes
 
-- This brief does **not** decide the dashboard design (that is settled and
-  independent; the dashboard already authorizes "by credential class regardless of
-  network position," so it is compatible with whatever we choose here).
-- This brief does **not** pick an implementation. It frames the current state, the
-  two gaps, and the one fact (the hosts' network relationship) that decides which
-  direction is even available.
+- Does **not** decide the dashboard design (settled and independent; it already
+  authorizes "by credential class regardless of network position").
+- Does **not** pick an implementation. It frames the current state, the one
+  enforcement gap, the transport / workload / application separation, and the fact
+  (hosts' network relationship) that decides what is available for the first two.
 
 ## Reference points
 
