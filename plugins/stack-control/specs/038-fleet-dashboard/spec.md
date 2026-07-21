@@ -8,6 +8,12 @@
 
 **Input**: Approved design record `docs/superpowers/specs/2026-07-21-fleet-dashboard-design.md` (source of truth) + roadmap item `design:feature/fleet-dashboard`.
 
+## Clarifications
+
+### Session 2026-07-21
+
+- Q: Default fleet-table membership — connected/recent only, or include stale/gone? → A: Connected/recent by default, with an explicit reveal (toggle/filter) for gone/disconnected instances.
+
 ## User Scenarios & Testing *(mandatory)*
 
 The fleet control plane exposes a live read API. Operators need a browser surface over it: a live ops window and a way to drill into any one instance. The surface must be a standalone, out-of-process application that consumes the plane's read API as an ordinary external client with its own credential — replacing a rejected in-process prototype that authenticated by reusing a sidecar's telemetry token.
@@ -44,6 +50,7 @@ As an operator, I want to open the dashboard and see an instance-rooted table of
 3. **Given** the dashboard is open, **When** an instance is removed, **Then** its row disappears from the table.
 4. **Given** the live stream drops, **When** the connection is lost, **Then** the view shows a disconnected/stale indicator and, on reconnect, re-fetches a fresh snapshot and resumes applying deltas.
 5. **Given** a browser is loading the dashboard, **When** the page requests data, **Then** it talks only to the dashboard's own origin — the plane read credential is never delivered to browser code.
+6. **Given** the fleet has gone/disconnected instances, **When** the operator opens the dashboard, **Then** those instances are not shown by default; **When** the operator uses the reveal control, **Then** the gone/disconnected instances become visible, marked as such.
 
 ---
 
@@ -114,6 +121,7 @@ As a maintainer, I want the rejected in-process dashboard removed once the stand
 
 - **FR-013**: The dashboard's home surface MUST be a single instance-rooted table (one row per instance), not separate side-by-side views.
 - **FR-014**: The table MUST render each instance's connection and liveness state.
+- **FR-014a**: The table MUST show connected/recent instances by default and MUST provide an explicit reveal (toggle/filter) that additionally shows gone/disconnected instances (marked as such). Gone/disconnected instances MUST NOT appear in the default view.
 - **FR-015**: The table MUST update in place from the plane's live delta stream (instance upserted / removed) — never by a full re-fetch per change and never by a full-page reload.
 - **FR-016**: On live-stream disconnect, the dashboard MUST surface a disconnected/stale indicator; on reconnect it MUST re-fetch a fresh snapshot and resume applying deltas.
 - **FR-017**: The dashboard MUST reuse the plane's existing read + delta API shapes for the scoped surface; it MUST NOT require a new plane read projection for the instance-rooted home + drill-in.
@@ -157,7 +165,7 @@ As a maintainer, I want the rejected in-process dashboard removed once the stand
 - **SC-001**: The dashboard never holds or transmits a sidecar telemetry token; read access is performed with a credential that is refused on ingest routes (verifiable at the plane boundary, 100% of the time).
 - **SC-002**: A telemetry token is refused on every consumer read route, and a read credential is refused on every ingest route (invariant — no exceptions).
 - **SC-003**: With the dashboard open, an instance state change on the plane is reflected in the table within a few seconds, with no manual refresh.
-- **SC-004**: An operator can open the dashboard and identify which instances are active/connected vs stale/gone without any drill-in action.
+- **SC-004**: An operator can open the dashboard and identify which instances are active/connected at a glance in the default view, and can reveal stale/gone instances on demand — all without any drill-in action.
 - **SC-005**: When the live stream drops and later recovers, the dashboard shows a disconnected indicator during the outage and returns to an accurate live view automatically on reconnect (no operator action, no stale-shown-as-live).
 - **SC-006**: The browser makes no request to the plane origin — all data arrives from the dashboard server's own origin.
 - **SC-007**: The dashboard runs successfully with the dashboard server on a different host from the plane.
