@@ -23,6 +23,16 @@ async function start(): Promise<string> {
         res.end(JSON.stringify({ token: 't-1' }));
         return;
       }
+      if (auth === 'Bearer no-token-cred') {
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({}));
+        return;
+      }
+      if (auth === 'Bearer not-json-cred') {
+        res.writeHead(200, { 'content-type': 'text/plain' });
+        res.end('not json');
+        return;
+      }
       res.writeHead(401, { 'content-type': 'application/json' });
       res.end(JSON.stringify({ reason: 'unknown-credential' }));
       void body;
@@ -53,5 +63,25 @@ describe('enrollInstance', () => {
       identity: { installationId: 'i', host: 'h', path: '/p' },
     });
     expect(result).toEqual({ ok: false, status: 401 });
+  });
+
+  it('returns ok:false status:200 when the 200 body has no token field', async () => {
+    const planeUrl = await start();
+    const result = await enrollInstance({
+      planeUrl,
+      credential: 'no-token-cred',
+      identity: { installationId: 'i', host: 'h', path: '/p' },
+    });
+    expect(result).toEqual({ ok: false, status: 200 });
+  });
+
+  it('returns ok:false status:200 (never throws) when the 200 body is not valid JSON', async () => {
+    const planeUrl = await start();
+    const result = await enrollInstance({
+      planeUrl,
+      credential: 'not-json-cred',
+      identity: { installationId: 'i', host: 'h', path: '/p' },
+    });
+    expect(result).toEqual({ ok: false, status: 200 });
   });
 });

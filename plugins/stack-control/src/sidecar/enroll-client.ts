@@ -24,7 +24,7 @@ function isTokenResponse(value: unknown): value is { token: string } {
     typeof value === 'object' &&
     value !== null &&
     'token' in value &&
-    typeof (value as Record<string, unknown>).token === 'string'
+    typeof value.token === 'string'
   );
 }
 
@@ -42,7 +42,13 @@ export async function enrollInstance(args: EnrollArgs): Promise<EnrollResult> {
     return { ok: false, status: response.status };
   }
 
-  const body: unknown = await response.json();
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch {
+    return { ok: false, status: 200 };
+  }
+
   if (!isTokenResponse(body)) {
     return { ok: false, status: 200 };
   }
