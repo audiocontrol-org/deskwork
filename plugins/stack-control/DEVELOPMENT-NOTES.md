@@ -2,21 +2,29 @@
 
 ---
 
-## 2026-07-21: <!-- session title -->
+## 2026-07-21: Fleet dashboard — design → define (full Spec Kit chain to execute-ready)
 
-**Goal:** <!-- compose: what we set out to do -->
+**Goal:** Pick up `design:feature/fleet-dashboard` at the design phase and take it through the governed lifecycle — `/stack-control:design` (brainstorming backend) → operator approval → `/stack-control:define` (the full Spec Kit chain specify → clarify → plan → tasks → analyze) — to an execute-ready spec. Orchestrator session only; no implementation.
 
 **Accomplished:**
-- <!-- compose -->
+- **Design record authored + approved.** `docs/superpowers/specs/2026-07-21-fleet-dashboard-design.md` (6 axes, ≥2 alternatives each). Converged through **three third-party design reviews** onto: out-of-process **backend-for-frontend** (the dashboard server holds the read credential; browser talks same-origin only), **instance-rooted** home surface, **read-only** (no command), a **static-minimal read-credential class** on the plane stated as a behavioral invariant, and a **zero-trust** posture that delegates browser-facing auth to a service mesh (no in-app human auth). Recorded `design-approved` (gate 7/7); handed off to define.
+- **Spec Kit chain to runnable.** `specs/038-fleet-dashboard/`: spec.md (4 stories, 31 FRs, 8 SCs), one clarification (default table membership = connected/recent + reveal), plan.md + research.md (6 decisions) + data-model.md + 2 contracts + quickstart.md, and tasks.md (26 TDD tasks, all tier-tagged). `/speckit-analyze`: 0 critical/high, 100% FR→task coverage. `execute-check` → **runnable**. Each backend drive bracketed by the 026 front-door capability marker (5 enter/exit pairs, all balanced).
+- **Sidecar zero-trust posture brief** (`docs/superpowers/specs/2026-07-21-sidecar-zero-trust-posture-brief.md`) — spun out of the dashboard's zero-trust decision, converged through **three review rounds** (team + operator) into a working posture, and captured as its own roadmap item `design:feature/sidecar-zero-trust-auth`. Established the transport-security / workload-identity / application-(installation)-identity separation and reframed the C6 gap as a **transport-enforcement** gap, not an auth gap.
 
 **Didn't Work:**
-- <!-- compose -->
+- **The `before_specify` git.feature hook is unusable in this worktree** — `check-prerequisites`/`setup-plan` report `HAS_GIT:false` (already tracked: TASK-455, TASK-46). Worked around by authoring the numbered spec dir directly on the pinned branch (the program's one-long-lived-branch convention), which is the correct behavior here anyway.
+- **The `/stack-control:define` Skill invocation returned a generic passthrough** rather than inlining SKILL.md; read the SKILL.md manually and followed it end-to-end. Minor.
 
 **Course Corrections:**
-- <!-- compose -->
+- [COMPLEXITY] Over-indexed on the credential/registry machinery in the dashboard design — operator: *"why are you obsessing over security?"* Dropped the auth deep-dive; the dashboard is the feature, the credential is one small piece.
+- [PROCESS] Carried "commandable runs" as a captured design axis — operator disowned it as a prior-session obsession (not near-term). Removed entirely (not even a "for later" note). Saved to memory.
+- [DOCUMENTATION] Framed the delegated-auth posture as perimeter-based — operator reframed to **zero trust** (*"no safe inner network separated by a secure perimeter"*). Purged perimeter language; saved to memory.
+- [UX] Reduced the sidecar security discussion to a multiple-choice survey — operator: *"we need to discuss this, not boil it down to a survey."* Switched to a genuine design conversation, then a written brief.
+- [PROCESS] Homed the dashboard at `packages/fleet-dashboard` — operator: keep **all** stack-control source under `plugins/stack-control/` because stack-control is spinning out to its own repo. Moved to `plugins/stack-control/fleet-dashboard/`; saved to memory.
 
 **Insights:**
-- <!-- compose -->
+- The operator's corrections this session share a shape: **resist agent-manufactured scope/complexity.** Security machinery, a dead "commandable" axis, perimeter framing, a survey instead of a conversation, and source-in-the-wrong-tree were all the agent adding structure the operator then had to strip. Capturing each as a durable memory (not chat) is the fix — three new memories written.
+- Multi-round third-party review is a strong convergence engine for a design record: the dashboard security posture and the sidecar brief each sharpened materially across 3 rounds, and every round's steer was folded back into the artifact + a commit, so the record *is* the converged decision, not a summary of it.
 
 **Quantitative (auto-derived from git; verify before publishing):**
 - Commits: 13
