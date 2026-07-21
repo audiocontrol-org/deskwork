@@ -28,9 +28,12 @@ installation at a time.
 
 - **Won election:** prints `sidecar: elected — listening at <socketPath>` and
   blocks until a stop signal.
-- **Lost election:** exits silently (exit 0) — another sidecar is already
-  elected for this installation; this is the normal, expected outcome, not an
-  error.
+- **Lost election:** writes `sidecar: lost election — pid <n> already elected
+  for this installation (<reason>)` to **stderr** (naming the already-elected
+  owner when its pid is known) and exits 0 — another sidecar already owns this
+  installation. Conceding is the normal, expected outcome (not an error), but it
+  is announced rather than silent so a running-but-not-elected process is never
+  mistaken for the winner.
 - **`--plane-url <url>`** is optional. When omitted, the daemon falls back to
   the `STACKCTL_CP_URL` environment variable. (A config-file `plane.url`
   resolution is a known gap — the installation config-loader does not yet

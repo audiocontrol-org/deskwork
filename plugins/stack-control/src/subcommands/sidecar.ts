@@ -30,7 +30,18 @@
 import { openEnrollmentCustody } from '../machine-state/enrollment-custody.js';
 import { locateHostState } from '../machine-state/locate.js';
 import { runSidecarDaemon } from '../sidecar/daemon.js';
+import type { LossReason } from '../sidecar/server.js';
 import type { SubactionGrammar } from './document-verb-shared.js';
+
+/**
+ * The stderr line `sidecar run` writes when it loses the election. Names the
+ * already-elected owner's pid when known so a running-but-not-elected process
+ * is never mistaken (silently) for the winner.
+ */
+export function lostElectionMessage(start: { readonly reason: LossReason; readonly ownerPid?: number }): string {
+  const who = start.ownerPid !== undefined ? `pid ${start.ownerPid}` : 'another sidecar';
+  return `sidecar: lost election — ${who} already elected for this installation (${start.reason})`;
+}
 
 const SIDECAR_USAGE =
   'usage: sidecar (run [--plane-url <url>] | set-enrollment --token <cred>)';
@@ -80,8 +91,9 @@ function parseRunArgs(args: string[]): RunArgs {
 /**
  * `sidecar run [--plane-url <url>]` — elect + run the sidecar daemon for the
  * current installation, staying alive until SIGINT/SIGTERM. A lost election
- * exits silently (0); a won election holds the process open and stops
- * gracefully on a stop signal.
+ * writes a diagnostic line to stderr (naming the already-elected owner) and
+ * exits 0; a won election holds the process open and stops gracefully on a
+ * stop signal.
  */
 async function runSidecarRun(args: string[]): Promise<void> {
   const { planeUrl } = parseRunArgs(args);
@@ -93,8 +105,11 @@ async function runSidecarRun(args: string[]): Promise<void> {
 
   const start = await daemon.started;
   if (start.kind === 'lost') {
-    // Losing the bind-wins election is normal and quiet (C6): another sidecar
-    // already holds this installation's socket. Exit silently.
+    // Losing the bind-wins election is expected (another sidecar already holds
+    // this installation's socket), but it must NOT be silent — a
+    // running-but-not-elected process is otherwise indistinguishable from the
+    // winner to anything watching. Announce it on stderr, then concede (exit 0).
+    process.stderr.write(`${lostElectionMessage(start)}\n`);
     return;
   }
 

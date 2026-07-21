@@ -98,10 +98,11 @@ import { ingestFrameGuarded, type DroppedFrame } from './ingest-frame.js';
 
 /** How the daemon finished its startup (election): won ⇒ it is now live and
  * (if the uplink resolved) transmitting; lost ⇒ another sidecar holds the
- * socket and the caller should exit silently (C6). */
+ * socket. On a loss the caller surfaces the already-elected owner (`ownerPid`,
+ * when known) on stderr rather than exiting silently (C6). */
 export type SidecarDaemonStart =
   | { readonly kind: 'won'; readonly socketPath: string }
-  | { readonly kind: 'lost'; readonly reason: LossReason };
+  | { readonly kind: 'lost'; readonly reason: LossReason; readonly ownerPid?: number };
 
 /** Options for {@link runSidecarDaemon}. Only `installationRoot` is required. */
 export interface SidecarDaemonOptions {
@@ -440,7 +441,7 @@ export function runSidecarDaemon(options: SidecarDaemonOptions): SidecarDaemonHa
   const started: Promise<SidecarDaemonStart> = (async (): Promise<SidecarDaemonStart> => {
     const outcome = await electSidecarForInstallation(options.installationRoot, onFrame);
     if (outcome.kind !== 'won') {
-      return { kind: 'lost', reason: outcome.reason };
+      return { kind: 'lost', reason: outcome.reason, ownerPid: outcome.ownerPid };
     }
     // Record the server BEFORE the stop-race check so a concurrent stop() (which
     // awaits `started`) can always close it.
