@@ -6,7 +6,7 @@ Runnable scenarios that prove the feature end-to-end. Implementation details liv
 
 - A running control plane reachable at a base URL, configured with at least one **read credential** (the new credential class — see `contracts/plane-read-credential.md`).
 - At least one enrolled instance reporting to the plane (so the fleet is non-empty).
-- The `@deskwork/fleet-dashboard` package built/runnable via the repo's `tsx` toolchain.
+- The dashboard (`plugins/stack-control/fleet-dashboard/`) built/runnable via stack-control's `tsx` toolchain.
 
 ## Setup
 
@@ -14,7 +14,7 @@ Runnable scenarios that prove the feature end-to-end. Implementation details liv
 export FLEET_PLANE_URL="https://<plane-host>:<port>"
 export FLEET_PLANE_READ_TOKEN="<the configured read credential>"
 # start the dashboard server (loopback default)
-<documented start command for @deskwork/fleet-dashboard>
+<documented start command for plugins/stack-control/fleet-dashboard>
 # open the dashboard origin in a browser (e.g. http://127.0.0.1:<port>/)
 ```
 

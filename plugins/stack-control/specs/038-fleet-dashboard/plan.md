@@ -65,10 +65,10 @@ specs/038-fleet-dashboard/
 
 ### Source Code (repository)
 
-Two touch-points — a **new** dashboard package (out-of-process consumer) and a **bounded** plane-side change:
+All new source lives **under `plugins/stack-control/`** so it travels with stack-control's planned spin-out into its own repository (see Structure Decision). Two touch-points — a **new** dashboard subtree (out-of-process consumer) and a **bounded** change to the existing plane:
 
 ```text
-packages/fleet-dashboard/                # NEW workspace package (@deskwork/fleet-dashboard)
+plugins/stack-control/fleet-dashboard/   # NEW out-of-process dashboard (under stack-control)
 ├── src/
 │   ├── server/                          # the BFF: node:http server, loopback-default bind
 │   │   ├── config.ts                    # FLEET_PLANE_URL / FLEET_PLANE_READ_TOKEN + bind opts
@@ -87,7 +87,7 @@ plugins/stack-control/src/dashboard/     # REMOVED at cutover (FR-026..028), aft
                                          #   passes acceptance against a released plane
 ```
 
-**Structure Decision**: The dashboard is a new top-level workspace package `packages/fleet-dashboard` (added to the root `workspaces` array, alongside `packages/{core,cli,studio}`), so it is genuinely out-of-process and separate from the plane's plugin tree — embodying "first-class external consumer." The plane-side credential-class change is bounded to `plugins/stack-control/src/plane/{http/auth.ts,runtime.ts}`. This resolves the design record's "app home = monorepo package"; the exact package path is a plan-level pick the operator can redirect. The browser client stack lives under `src/client/` but its framework/build is intentionally unset here (FR-030).
+**Structure Decision**: The dashboard is a new subtree **`plugins/stack-control/fleet-dashboard/`**, out-of-*process* from the plane but inside the stack-control tree. Rationale (operator, 2026-07-21): **all stack-control source stays under `plugins/stack-control/` because stack-control will be moved out of the deskwork repository into its own dedicated repository** — placing the dashboard in the deskwork-owned `packages/` would strand it at spin-out. This is the "out-of-process" property that matters (own process, own credential, HTTP-only coupling to `/v1/*`), not "out-of-package"; it refines the design record's "monorepo workspace package" home to "a subtree under stack-control." It shares stack-control's tooling (`tsx` + `vitest`); nothing is added to the deskwork root `workspaces` array. The plane-side credential-class change is bounded to `plugins/stack-control/src/plane/{http/auth.ts,runtime.ts}`. The browser client stack under `fleet-dashboard/src/client/` is intentionally unset here (FR-030).
 
 ## Complexity Tracking
 

@@ -148,7 +148,7 @@ As a maintainer, I want the rejected in-process dashboard removed once the stand
 
 **Delivery boundary**
 
-- **FR-029**: The dashboard MUST be delivered as a new workspace package in the monorepo, started by a single documented command that serves HTTP on a configurable port.
+- **FR-029**: The dashboard MUST be delivered as a new subtree under the stack-control tree (`plugins/stack-control/`), started by a single documented command that serves HTTP on a configurable port. It MUST NOT live in the deskwork-owned `packages/` area — all stack-control source stays under `plugins/stack-control/` so it travels with stack-control's planned move into its own dedicated repository.
 - **FR-030**: The visual and interaction *look* (framework, layout, styling) is out of scope for this spec and MUST be settled by a `/frontend-design` pass before implementation; this spec fixes surface scope and nonvisual interaction contracts only.
 
 ### Key Entities *(include if feature involves data)*
@@ -173,7 +173,7 @@ As a maintainer, I want the rejected in-process dashboard removed once the stand
 
 ## Assumptions
 
-- **App home**: the dashboard is a new monorepo workspace package; a separate-repository spin-out is deferred and not part of this feature.
+- **App home**: the dashboard is a new subtree under `plugins/stack-control/` (`plugins/stack-control/fleet-dashboard/`), sharing stack-control's tooling — NOT a `packages/` workspace. Rationale: stack-control will be moved out of the deskwork repository into its own dedicated repository, so all its source stays under `plugins/stack-control/` to travel with that move. A per-app separate-repository spin-out is not a thing; the spin-out is a whole-stack-control move.
 - **Single plane**: the dashboard targets exactly one plane (URL + read credential in its own config). Multi-plane targeting, if ever wanted, would live in the dashboard server and is out of scope here.
 - **Credential config format + reload**: the exact configuration key / environment-variable shape for read credentials, and whether changes take effect on restart only or via the plane's existing live-reload path, are implementation-level details to be settled in planning; the requirement is only that read credentials are configured (not minted) and independently revocable.
 - **BFF↔plane live-stream relay shape**: whether the dashboard server proxies the upstream stream per browser connection or holds one upstream stream and fans out is an internal implementation detail; the contract is that the browser receives same-origin live updates and the credential stays server-side.

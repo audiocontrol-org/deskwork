@@ -26,11 +26,11 @@ Resolves the open questions carried from the design record into plan-level decis
 - **Rationale**: Operator posture (design decision 13): build as little novel security code as possible; delegate to a mature mesh; zero trust, not perimeter. The loopback-default bind is a fail-closed default so the server is never accidentally exposed as an unauthenticated listener.
 - **Alternatives considered**: Any in-app auth (login/OAuth/OIDC/session) — rejected per the posture. Binding to all interfaces by default — rejected (fail-open).
 
-## R5 — Dashboard package home
+## R5 — Dashboard source home
 
-- **Decision**: A new workspace package `packages/fleet-dashboard` (`@deskwork/fleet-dashboard`), added to the root `workspaces` array.
-- **Rationale**: Genuinely out-of-process and separate from the plane's plugin tree; sits in the established `packages/*` workspace area with repo-standard tooling (tsx + vitest).
-- **Alternatives considered**: Nesting under `plugins/stack-control/` (blurs "external consumer" — rejected). A `plugins/fleet-dashboard` entry (the `plugins/*` glob is for Claude Code plugins; an app there is semantically wrong — rejected). A separate repository (deferred per the design record — its deploy-independence is not needed yet).
+- **Decision**: A new subtree **`plugins/stack-control/fleet-dashboard/`**, inside the stack-control tree, sharing stack-control's `tsx` + `vitest` tooling. Nothing added to the deskwork root `workspaces` array.
+- **Rationale**: **All stack-control source must stay under `plugins/stack-control/` because stack-control will be moved out of the deskwork repository into its own dedicated repository** (operator, 2026-07-21). Placing the dashboard in the deskwork-owned `packages/` would strand it at spin-out. The load-bearing property is out-of-*process* (own process, own credential, HTTP-only coupling), not out-of-*package*.
+- **Alternatives considered**: `packages/fleet-dashboard` as a root workspace package (stranded at spin-out — rejected). A `plugins/fleet-dashboard` entry (the `plugins/*` glob is for Claude Code plugins; an app there is semantically wrong, and it would also not travel with stack-control — rejected). A separate repository now (deferred per the design record; the spin-out is a whole-stack-control move, not a per-app one).
 
 ## R6 — Browser UI framework/build
 
