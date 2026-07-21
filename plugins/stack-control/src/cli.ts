@@ -169,8 +169,10 @@ const SUBCOMMANDS: Record<string, Subcommand> = {
   // Front-door regression guard (028 US4): the four-assertion check over the
   // fronted-operations registry. Self-documenting (mounted on the command surface).
   'check-front-door': runCheckFrontDoorCli,
-  // Fleet control plane (036): `provision-token` (PT-015) + `serve` (T124, the
-  // runnable PLANE daemon the dogfood drives).
+  // Fleet control plane (036, rewired 037 Task 5): `serve` (T124, the
+  // runnable PLANE daemon the dogfood drives — boots against the fleet
+  // registry; accepted tokens come from enrollment, not a CLI-provisioned
+  // `--token`).
   plane: runPlane,
   // Fleet control plane (036): the runnable SIDECAR daemon — `sidecar run`
   // elects, receives+spools local telemetry, uplinks to the plane, consumes

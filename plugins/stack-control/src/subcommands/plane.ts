@@ -1,123 +1,65 @@
-// specs/036-fleet-control-plane — T119 (impl), pairs with T119's RED test
-// (tests/fleet/plane-provision-token.test.ts).
+// specs/037-instance-observability (plan: docs/superpowers/plans/
+// 2026-07-20-fleet-multihost-enrollment.md) — Task 5.
 //
-// PT-015 (research.md): the bearer token is placed into the machine-local
-// durable store by an EXPLICIT operator-run verb. NO join-code exchange, NO
-// automatic enrollment — a single-operator fleet (FR-078) does not need one.
-// Revocation is plane-side (removing the token from the plane's accepted
-// set) — a separate concern, out of scope here. This module owns ONLY the
-// sidecar-side placement: an operator runs `stackctl plane provision-token
-// --token <value>` and the value lands in T118's token custody
-// (src/machine-state/token.ts, 0600, machine-local, never in `.stack-control/`).
+// `plane serve` now boots against the FLEET REGISTRY (Task 1's
+// `loadFleetRegistry`) rather than a single operator-provisioned `--token`.
+// This is a CLEAN BREAK (no back-compat shim): the old `provision-token`
+// subaction and its single-token `--token` binding on `serve` are DELETED —
+// per-installation accepted tokens/instances now come from the registry's
+// live `activeTokens()` / `instanceBindings()` maps, populated by enrollment
+// (`POST /v1/enroll`, Task 2/3) rather than an operator-run CLI verb.
 //
-// `provision-token` is the ONLY subaction implemented today. `runPlane` is
-// structured as a thin subaction dispatcher precisely so a future sibling
-// subaction can be added as its own `run<Subaction>` + one more dispatch arm
-// without disturbing this one. T124 wires the top-level `plane` verb into
-// the CLI dispatcher; this module owns only the verb's own logic.
+// LOOPBACK SELF-ENROLLMENT: on first serve (no enrollment credentials yet
+// registered), `buildServeRuntime` mints one, adds it to the registry, and
+// writes it into the HOST-level enrollment custody
+// (`locateHostState().durableDir`, `enrollment-custody.ts`) — the exact
+// credential a sidecar on THIS host reads to self-enroll. This is the same
+// path a remote host's operator-issued credential takes; host A's own
+// sidecars enroll through it identically, no privileged shortcut.
 //
-// STRICT ARG PARSING mirrors execute-check.ts's contract (AUDIT-20260605-09,
-// "no flag silently ignored"): an unknown flag, a missing `--token` value, a
-// stray positional, or a missing/unknown subaction is a usage error — exit 2,
-// never a silently-accepted no-op.
-//
-// THE TOKEN IS A CREDENTIAL (contracts/sidecar-plane-protocol.md § C6) — this
-// verb never echoes it to stdout/stderr, on success or otherwise; only a
-// confirmation message is printed.
+// `plane` is a thin subaction dispatcher — `serve` is its only subaction
+// today. STRICT ARG PARSING mirrors execute-check.ts's contract
+// (AUDIT-20260605-09, "no flag silently ignored"): an unknown flag, a
+// missing `--port` value, a stray positional, or a missing/unknown
+// subaction is a usage error — exit 2, never a silently-accepted no-op.
 //
 // No `any`, no `as`, no `@ts-ignore` (Constitution Principle VI). Relative
 // `.js` imports under node16 module resolution (no `@/` alias configured).
 
 import { join } from 'node:path';
-import { locateMachineState } from '../machine-state/locate.js';
-import { openTokenCustody } from '../machine-state/token.js';
+import { locateHostState, locateMachineState } from '../machine-state/locate.js';
 import { mintOrReadInstallationId } from '../machine-state/identity.js';
-import { createPlaneRuntime } from '../plane/runtime.js';
-import { buildServeRuntimeOptions } from './plane-serve-options.js';
+import { openEnrollmentCustody } from '../machine-state/enrollment-custody.js';
+import { createPlaneRuntime, type PlaneRuntime } from '../plane/runtime.js';
+import { loadFleetRegistry, mintCredential } from '../plane/fleet-registry.js';
+import { createEnrollHandler } from '../plane/http/enroll.js';
 import type { SubactionGrammar } from './document-verb-shared.js';
 
-const USAGE = 'usage: plane provision-token --token <value>';
-const PLANE_USAGE = 'usage: plane <provision-token | serve> [...]';
-const SERVE_USAGE = 'usage: plane serve --port <n> --token <accepted-bearer>';
+const PLANE_USAGE = 'usage: plane serve [...]';
+const SERVE_USAGE = 'usage: plane serve --port <n>';
 
 /**
  * The `plane` verb's per-subaction grammar — read by the cli-help surface
- * builder (`src/cli-help/surfaces/fleet.ts`, T120-T125) so `--help` cannot
- * drift from what `parseProvisionTokenArgs`/`parseServeArgs` actually accept.
- * This is DESCRIPTIVE metadata only: it feeds the help-only commander Command
- * `buildGrammarSurfaceCommand` builds; it does not drive `runPlane`'s own
- * strict hand-rolled parsing above, so this module's runtime behavior and
- * exit codes are unchanged by its presence.
+ * builder (`src/cli-help/surfaces/fleet.ts`) so `--help` cannot drift from
+ * what `parseServeArgs` actually accepts. DESCRIPTIVE metadata only: it
+ * feeds the help-only commander Command `buildGrammarSurfaceCommand` builds;
+ * it does not drive `runPlane`'s own strict hand-rolled parsing below, so
+ * this module's runtime behavior and exit codes are unchanged by its
+ * presence.
  */
 export const SUBACTION_SPECS: Readonly<Record<string, SubactionGrammar>> = {
-  'provision-token': { valueFlags: ['token'], apply: false, positionals: 0 },
-  serve: { valueFlags: ['port', 'token'], apply: false, positionals: 0 },
+  serve: { valueFlags: ['port'], apply: false, positionals: 0 },
 };
-
-interface ProvisionTokenArgs {
-  readonly token: string;
-}
-
-// Strict arg parsing for the `provision-token` subaction: accept ONLY
-// `--token <value>`; reject a missing value, an unknown flag, or a stray
-// positional with exit 2 — a typo must never silently no-op.
-function parseProvisionTokenArgs(args: string[]): ProvisionTokenArgs {
-  let token: string | undefined;
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-    if (arg === undefined) continue;
-    if (arg === '--token') {
-      const value = args[i + 1];
-      if (value === undefined || value.startsWith('--')) {
-        process.stderr.write(`plane provision-token: --token <value> required (${USAGE})\n`);
-        process.exit(2);
-      }
-      token = value;
-      i++; // consume the value
-      continue;
-    }
-    process.stderr.write(
-      `plane provision-token: unexpected argument '${arg}' (${USAGE})\n`,
-    );
-    process.exit(2);
-  }
-  if (token === undefined) {
-    process.stderr.write(`plane provision-token: --token <value> required (${USAGE})\n`);
-    process.exit(2);
-  }
-  return { token };
-}
-
-/**
- * `plane provision-token --token <value>` — the PT-015 operator-run
- * placement verb. Resolves the machine-local store for the current
- * installation (`locateMachineState(process.cwd())`, mirroring cli.ts's own
- * `installationRoot` convention) and writes `token` into T118's token
- * custody at `TOKEN_FILE_MODE` (0600), overwriting any prior value —
- * provisioning and rotation are the same operation.
- */
-async function runProvisionToken(args: string[]): Promise<void> {
-  const { token } = parseProvisionTokenArgs(args);
-
-  const installationRoot = process.cwd();
-  const location = locateMachineState(installationRoot);
-  openTokenCustody(location.durableDir).write(token);
-
-  // Confirmation ONLY — never the token value itself (it's a credential).
-  process.stdout.write('plane: bearer token provisioned\n');
-}
 
 interface ServeArgs {
   readonly port: number;
-  readonly token: string;
 }
 
-// Strict arg parsing for `serve`: require `--port <n>` and `--token <value>`;
-// reject a missing value, an unknown flag, or a stray positional with exit 2
-// (mirrors execute-check.ts / provision-token — no flag silently ignored).
+// Strict arg parsing for `serve`: require `--port <n>`; reject a missing
+// value, an unknown flag, or a stray positional with exit 2 (mirrors
+// execute-check.ts — no flag silently ignored).
 function parseServeArgs(args: string[]): ServeArgs {
   let port: number | undefined;
-  let token: string | undefined;
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     if (arg === undefined) continue;
@@ -136,16 +78,6 @@ function parseServeArgs(args: string[]): ServeArgs {
       i++; // consume the value
       continue;
     }
-    if (arg === '--token') {
-      const value = args[i + 1];
-      if (value === undefined || value.startsWith('--')) {
-        process.stderr.write(`plane serve: --token <value> required (${SERVE_USAGE})\n`);
-        process.exit(2);
-      }
-      token = value;
-      i++; // consume the value
-      continue;
-    }
     process.stderr.write(`plane serve: unexpected argument '${arg}' (${SERVE_USAGE})\n`);
     process.exit(2);
   }
@@ -153,57 +85,66 @@ function parseServeArgs(args: string[]): ServeArgs {
     process.stderr.write(`plane serve: --port <n> required (${SERVE_USAGE})\n`);
     process.exit(2);
   }
-  if (token === undefined) {
-    process.stderr.write(`plane serve: --token <value> required (${SERVE_USAGE})\n`);
-    process.exit(2);
-  }
-  return { port, token };
+  return { port };
 }
 
 /**
- * `plane serve --port <n> --token <accepted>` — start the runnable plane the
- * dogfood drives. Builds the runtime options via `buildServeRuntimeOptions`
- * (the shared, tested assembly), which seeds the runtime's accepted-token set
- * with the single `--token` mapped to THIS installation's id
- * (`mintOrReadInstallationId`) AND binds that token to this installation's
- * `host:path` instance identity (`deriveInstanceId(installationRoot)`, D8) so
- * the T038 instance-mismatch check (`refuseInstanceMismatch`) is LIVE on the
- * real serve path — an ingest claiming a DIFFERENT `host:path` is refused 403
- * (AUDIT-20260719-01). Roots the durable command + late-event stores under the
- * machine-local durable dir, and listens on `--port`. The process stays alive
- * holding the server open (Ctrl-C / SIGTERM to stop).
+ * Build the runnable plane runtime for `installationRoot`'s fleet registry
+ * (Task 1's `loadFleetRegistry`, rooted at `<durableDir>/plane/fleet/`).
+ * Pure assembly, factored out of `runServe` so a test can prove the wiring
+ * (registry load + loopback seed + runtime construction) without binding a
+ * real socket.
  *
- * SEAM (flagged, not silently deferred): the accepted-token source is a
- * SINGLE `--token`. A multi-installation fleet needs a per-installation
- * accepted-token registry (a file the operator provisions via
- * `provision-token` on each host, read here) — out of scope for the
- * single-operator dogfood (FR-078); the runtime already accepts a full
- * `ReadonlyMap<token, installationId>`, so widening `serve` is additive.
+ * LOOPBACK SEED: when the registry has no enrollment credentials yet (the
+ * very first `plane serve` for this installation), mints one, registers it
+ * (`registry.addCredential(seed, 'local')`), and writes it into this HOST's
+ * enrollment custody (`locateHostState().durableDir`) — the same file a
+ * sidecar on this host reads to self-enroll (`enrollment-custody.ts`).
+ */
+export function buildServeRuntime(installationRoot: string): { readonly runtime: PlaneRuntime } {
+  const location = locateMachineState(installationRoot);
+  // Ensure this installation's identity is minted before the plane serves —
+  // mirrors the prior `runServe`'s eager mint (side effect only; the id
+  // itself is not threaded into the registry-backed runtime options below).
+  mintOrReadInstallationId(installationRoot);
+
+  const planeDurableDir = join(location.durableDir, 'plane');
+  const registry = loadFleetRegistry(planeDurableDir);
+
+  if (registry.enrollmentCredentials().size === 0) {
+    const seed = mintCredential();
+    registry.addCredential(seed, 'local');
+    openEnrollmentCustody(locateHostState().durableDir).write(seed);
+  }
+
+  const runtime = createPlaneRuntime({
+    acceptedTokens: registry.activeTokens(),
+    acceptedInstances: registry.instanceBindings(),
+    revokedTokens: registry.revokedTokens(),
+    commandStoreDir: join(planeDurableDir, 'commands'),
+    enrollment: { handler: createEnrollHandler(registry) },
+  });
+
+  return { runtime };
+}
+
+/**
+ * `plane serve --port <n>` — start the runnable plane the dogfood drives.
+ * Builds the runtime from the fleet registry (`buildServeRuntime`) and
+ * listens on `--port`. The process stays alive holding the server open
+ * (Ctrl-C / SIGTERM to stop).
  */
 async function runServe(args: string[]): Promise<void> {
-  const { port, token } = parseServeArgs(args);
+  const { port } = parseServeArgs(args);
 
-  const installationRoot = process.cwd();
-  const location = locateMachineState(installationRoot);
-  const installationId = mintOrReadInstallationId(installationRoot);
-  const commandStoreDir = join(location.durableDir, 'plane', 'commands');
-
-  const runtime = createPlaneRuntime(
-    buildServeRuntimeOptions({
-      tokens: [token],
-      installationId,
-      installationRoot,
-      commandStoreDir,
-    }),
-  );
+  const { runtime } = buildServeRuntime(process.cwd());
   const server = runtime.createServer();
 
   await new Promise<void>((resolve, reject) => {
     server.once('error', reject);
     server.listen(port, () => {
       server.removeListener('error', reject);
-      // The bound port (relevant when --port 0 chose an ephemeral one) — the
-      // token itself is a credential and is NEVER echoed.
+      // The bound port (relevant when --port 0 chose an ephemeral one).
       const address = server.address();
       const boundPort = typeof address === 'object' && address !== null ? address.port : port;
       process.stdout.write(`plane: serving on port ${boundPort}\n`);
@@ -218,9 +159,9 @@ async function runServe(args: string[]): Promise<void> {
 }
 
 /**
- * `stackctl plane <subaction> [...]`. Subactions: `provision-token` (PT-015)
- * and `serve` (T124). A missing or unrecognized subaction is a usage error
- * (exit 2), matching every other stackctl verb's strict-arg contract.
+ * `stackctl plane <subaction> [...]`. `serve` is the only subaction. A
+ * missing or unrecognized subaction is a usage error (exit 2), matching
+ * every other stackctl verb's strict-arg contract.
  */
 export async function runPlane(args: string[]): Promise<void> {
   const [subaction, ...rest] = args;
@@ -228,11 +169,6 @@ export async function runPlane(args: string[]): Promise<void> {
   if (subaction === undefined) {
     process.stderr.write(`plane: subcommand required (${PLANE_USAGE})\n`);
     process.exit(2);
-  }
-
-  if (subaction === 'provision-token') {
-    await runProvisionToken(rest);
-    return;
   }
 
   if (subaction === 'serve') {

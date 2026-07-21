@@ -1,9 +1,12 @@
-// Mounted-verb declarations for the fleet-control-plane family (036 T120-T125;
-// FR-003 non-drift). Two multi-subaction verbs:
+// Mounted-verb declarations for the fleet-control-plane family (036 T120-T125,
+// rewired 037 Task 5; FR-003 non-drift). Two multi-subaction verbs:
 //
-//   - `plane` (src/subcommands/plane.ts) — `provision-token` (place the
-//     accepted-bearer token into machine-local token custody) and `serve`
-//     (start the runnable plane HTTP endpoint).
+//   - `plane` (src/subcommands/plane.ts) — `serve` (start the runnable plane
+//     HTTP endpoint, boot against the fleet registry). The prior
+//     `provision-token` subaction was DELETED (clean break, no back-compat
+//     alias) when `serve` moved onto the fleet registry (037 Task 5):
+//     accepted tokens now come from enrollment (`POST /v1/enroll`), not an
+//     operator-run CLI verb.
 //   - `sidecar` (src/subcommands/sidecar.ts) — `run` (elect + run the
 //     sidecar daemon for this installation).
 //
@@ -17,7 +20,6 @@
 //
 // Mediation (Decision 4 — declared, never inferred): every subaction here is
 // MUTATING —
-//   - `plane provision-token` writes token custody (a credential) to disk.
 //   - `plane serve` opens a network service and writes the durable command
 //     store under the machine-local durable dir.
 //   - `sidecar run` spawns/binds a local socket and writes the sidecar's spool.
@@ -32,7 +34,6 @@ import type { MediationClass, MountedVerb } from '../command-surface.js';
 import { buildGrammarSurfaceCommand } from '../surface-builder.js';
 
 const PLANE_MEDIATION: Readonly<Record<string, MediationClass>> = {
-  'provision-token': 'mutating',
   serve: 'mutating',
 };
 
@@ -47,14 +48,12 @@ export const FLEET_VERBS: readonly MountedVerb[] = [
       buildGrammarSurfaceCommand({
         verb: 'plane',
         description:
-          'The fleet control plane: provision the accepted bearer token into machine-local custody, or serve the plane HTTP endpoint.',
+          'The fleet control plane: serve the plane HTTP endpoint, booting against the fleet registry (accepted tokens come from enrollment, not a CLI-provisioned token).',
         specs: PLANE_SPECS,
         summaries: {
-          'provision-token': 'place a bearer token into this installation\'s machine-local token custody (PT-015)',
           serve: 'start the runnable plane HTTP endpoint, listening on --port until stopped',
         },
         flagDescriptions: {
-          token: 'the bearer token value (provision-token: the token to store; serve: the accepted bearer)',
           port: 'TCP port to listen on (serve; required)',
         },
       }),
