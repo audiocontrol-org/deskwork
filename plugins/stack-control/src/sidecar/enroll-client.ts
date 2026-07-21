@@ -28,15 +28,29 @@ function isTokenResponse(value: unknown): value is { token: string } {
   );
 }
 
+// Bounded so an unreachable/hanging plane can never stall the daemon's
+// `started` election (which `stop()` awaits) or delay startup indefinitely.
+const ENROLL_TIMEOUT_MS = 15_000;
+
 export async function enrollInstance(args: EnrollArgs): Promise<EnrollResult> {
-  const response = await fetch(`${args.planeUrl}/v1/enroll`, {
-    method: 'POST',
-    headers: {
-      authorization: `Bearer ${args.credential}`,
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify(args.identity),
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${args.planeUrl}/v1/enroll`, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${args.credential}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify(args.identity),
+      signal: AbortSignal.timeout(ENROLL_TIMEOUT_MS),
+    });
+  } catch {
+    // Any network failure — connection refused, DNS failure, abort/timeout —
+    // never throws out of this call. status:0 denotes "no HTTP response was
+    // ever obtained" (distinct from a real HTTP status). Never fabricate a
+    // token on failure.
+    return { ok: false, status: 0 };
+  }
 
   if (response.status !== 200) {
     return { ok: false, status: response.status };

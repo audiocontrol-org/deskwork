@@ -51,12 +51,12 @@
  * BEFORE the WAL append for the 036 path.
  *
  * PLANE-URL / TOKEN RESOLUTION: the uplink is ACTIVE only when BOTH a plane URL
- * (explicit option ?? `STACKCTL_CP_URL`) AND a provisioned bearer token
- * (machine-local token custody) resolve. With neither URL nor token, the
- * daemon STILL runs the local socket receiver + spools to the WAL — the uplink
- * simply stays idle (no crash). This is the "spool now, transmit when the
- * plane is reachable" posture the WAL's at-least-once replay (FR-049) makes
- * safe.
+ * (explicit option ?? `STACKCTL_CP_URL`) AND a bearer token resolve — either
+ * already-PROVISIONED (token custody) or ACQUIRED via auto-enroll (see
+ * `resolveTelemetryToken`, ./token-resolution.js). With neither, the daemon
+ * STILL runs the local socket receiver + spools to the WAL — the uplink stays
+ * idle (no crash), per the "spool now, transmit when reachable" posture
+ * (FR-049).
  *
  * TIME: every cadence/backoff is driven by an injected `Clock` (default
  * `SystemClock`) plus small `setInterval`s that are `unref()`'d (so they never
@@ -70,13 +70,12 @@
 
 import { join } from 'node:path';
 import { SystemClock, type Clock } from '../fleet/clock.js';
-import { locateMachineState, locateHostState } from '../machine-state/locate.js';
+import { locateMachineState } from '../machine-state/locate.js';
 import { mintOrReadInstallationId } from '../machine-state/identity.js';
 import { deriveInstanceFields } from '../machine-state/instance-id.js';
-import { openTokenCustody } from '../machine-state/token.js';
-import { openEnrollmentCustody } from '../machine-state/enrollment-custody.js';
 import { createPipeline, type SidecarPipeline } from './pipeline.js';
 import { enrollInstance, type EnrollArgs, type EnrollResult } from './enroll-client.js';
+import { resolveTelemetryToken } from './token-resolution.js';
 import { openWal, type WalHandle } from './spool/wal.js';
 import { BackoffSchedule } from './spool/drain.js';
 import { createTelemetryPoster, type TelemetryPoster } from './uplink/post.js';
@@ -123,11 +122,10 @@ export interface SidecarDaemonOptions {
   readonly transport?: SseTransport;
   /** Injected telemetry/liveness POST seam (default real fetch-backed poster). */
   readonly poster?: TelemetryPoster;
-  /** Injected self-enrollment seam (default real `enrollInstance`, ./enroll-
-   * client.js — POST /v1/enroll). Exchanges the HOST-level enrollment
-   * credential (`sidecar set-enrollment`, Task 8) for a per-instance
-   * telemetry token when this installation has a credential but no token
-   * yet (Task 10 auto-enroll). Tests inject a fake so no network is hit. */
+  /** Injected self-enrollment seam (default real `enrollInstance`,
+   * ./enroll-client.js — POST /v1/enroll). Used by `resolveTelemetryToken`
+   * (./token-resolution.js) to exchange a host enrollment credential for a
+   * per-instance token. Tests inject a fake so no network is hit. */
   readonly enroll?: (args: EnrollArgs) => Promise<EnrollResult>;
   /** The LOCAL-RUN delivery sink: fired for each command delivered over the
    * plane's SSE stream so the daemon can route it onward to the target run.
@@ -135,22 +133,16 @@ export interface SidecarDaemonOptions {
    * command→local-run fan-in over the socket (`register-run`/`command` frames)
    * is a larger tracked concern (TASK-461). */
   readonly onCommand?: (command: unknown) => void;
-  /** Observable record for a command that arrived over SSE but had NO local-run
-   * delivery sink (`onCommand` absent). The daemon MUST NOT silently discard a
-   * received command (AUDIT-20260717-17): with no sink, each command is
-   * recorded here as UNDELIVERED. Absent ⇒ a default recorder logs the
-   * undelivered command to stderr, so the production default path is never
-   * silent. */
+  /** Observable record for a command that arrived over SSE with NO local-run
+   * delivery sink (`onCommand` absent) — the daemon MUST NOT silently discard
+   * it (AUDIT-20260717-17). Absent ⇒ a default recorder logs it to stderr. */
   readonly onUndeliveredCommand?: (command: unknown) => void;
   /** Best-effort observer for non-fatal background errors (drain/liveness
    * failures, malformed command frames). Telemetry never crashes the daemon. */
   readonly onError?: (error: unknown) => void;
   /** Observable record for a spool record the plane PERMANENTLY rejected (a 4xx
-   * from `/v1/ingest`, e.g. the classification-downgrade guard) — the drain
-   * loop skips-and-advances past it so the records spooled AFTER it are not
-   * head-of-line-blocked forever (AUDIT-20260718-05, FR-017 defined-drop
-   * discipline). Absent ⇒ a default recorder logs the drop to stderr, so the
-   * production default path is never silent. */
+   * from `/v1/ingest`) — skip-and-advance so later records aren't head-of-line
+   * blocked forever (AUDIT-20260718-05, FR-017). Absent ⇒ logs to stderr. */
   readonly onDroppedRecord?: (info: DroppedSpoolRecord) => void;
   /** Observable record for a single INBOUND `event` frame that could not be
    * ingested (absent host/path identity, or a `receive` that threw) — it is
@@ -179,23 +171,14 @@ export interface SidecarDaemonHandle {
 }
 
 /**
- * Distinguish a PERMANENT ingest rejection (skip-and-record, per FR-017) from a
- * TRANSIENT one (back off, retry the same record). A 4xx names a request the
- * plane will reject identically on every byte-identical replay (malformed
- * payload, classification-downgrade guard) — permanent. The 4xx statuses that
- * are genuinely retryable are excluded:
- *  - 408 (Request Timeout) and 429 (Too Many Requests) — transient.
- *  - 401 (Unauthorized) / 403 (Forbidden) — an AUTH failure is a fact about the
- *    bearer token, NOT the payload: the SAME record would transmit once the
- *    token is provisioned / rotated / un-revoked, or once the plane finishes
- *    booting its token registry. Dropping the spooled records on a transient
- *    auth window (a plane restarted with a mismatched `--token`, a startup
- *    race, an operator credential rotation) is irrecoverable telemetry loss and
- *    violates the at-least-once/"spool now, transmit when the plane is
- *    reachable" posture (FR-049). So 401/403 RETAIN — back off and retry the
- *    same record — exactly like 408/429 (AUDIT-20260718-36).
- * Everything else (5xx, network errors handled upstream of this call) is
- * transient too. (AUDIT-20260718-05.)
+ * Distinguish a PERMANENT ingest rejection (skip-and-record, FR-017) from a
+ * TRANSIENT one (back off, retry). A 4xx replays byte-identical and is
+ * permanent EXCEPT: 408/429 (timeout/rate-limit) are transient, and 401/403
+ * are transient too — an auth failure is a fact about the bearer token, NOT
+ * the payload, so dropping spooled records on a transient auth window would
+ * be irrecoverable telemetry loss (violates the FR-049 at-least-once
+ * posture; AUDIT-20260718-36). Everything else (5xx, upstream network
+ * errors) is transient too (AUDIT-20260718-05).
  */
 function isPermanentRejection(status: number): boolean {
   if (status < 400 || status >= 500) return false;
@@ -273,13 +256,10 @@ export function runSidecarDaemon(options: SidecarDaemonOptions): SidecarDaemonHa
 
   const planeUrl = options.planeUrl ?? process.env.STACKCTL_CP_URL;
   const enroll = options.enroll ?? enrollInstance;
-  // The effective telemetry token (custody read, else auto-enroll) is resolved
-  // ASYNCHRONOUSLY inside the `started` election flow below, BEFORE
-  // `uplinkReady`/`bearerHeaders` are computed and before `startUplink()` runs
-  // (Task 10). It cannot be resolved here synchronously: auto-enroll is an
-  // async HTTP exchange (Task 9's `enroll` seam), and it must never block or
-  // replace the synchronous election/local-socket/WAL startup this module
-  // guarantees even with no plane URL, no token, and no enrollment credential.
+  // The effective token (`resolveTelemetryToken`, ./token-resolution.js) is
+  // resolved ASYNCHRONOUSLY inside the `started` election flow below, before
+  // `uplinkReady`/`bearerHeaders`/`startUplink()` — it must never block the
+  // synchronous election/local-socket/WAL startup this module guarantees.
 
   // Redact+spool every received `event` frame through the pipeline. The
   // pipeline mints its own eventId+sequences and redacts BEFORE spooling.
@@ -316,11 +296,9 @@ export function runSidecarDaemon(options: SidecarDaemonOptions): SidecarDaemonHa
   let drainTimer: NodeJS.Timeout | undefined;
   let livenessTimer: NodeJS.Timeout | undefined;
 
-  // Placeholder until the async election flow resolves the effective token
-  // (custody read, else auto-enroll) and reassigns this BEFORE `startUplink()`
-  // runs — every closure below (`drainTick`, the liveness `send`) reads this
-  // binding at CALL time, never at closure-creation time, so the reassignment
-  // is visible to them (Task 10).
+  // Placeholder until the election flow resolves the token and reassigns this
+  // BEFORE `startUplink()` runs; closures below read it at CALL time so the
+  // reassignment is visible to them.
   let bearerHeaders: Readonly<Record<string, string>> = { authorization: 'Bearer ' };
   const ingestUrl = `${planeUrl ?? ''}/v1/ingest`;
   const streamUrl = `${planeUrl ?? ''}/v1/sidecar/stream`;
@@ -472,32 +450,18 @@ export function runSidecarDaemon(options: SidecarDaemonOptions): SidecarDaemonHa
     }
 
     // --- resolve the effective telemetry token (Task 10 auto-enroll) --------
-    // Custody read is the common, already-provisioned path. When it is ABSENT
-    // and a plane URL is configured, check the HOST-level enrollment
-    // credential (`sidecar set-enrollment`, Task 4/8) — shared across every
-    // installation on this host. If present, self-enroll via the injected
-    // `enroll` seam (default: Task 9's real `enrollInstance`, POST /v1/enroll)
-    // and persist the issued per-instance token into the SAME custody every
-    // other path reads. A DECLINED credential, a FAILED enroll exchange, or no
-    // plane URL at all all leave `token` undefined — the uplink simply stays
-    // idle (the existing "spool now, transmit when reachable" posture); the
-    // local socket + WAL keep running regardless (preserved from before this
-    // task).
-    let token = openTokenCustody(location.durableDir).read();
-    if (token === undefined && planeUrl !== undefined && planeUrl.length > 0) {
-      const credential = openEnrollmentCustody(locateHostState().durableDir).read();
-      if (credential !== undefined) {
-        const result = await enroll({
-          planeUrl,
-          credential,
-          identity: { installationId, host: instanceHost, path: instancePath },
-        });
-        if (result.ok) {
-          openTokenCustody(location.durableDir).write(result.token);
-          token = result.token;
-        }
-      }
-    }
+    // See `resolveTelemetryToken` (token-resolution.ts) for the full custody-
+    // then-auto-enroll contract. `token` resolves to `undefined` on a
+    // declined credential, a failed enroll exchange, or no plane URL — the
+    // uplink then simply stays idle; the local socket + WAL keep running.
+    const token = await resolveTelemetryToken({
+      location,
+      planeUrl,
+      installationId,
+      instanceHost,
+      instancePath,
+      enroll,
+    });
     const uplinkReady = planeUrl !== undefined && planeUrl.length > 0 && token !== undefined;
     bearerHeaders = { authorization: `Bearer ${token ?? ''}` };
 

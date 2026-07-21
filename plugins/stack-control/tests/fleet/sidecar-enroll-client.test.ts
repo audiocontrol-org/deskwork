@@ -84,4 +84,16 @@ describe('enrollInstance', () => {
     });
     expect(result).toEqual({ ok: false, status: 200 });
   });
+
+  it('returns ok:false status:0 (never throws) when the plane refuses the connection', async () => {
+    // Port 1 is a privileged, unassigned port with no listener — the connect
+    // attempt fails near-instantly (ECONNREFUSED), well under the 15s enroll
+    // timeout, so this test does not wait on the timeout to observe the fix.
+    const result = await enrollInstance({
+      planeUrl: 'http://127.0.0.1:1',
+      credential: 'good-cred',
+      identity: { installationId: 'i', host: 'h', path: '/p' },
+    });
+    expect(result).toEqual({ ok: false, status: 0 });
+  });
 });
