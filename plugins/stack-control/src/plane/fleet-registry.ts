@@ -167,15 +167,23 @@ function parseTelemetryFile(raw: string, path: string): TelemetryFileShape {
   return { tokens };
 }
 
-function writeJsonAtomicish(path: string, data: unknown): void {
+function writeJsonFile(path: string, data: unknown): void {
   writeFileSync(path, `${JSON.stringify(data, null, 2)}\n`, { encoding: 'utf8', mode: FLEET_FILE_MODE });
   if (process.platform !== 'win32') {
     chmodSync(path, FLEET_FILE_MODE);
   }
 }
 
+/**
+ * Build a collision-safe key for identity comparison. `host`/`path` are
+ * free-form and may contain spaces, so a space-joined key (the prior
+ * implementation) can alias two distinct identities onto the same string
+ * (e.g. host="host a" path="/p" vs host="host" path="a /p" both joined to
+ * "inst host a /p"). JSON-encoding the tuple preserves field boundaries
+ * unambiguously.
+ */
 function bindingKey(identity: EnrollIdentity): string {
-  return `${identity.installationId} ${identity.host} ${identity.path}`;
+  return JSON.stringify([identity.installationId, identity.host, identity.path]);
 }
 
 /**
@@ -216,11 +224,11 @@ export function loadFleetRegistry(planeDurableDir: string): FleetRegistry {
   }
 
   function persistEnrollment(): void {
-    writeJsonAtomicish(enrollmentPath, enrollmentFile);
+    writeJsonFile(enrollmentPath, enrollmentFile);
   }
 
   function persistTelemetry(): void {
-    writeJsonAtomicish(telemetryPath, telemetryFile);
+    writeJsonFile(telemetryPath, telemetryFile);
   }
 
   function findTokenForIdentity(identity: EnrollIdentity): string | undefined {
@@ -276,6 +284,7 @@ export function loadFleetRegistry(planeDurableDir: string): FleetRegistry {
       return { ok: true, token };
     },
     addCredential(credential: string, label: string): void {
+      if (credentialSet.has(credential)) return;
       enrollmentFile.credentials.push({ credential, label });
       credentialSet.add(credential);
       persistEnrollment();
