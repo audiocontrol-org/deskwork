@@ -11,7 +11,8 @@ While designing the fleet dashboard we settled a **security posture lean**: buil
 as little novel security code as possible (no one on the team is a security
 expert), rely on mature infrastructure wherever practical, and frame it as **zero
 trust** — *nothing is trusted for its network location; every accepted request must
-have crossed the intended authenticated transport boundary.*
+arrive over an authenticated transport path whose trust boundary is enforced rather
+than assumed.*
 
 Applying that lens to the **sidecar → plane** channel surfaces one real gap and a
 clarifying separation of concerns the team review sharpened.
@@ -61,11 +62,13 @@ gap is that **authenticated traffic can bypass the required secure transport**:
 - traffic can reach the plane without passing the intended TLS-termination point,
 - so the deployment no longer *guarantees* the protocol-required TLS is in use.
 
-Zero trust's operative property here: **the plane must be unreachable except through
-the authenticated transport boundary** — via a private listener, a trusted-proxy-only
-accept policy, network policy that prevents bypass, or equivalent. Externally
-terminated TLS is fully compatible with zero trust *when that boundary is actually
-enforced.*
+Zero trust's operative property here: **the telemetry ingress surface must be
+unreachable except through the authenticated transport boundary** — via a private
+listener, a trusted-proxy-only accept policy, network policy that prevents bypass, or
+equivalent. (Scoping this to the telemetry ingress surface, rather than the whole
+plane, is deliberately future-proof: the plane may later expose other APIs with
+different trust requirements.) Externally terminated TLS is fully compatible with
+zero trust *when that boundary is actually enforced.*
 
 ## The application credential is legitimate — keep it minimal
 
@@ -87,9 +90,9 @@ mature existing solutions.
 
 Until a common identity fabric is available across all supported sidecar hosts:
 
-- **Infrastructure owns transport security and workload identity** — service mesh,
-  reverse proxy, mTLS, identity-aware access, existing workload-identity systems,
-  used whenever available.
+- **Infrastructure owns transport security and, where available, workload
+  identity** — service mesh, reverse proxy, mTLS, identity-aware access, existing
+  workload-identity systems, used whenever available.
 - **stack-control owns only application-specific identity + authorization** — the
   minimal per-installation credential and its revocation.
 - **Require the plane to be reachable only through the trusted transport boundary**
@@ -97,17 +100,34 @@ Until a common identity fabric is available across all supported sidecar hosts:
 - **Build no** custom PKI, certificate lifecycle, browser authentication, or
   identity-management code inside stack-control.
 
-Clean separation of responsibility: **infrastructure** owns transport + workload
-identity; **stack-control** owns application authorization decisions.
+Clean separation of responsibility: **infrastructure** owns transport security and,
+where available, workload identity; **stack-control** owns application authorization
+decisions.
+
+## Architectural invariant
+
+The application never grants authority based solely on network location or transport
+identity. Transport identity establishes *who is connected*; application identity
+establishes *which stack-control installation is authorized*.
+
+## Non-goal
+
+This posture does not require stack-control to become an identity provider,
+certificate authority, authentication gateway, or browser-authentication system. The
+objective is to minimize security-sensitive code while preserving application-level
+authorization.
 
 ## Remaining input we still want
 
 **What identity fabric, if any, spans the hosts sidecars run on** (single tailnet /
 WireGuard, shared mTLS CA, or heterogeneous)?
 
-- This decides what is available for concerns (1) and (2) — where a fabric exists,
-  the plane can verify **per-connection workload identity on every request** (not
-  "it arrived over the tailnet," which would re-import the perimeter we reject).
+- This determines **which infrastructure mechanisms are available** for concerns (1)
+  and (2) — where a workload-identity fabric exists, the deployment can enforce
+  authenticated workload identity on every accepted connection (not "it arrived over
+  the tailnet," which would re-import the perimeter we reject). The application
+  architecture stays stable regardless of which transport or workload-identity
+  technology a deployment chooses.
 - It does **not** decide concern (3): the minimal installation credential is
   retained regardless, because infrastructure identity generally cannot express
   "which installation" or give per-installation revocation.
