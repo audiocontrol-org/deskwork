@@ -35,9 +35,11 @@ import { loadFleetRegistry, mintCredential } from '../plane/fleet-registry.js';
 import { createEnrollHandler } from '../plane/http/enroll.js';
 import type { SubactionGrammar } from './document-verb-shared.js';
 
-const PLANE_USAGE = 'usage: plane serve [...] | plane issue-enrollment [--label <host>]';
+const PLANE_USAGE =
+  'usage: plane serve [...] | plane issue-enrollment [--label <host>] | plane revoke (--token <t> | --enrollment <e>)';
 const SERVE_USAGE = 'usage: plane serve --port <n>';
 const ISSUE_ENROLLMENT_USAGE = 'usage: plane issue-enrollment [--label <host>]';
+const REVOKE_USAGE = 'usage: plane revoke (--token <t> | --enrollment <e>)';
 
 /**
  * The `plane` verb's per-subaction grammar — read by the cli-help surface
@@ -51,6 +53,7 @@ const ISSUE_ENROLLMENT_USAGE = 'usage: plane issue-enrollment [--label <host>]';
 export const SUBACTION_SPECS: Readonly<Record<string, SubactionGrammar>> = {
   serve: { valueFlags: ['port'], apply: false, positionals: 0 },
   'issue-enrollment': { valueFlags: ['label'], apply: false, positionals: 0 },
+  revoke: { valueFlags: ['token', 'enrollment'], apply: false, positionals: 0 },
 };
 
 interface ServeArgs {
@@ -211,10 +214,99 @@ async function runIssueEnrollment(args: string[]): Promise<void> {
   process.stdout.write(`${credential}\n`);
 }
 
+interface RevokeArgs {
+  readonly token: string | undefined;
+  readonly enrollment: string | undefined;
+}
+
+// Strict arg parsing for `revoke`: EXACTLY ONE of `--token <value>` or
+// `--enrollment <value>` is required. Both or neither, a missing value, an
+// unknown flag, or a stray positional is a usage error — exit 2 (mirrors
+// `parseServeArgs`/`parseIssueEnrollmentArgs` above — no flag silently
+// ignored).
+function parseRevokeArgs(args: string[]): RevokeArgs {
+  let token: string | undefined;
+  let enrollment: string | undefined;
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === undefined) continue;
+    if (arg === '--token') {
+      const value = args[i + 1];
+      if (value === undefined || value.startsWith('--')) {
+        process.stderr.write(`plane revoke: --token <t> requires a value (${REVOKE_USAGE})\n`);
+        process.exit(2);
+      }
+      token = value;
+      i++; // consume the value
+      continue;
+    }
+    if (arg === '--enrollment') {
+      const value = args[i + 1];
+      if (value === undefined || value.startsWith('--')) {
+        process.stderr.write(`plane revoke: --enrollment <e> requires a value (${REVOKE_USAGE})\n`);
+        process.exit(2);
+      }
+      enrollment = value;
+      i++; // consume the value
+      continue;
+    }
+    process.stderr.write(`plane revoke: unexpected argument '${arg}' (${REVOKE_USAGE})\n`);
+    process.exit(2);
+  }
+  if (token === undefined && enrollment === undefined) {
+    process.stderr.write(`plane revoke: exactly one of --token or --enrollment is required (${REVOKE_USAGE})\n`);
+    process.exit(2);
+  }
+  if (token !== undefined && enrollment !== undefined) {
+    process.stderr.write(`plane revoke: --token and --enrollment are mutually exclusive (${REVOKE_USAGE})\n`);
+    process.exit(2);
+  }
+  return { token, enrollment };
+}
+
 /**
- * `stackctl plane <subaction> [...]`. `serve` and `issue-enrollment` are the
- * subactions. A missing or unrecognized subaction is a usage error (exit
- * 2), matching every other stackctl verb's strict-arg contract.
+ * `plane revoke (--token <t> | --enrollment <e>)` — revoke a telemetry
+ * token (an enrolled instance stops being accepted) or an enrollment
+ * credential (no new enrollment from that host). Exactly one of the two is
+ * required. Unlike `issue-enrollment`, revoke's argument is a secret the
+ * operator already holds (they're revoking it, not retrieving it) — it is
+ * NOT echoed back to stdout, matching the never-echo-telemetry-tokens
+ * contract (`no-creds-in-cli.test.ts`).
+ *
+ * SCOPE NOTE: the revocation is written to the registry (`enrollment.json`)
+ * and takes effect at the NEXT `plane serve` — the running plane snapshots
+ * its accepted set at startup (`buildServeRuntime`). Live revocation
+ * without restart is a named follow-on in the design's Scope Boundary, not
+ * implemented here.
+ */
+async function runRevoke(args: string[]): Promise<void> {
+  const { token, enrollment } = parseRevokeArgs(args);
+
+  const root = process.cwd();
+  const location = locateMachineState(root);
+  const registry = loadFleetRegistry(join(location.durableDir, 'plane'));
+
+  if (token !== undefined) {
+    registry.revokeToken(token);
+    process.stdout.write('plane: token revoked (effective at next plane serve)\n');
+    return;
+  }
+
+  // enrollment is guaranteed defined here (parseRevokeArgs enforces
+  // exactly-one-of), but TypeScript can't see that across the branch —
+  // narrow explicitly rather than reaching for a non-null assertion.
+  if (enrollment !== undefined) {
+    registry.revokeCredential(enrollment);
+    process.stdout.write('plane: enrollment credential revoked (effective at next plane serve)\n');
+    return;
+  }
+}
+
+/**
+ * `stackctl plane <subaction> [...]`. `serve`, `issue-enrollment`, and
+ * `revoke` are the subactions. A missing or unrecognized subaction is a
+ * usage error (exit 2), matching every other stackctl verb's strict-arg
+ * contract.
  */
 export async function runPlane(args: string[]): Promise<void> {
   const [subaction, ...rest] = args;
@@ -231,6 +323,11 @@ export async function runPlane(args: string[]): Promise<void> {
 
   if (subaction === 'issue-enrollment') {
     await runIssueEnrollment(rest);
+    return;
+  }
+
+  if (subaction === 'revoke') {
+    await runRevoke(rest);
     return;
   }
 
