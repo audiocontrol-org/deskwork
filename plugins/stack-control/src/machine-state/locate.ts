@@ -197,3 +197,31 @@ export function locateMachineState(installationRoot: string): MachineStateLocati
 
   return { installationRoot, key, platform, durableDir, socketPath, socketDir };
 }
+
+/**
+ * The located host-level durable state dir — SHARED ACROSS EVERY
+ * INSTALLATION ON THE HOST, unlike `locateMachineState`'s per-installation
+ * `durableDir` (which is keyed by `storeKey(installationRoot)`). Holds the
+ * operator-issued enrollment credential (Task 4): a host enrolls with the
+ * plane once, and every installation's sidecar on that host reads the same
+ * credential to self-enroll.
+ *
+ * Same durable base resolution as `locateMachineState` (PT-001: XDG_STATE_HOME
+ * / ~/Library/Application Support / %LOCALAPPDATA%), but WITHOUT the
+ * per-installation key segment — `<base>/stack-control` directly.
+ */
+export interface HostStateLocation {
+  /** The 0700 host-level durable dir — `<durableBase>/stack-control`. */
+  readonly durableDir: string;
+}
+
+/**
+ * Locate the host-level durable state dir and create it with the 0700
+ * authorization mode (PT-001). Idempotent — safe to call repeatedly.
+ */
+export function locateHostState(): HostStateLocation {
+  const platform = process.platform;
+  const durableDir = join(durableBase(platform), STORE_NAMESPACE);
+  ensureDir0700(durableDir);
+  return { durableDir };
+}
