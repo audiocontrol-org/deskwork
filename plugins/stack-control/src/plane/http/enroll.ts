@@ -55,7 +55,16 @@ export function createEnrollHandler(registry: FleetRegistry): RouteHandler {
       return;
     }
 
-    const body = await readJsonBody(ctx.req);
+    let body: unknown;
+    try {
+      body = await readJsonBody(ctx.req);
+    } catch (error) {
+      respondJson(ctx.res, 400, {
+        error: 'bad-request',
+        detail: error instanceof Error ? error.message : String(error),
+      });
+      return;
+    }
     if (!isEnrollRequestBody(body)) {
       respondJson(ctx.res, 400, {
         error: 'bad-request',

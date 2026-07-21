@@ -62,4 +62,58 @@ describe('POST /v1/enroll', () => {
     });
     expect(res.status).toBe(400);
   });
+
+  it('rejects unparseable JSON with 400 (not a 500)', async () => {
+    const base = await start();
+    const res = await fetch(`${base}/v1/enroll`, {
+      method: 'POST',
+      headers: { authorization: 'Bearer cred-1', 'content-type': 'application/json' },
+      body: 'not json at all',
+    });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ error: 'bad-request' });
+  });
+
+  it('rejects a missing bearer with 401 { reason: missing }', async () => {
+    const base = await start();
+    const res = await fetch(`${base}/v1/enroll`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ installationId: 'i', host: 'h', path: '/p' }),
+    });
+    expect(res.status).toBe(401);
+    expect(await res.json()).toMatchObject({ reason: 'missing' });
+  });
+
+  it('rejects re-enrolling the same identity under a different credential with 409', async () => {
+    dir = mkdtempSync(join(tmpdir(), 'scf-enroll-'));
+    const reg = loadFleetRegistry(dir);
+    reg.addCredential('cred-1', 'h1');
+    reg.addCredential('cred-2', 'h2');
+    const handler = createEnrollHandler(reg);
+    server = createServer((req, res) => {
+      void handler({ req, res, params: {}, url: new URL(req.url ?? '/', 'http://x') });
+    });
+    await new Promise<void>((resolve) => server?.listen(0, '127.0.0.1', () => resolve()));
+    const addr = server.address();
+    if (addr === null || typeof addr === 'string') throw new Error('no port');
+    const base = `http://127.0.0.1:${(addr satisfies AddressInfo).port}`;
+
+    const identity = { installationId: 'inst-shared', host: 'hostShared', path: '/p' };
+
+    const first = await fetch(`${base}/v1/enroll`, {
+      method: 'POST',
+      headers: { authorization: 'Bearer cred-1', 'content-type': 'application/json' },
+      body: JSON.stringify(identity),
+    });
+    expect(first.status).toBe(200);
+
+    const second = await fetch(`${base}/v1/enroll`, {
+      method: 'POST',
+      headers: { authorization: 'Bearer cred-2', 'content-type': 'application/json' },
+      body: JSON.stringify(identity),
+    });
+    expect(second.status).toBe(409);
+    expect(await second.json()).toMatchObject({ reason: 'identity-owned-by-other-credential' });
+  });
 });
