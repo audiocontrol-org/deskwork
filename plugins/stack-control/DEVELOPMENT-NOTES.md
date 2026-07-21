@@ -2,6 +2,87 @@
 
 ---
 
+## 2026-07-21: Multi-host fleet enrollment — design → SDD build → live-dogfood fixes (plane-host / orion-m4)
+
+**Goal:** Make the fleet control plane actually multi-host (a sidecar on another machine can report into one running plane), then dogfood it live against a real second host (`orion-m1`) and fix whatever the live run surfaces. This session ran the plane on `orion-m4`; a parallel session ran the sidecar on `orion-m1` (its own entry, below).
+
+**Accomplished:**
+- **Full lifecycle for the multi-host enrollment feature.** Brainstormed the design (per-instance telemetry tokens, host-scoped self-enrollment under an operator-issued enrollment credential, a two-file race-free registry, always-over-tailnet → no TLS), wrote the implementation plan, and executed it via subagent-driven development — 12 TDD tasks, each spec+quality reviewed with fix loops, a final whole-branch review returning "ready to merge, no Critical/Important." Opened **PR #530**.
+- **Two dogfood-driven fixes** once `orion-m1` connected: `6a45604a` live enrollment-file reload (a credential issued/revoked against a *running* plane is honored on first use, no restart — closed **TASK-473/474**), and `616463ea` lost-election stderr visibility (`sidecar run` names the winning PID instead of exiting 0 silently). Both TDD'd and verified live.
+- **Corrected the dashboard's roadmap direction** (`913d9e56`): dogfooding exposed the merged validation-build dashboard as architecturally wrong — it runs in-process with the plane yet authenticates to the plane's own `/v1/*` API by injecting a *stolen sidecar telemetry token*. Rewrote `design:feature/fleet-dashboard` to specify an out-of-process, first-class-consumer app + a plane-side consumer/read credential tier.
+
+**Didn't Work:**
+- **Hosting the plane/sidecars inside this agent session was unreliable** — `run_in_background` tasks were reaped between turns (three times). A persistent plane needs an operator terminal; worked around with `nohup`-detached, but the durable answer is operator-run. (Captured as a friction note.)
+- **I shipped a false finding the operator caught.** I claimed instance identity was fragmenting from an "unstable `os.hostname()`" when I had **conflated two separate machines** (`orion-m1` and `orion-m4` are different Macs). Retracted — **TASK-475 closed as invalid**.
+- **Reached for "restart the plane" as the fix** for issue-enrollment-not-live; the operator pushed for the mechanical fix ("make that not a problem"), which became the live-reload change.
+
+**Course Corrections:**
+- [FABRICATION] Conflated `orion-m1`/`orion-m4` as one host → invented an "unstable hostname" bug. Verify host identity before claiming identity instability; two different `.local`/tailnet suffixes were two machines, not one flapping name.
+- [PROCESS] Proposed a restart-as-workaround for a stale-config problem. Default to the mechanism fix over the workaround — the operator's bar is "mechanically impossible to hit the failure," not "here's the recovery step."
+- [COMPLEXITY] Proposed a "consumer credential tier" that *accepted* the broken premise (the dashboard authenticating to the plane it lives inside). The operator's push — the dashboard shouldn't self-authenticate at all — was the real fix; recorded it as an out-of-process app in the roadmap.
+
+**Insights:**
+- The recurring shape all session: a **normal-but-consequential outcome that is silent** — issue-enrollment restart-effective, lost-election exit-0, the dashboard's stolen-token coupling. Every dogfood round-trip cost *diagnosis time in a feedback gap*, not a mechanism failure. Both code fixes converted silence into an observable/mechanical signal (live reload; stderr announcement) — the right direction, matching the thesis (design the failure state out of existence).
+- Two agents dogfooding one feature across two real hosts is itself a strong signal generator: it surfaced the enrollment-restart gap, the zombie-sidecar/silent-loss gap, and the dashboard-credential coupling in roughly one round-trip each.
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits in the auto-derived window: **1** — `roadmap(fleet-dashboard): rebuild as an out-of-process app` (Files changed: 1).
+- **Reconciliation (per AUDIT-04):** the window shows only 1 because the boundary is the *last* journal entry — the concurrent `orion-m1` session-end (below), which already journaled the shared branch's ~22 feature commits. It is NOT that this session did one commit's worth of work: this session **authored the entire multi-host feature** (design + plan + 12-task SDD build) plus the two fixes `6a45604a`/`616463ea`; those are attributed once, in the entry below, to avoid double-counting across the two concurrent journalers.
+- Backlog touched (not auto-detected — captured/closed by hand this session): **TASK-473, TASK-474 closed** (fixed by `6a45604a`); **TASK-475 closed invalid** (host conflation); **TASK-476, TASK-477 open** (instances event-derived; dashboard credential coupling).
+- PR: **#530** (open, base `main`).
+
+## 2026-07-21: Connect this host's sidecar to the global control plane (operator-run dogfood)
+
+**Goal:** Enroll and connect this machine's (`orion-m1`) stack-control sidecar to the fleet control plane running on `orion-m4` over the tailnet — the first cross-host uplink of the just-landed multi-host enrollment feature, driven live as an operator dogfood.
+
+**Accomplished:**
+- Pulled the multi-host enrollment feature onto this checkout (`feature/fleet-control-plane`, up to `5e461967`) and `npm install`'d to sync `node_modules`; reverted the spurious `package-lock.json` peer-churn each time so the tree stayed clean.
+- **Connected the sidecar end-to-end.** `sidecar set-enrollment` → `sidecar run --plane-url http://orion-m4.tail8254f4.ts.net:47800`. Verified falsifiably: `sidecar: elected`, a `bearer-token` persisted to custody (enroll succeeded), and an authenticated `GET /v1/instances` on the plane returns this host (`orion-m1.local`, this checkout path). Sidecar left running (self-elected, enrolled, uplinking).
+- **Surfaced two friction issues; the plane-host agent fixed both and I pulled + verified them live:**
+  - `6a45604a` — plane reloads `enrollment.json` live (issued/revoked credentials work without a `plane serve` restart).
+  - `616463ea` — `sidecar run` announces a lost election on stderr naming the owner PID, instead of exiting silently. Verified live: a competing launch now prints `sidecar: lost election — pid 96535 already elected for this installation (live-owner)`.
+
+**Didn't Work:**
+- **Round 1 enrollment → `401 unknown-credential`.** Root-caused in source: a running `plane serve` snapshotted `enrollment.json` at startup and never re-read it, so a credential issued *after* serve started was invisible — issuing was silently restart-effective (same caveat as `revoke`). Operator restarted the plane; this is exactly what fix `6a45604a` then eliminated.
+- **Round 2 — a zombie sidecar held the election.** My initial `pkill -f "stackctl sidecar run"` killed the background *task wrapper* but not the real `node … cli.ts sidecar run` daemon (whose argv doesn't contain "stackctl"), so it survived — still bound to the dead old credential — and two relaunches silently *lost the election*. Diagnosed via `lsof` on the socket + a connect probe, killed the survivor by PID, cleared the stale socket, relaunched → clean win + enroll. Fix `616463ea` makes this failure self-announcing going forward.
+
+**Course Corrections:**
+- [PROCESS] Early source-exploration `Bash` calls were denied — the operator wanted the plain `git pull` done, not a code spelunk first. Corrected to act directly on the stated request.
+- [PROCESS] Relaunching a daemon without first *confirming the prior one actually exited* (trusting the task-wrapper's exit code over the real process) caused the round-2 election churn. Confirm the PID is gone before rebind.
+
+**Insights:**
+- The sidecar/plane split has two independent "restart-effective, not live" surfaces (credential issuance and election ownership) whose silence is the real cost — both round-trips this session were *diagnosis* time, not mechanism failures. Both fixes this session converted silence into an observable signal (live reload; stderr announcement), which is the right shape.
+- Dogfooding across two real hosts surfaced both issues in ~one round-trip each — the friction was in the *feedback gap*, exactly what the live run exists to expose.
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Session-authored code commits: 0 (operator-run *connect + verify* session, not implementation) — plus the session-end doc commit.
+- Commit provenance: the 22 below are the full multi-host enrollment feature landed on this branch since the merge-base. **2 arrived via `git pull` during this session** (`6a45604a` live enrollment reload, `616463ea` lost-election-visible — both authored by the parallel plane-host agent); the other 20 predate this session. The count reflects the branch window, not work authored here.
+- Commits in merge-base window (auto-derived): 22
+  - fix(fleet): sidecar run announces a lost election on stderr instead of exiting silently
+  - fix(fleet): live enrollment-file reload so issued credentials work without a plane restart
+  - docs(fleet): live two-host acceptance walkthrough (operator-run)
+  - docs(fleet): plane/sidecar skills for enrollment-based multi-host
+  - fix(fleet): extract token-resolution under file cap; bound enroll timeout so stop() cannot hang
+  - feat(fleet): sidecar run auto-enrolls when it has a credential but no token
+  - fix(fleet): drop as-cast in enroll client + guard 200 body parse + cover edge branches
+  - feat(fleet): sidecar enroll client (POST /v1/enroll)
+  - feat(fleet): sidecar set-enrollment stores the host enrollment credential
+  - feat(fleet): plane revoke (token|enrollment), restart-effective per design scope
+  - fix(fleet): declare issue-enrollment in the plane help surface (non-drift)
+  - feat(fleet): plane issue-enrollment mints a host enrollment credential
+  - feat(fleet)!: plane serve on the fleet registry; remove provision-token + single-token binding
+  - feat(machine-state): host-level enrollment-credential custody
+  - feat(fleet): mount /v1/enroll on the plane runtime behind the fleet registry
+  - fix(fleet): enroll handler returns 400 on malformed JSON; cover missing-bearer + 409
+  - feat(fleet): POST /v1/enroll handler over the fleet registry
+  - fix(fleet): escape binding key + cover corrupt-file throw + dedupe addCredential
+  - fix(fleet): remove stray NUL bytes from fleet-registry.ts written by prior commit
+  - feat(fleet): fleet registry — enroll/revoke + two-file persistence
+  - plan(fleet-control-plane): multi-host enrollment implementation plan
+  - design(fleet-control-plane): multi-host self-enrollment design
+- Files changed: 39
+- Backlog touched: (none)
+
 ## 2026-07-20: Ship → validate → release the fleet control plane (v0.59.0)
 
 **Goal:** Take the fleet control plane (036) + instance observability (037) from the govern-graduated boundary all the way out: ship to main, build a UI to *validate* it works end to end, close it as a validated first version, and cut a real release.

@@ -151,6 +151,9 @@ describe('stale-socket recovery: recover a dead endpoint, never steal a live one
       });
 
       expect(outcome.kind).toBe('lost');
+      // The lost outcome carries the already-elected owner's pid so `sidecar
+      // run` can name it on stderr instead of exiting silently.
+      if (outcome.kind === 'lost') expect(outcome.ownerPid).toBe(deadPid);
     } finally {
       await fixture.dispose();
     }

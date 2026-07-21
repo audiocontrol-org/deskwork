@@ -23,15 +23,16 @@
 //
 // SCOPE NOTE: the walk starts at src/telemetry/emit.ts (the entry the
 // finding names), not the whole of src/cli.ts. src/cli.ts statically
-// imports EVERY subcommand module for its dispatch table, including
-// src/subcommands/plane.ts — which LEGITIMATELY imports token.ts for the
-// operator-run `plane provision-token` verb (T119; that verb's entire job
-// is to provision the credential). Walking from cli.ts's full static
-// import list would flag that legitimate, unrelated verb as a false
-// positive. The concern this test guards — SC-011, "the telemetry emit
-// path never touches credentials" — is specifically about the emit path,
-// which is why the finding itself named src/telemetry/emit.ts as the walk
-// root.
+// imports EVERY subcommand module for its dispatch table, and some of those
+// modules legitimately touch token.ts (e.g. the sidecar daemon reads its own
+// custody). Walking from cli.ts's full static import list would flag those
+// legitimate, unrelated paths as false positives. The concern this test
+// guards — SC-011, "the telemetry emit path never touches credentials" — is
+// specifically about the emit path, which is why the finding itself named
+// src/telemetry/emit.ts as the walk root. (037 Task 5: `plane provision-token`
+// — the prior operator-run credential-placement verb — was deleted; `plane
+// serve` now boots against the fleet registry and no longer imports token.ts
+// at all.)
 //
 // Assertions:
 //   1. Every module transitively reachable (via static relative imports)

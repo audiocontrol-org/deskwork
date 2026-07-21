@@ -27,21 +27,38 @@
 // No `any`, no `as`, no `@ts-ignore` (Constitution Principle VI). Relative
 // `.js` imports under node16 module resolution (no `@/` alias configured).
 
+import { openEnrollmentCustody } from '../machine-state/enrollment-custody.js';
+import { locateHostState } from '../machine-state/locate.js';
 import { runSidecarDaemon } from '../sidecar/daemon.js';
+import type { LossReason } from '../sidecar/server.js';
 import type { SubactionGrammar } from './document-verb-shared.js';
 
-const SIDECAR_USAGE = 'usage: sidecar run [--plane-url <url>]';
+/**
+ * The stderr line `sidecar run` writes when it loses the election. Names the
+ * already-elected owner's pid when known so a running-but-not-elected process
+ * is never mistaken (silently) for the winner.
+ */
+export function lostElectionMessage(start: { readonly reason: LossReason; readonly ownerPid?: number }): string {
+  const who = start.ownerPid !== undefined ? `pid ${start.ownerPid}` : 'another sidecar';
+  return `sidecar: lost election — ${who} already elected for this installation (${start.reason})`;
+}
+
+const SIDECAR_USAGE =
+  'usage: sidecar (run [--plane-url <url>] | set-enrollment --token <cred>)';
 const RUN_USAGE = 'usage: sidecar run [--plane-url <url>]';
+const SET_ENROLLMENT_USAGE = 'usage: sidecar set-enrollment --token <cred>';
 
 /**
  * The `sidecar` verb's per-subaction grammar — read by the cli-help surface
  * builder (`src/cli-help/surfaces/fleet.ts`) so `--help` cannot drift from
- * what `parseRunArgs` actually accepts. Descriptive metadata only: it does
- * not drive `runSidecar`'s own strict hand-rolled parsing above, so this
- * module's runtime behavior and exit codes are unchanged by its presence.
+ * what `parseRunArgs`/`parseSetEnrollmentArgs` actually accept. Descriptive
+ * metadata only: it does not drive `runSidecar`'s own strict hand-rolled
+ * parsing above, so this module's runtime behavior and exit codes are
+ * unchanged by its presence.
  */
 export const SUBACTION_SPECS: Readonly<Record<string, SubactionGrammar>> = {
   run: { valueFlags: ['plane-url'], apply: false, positionals: 0 },
+  'set-enrollment': { valueFlags: ['token'], apply: false, positionals: 0 },
 };
 
 interface RunArgs {
@@ -74,8 +91,9 @@ function parseRunArgs(args: string[]): RunArgs {
 /**
  * `sidecar run [--plane-url <url>]` — elect + run the sidecar daemon for the
  * current installation, staying alive until SIGINT/SIGTERM. A lost election
- * exits silently (0); a won election holds the process open and stops
- * gracefully on a stop signal.
+ * writes a diagnostic line to stderr (naming the already-elected owner) and
+ * exits 0; a won election holds the process open and stops gracefully on a
+ * stop signal.
  */
 async function runSidecarRun(args: string[]): Promise<void> {
   const { planeUrl } = parseRunArgs(args);
@@ -87,8 +105,11 @@ async function runSidecarRun(args: string[]): Promise<void> {
 
   const start = await daemon.started;
   if (start.kind === 'lost') {
-    // Losing the bind-wins election is normal and quiet (C6): another sidecar
-    // already holds this installation's socket. Exit silently.
+    // Losing the bind-wins election is expected (another sidecar already holds
+    // this installation's socket), but it must NOT be silent — a
+    // running-but-not-elected process is otherwise indistinguishable from the
+    // winner to anything watching. Announce it on stderr, then concede (exit 0).
+    process.stderr.write(`${lostElectionMessage(start)}\n`);
     return;
   }
 
@@ -110,10 +131,62 @@ async function runSidecarRun(args: string[]): Promise<void> {
   });
 }
 
+interface SetEnrollmentArgs {
+  readonly token: string;
+}
+
+// Strict arg parsing for `set-enrollment`: accept ONLY a required
+// `--token <value>`; reject a missing value, a missing flag, an unknown flag,
+// or a stray positional with exit 2 — mirrors `parseRunArgs` above.
+function parseSetEnrollmentArgs(args: string[]): SetEnrollmentArgs {
+  let token: string | undefined;
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === undefined) continue;
+    if (arg === '--token') {
+      const value = args[i + 1];
+      if (value === undefined || value.startsWith('--')) {
+        process.stderr.write(
+          `sidecar set-enrollment: --token <cred> requires a value (${SET_ENROLLMENT_USAGE})\n`,
+        );
+        process.exit(2);
+      }
+      token = value;
+      i++; // consume the value
+      continue;
+    }
+    process.stderr.write(
+      `sidecar set-enrollment: unexpected argument '${arg}' (${SET_ENROLLMENT_USAGE})\n`,
+    );
+    process.exit(2);
+  }
+  if (token === undefined) {
+    process.stderr.write(
+      `sidecar set-enrollment: --token <cred> is required (${SET_ENROLLMENT_USAGE})\n`,
+    );
+    process.exit(2);
+  }
+  return { token };
+}
+
 /**
- * `stackctl sidecar <subaction> [...]`. The only subaction today is `run`. A
- * missing or unrecognized subaction is a usage error (exit 2), matching every
- * other stackctl verb's strict-arg contract.
+ * `sidecar set-enrollment --token <cred>` — store the operator-issued
+ * enrollment credential into HOST-LEVEL custody (shared across every
+ * installation on this host), so a later `sidecar run` can self-enroll
+ * (Task 10). Never echoes the credential value.
+ */
+async function runSidecarSetEnrollment(args: string[]): Promise<void> {
+  const { token } = parseSetEnrollmentArgs(args);
+
+  openEnrollmentCustody(locateHostState().durableDir).write(token);
+
+  process.stdout.write('sidecar: enrollment credential stored\n');
+}
+
+/**
+ * `stackctl sidecar <subaction> [...]`. Subactions: `run`, `set-enrollment`.
+ * A missing or unrecognized subaction is a usage error (exit 2), matching
+ * every other stackctl verb's strict-arg contract.
  */
 export async function runSidecar(args: string[]): Promise<void> {
   const [subaction, ...rest] = args;
@@ -125,6 +198,11 @@ export async function runSidecar(args: string[]): Promise<void> {
 
   if (subaction === 'run') {
     await runSidecarRun(rest);
+    return;
+  }
+
+  if (subaction === 'set-enrollment') {
+    await runSidecarSetEnrollment(rest);
     return;
   }
 

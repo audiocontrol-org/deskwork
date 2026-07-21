@@ -1,11 +1,18 @@
-// Mounted-verb declarations for the fleet-control-plane family (036 T120-T125;
-// FR-003 non-drift). Two multi-subaction verbs:
+// Mounted-verb declarations for the fleet-control-plane family (036 T120-T125,
+// rewired 037 Task 5; FR-003 non-drift). Two multi-subaction verbs:
 //
-//   - `plane` (src/subcommands/plane.ts) — `provision-token` (place the
-//     accepted-bearer token into machine-local token custody) and `serve`
-//     (start the runnable plane HTTP endpoint).
+//   - `plane` (src/subcommands/plane.ts) — `serve` (start the runnable plane
+//     HTTP endpoint, boot against the fleet registry), `issue-enrollment`
+//     (mint + register a fresh host enrollment credential, printed once),
+//     and `revoke` (revoke a telemetry token or an enrollment credential,
+//     effective at the next `serve`). The prior `provision-token` subaction
+//     was DELETED (clean break, no back-compat alias) when `serve` moved
+//     onto the fleet registry (037 Task 5): accepted tokens now come from
+//     enrollment (`POST /v1/enroll`), not an operator-run CLI verb.
 //   - `sidecar` (src/subcommands/sidecar.ts) — `run` (elect + run the
-//     sidecar daemon for this installation).
+//     sidecar daemon for this installation) and `set-enrollment` (store the
+//     operator-issued enrollment credential in host-level custody, for a
+//     later self-enroll).
 //
 // Both are built via `buildGrammarSurfaceCommand`, driven by each module's own
 // exported `SUBACTION_SPECS` (the same non-drift pattern `backlog`/`inbox` use
@@ -17,10 +24,11 @@
 //
 // Mediation (Decision 4 — declared, never inferred): every subaction here is
 // MUTATING —
-//   - `plane provision-token` writes token custody (a credential) to disk.
 //   - `plane serve` opens a network service and writes the durable command
 //     store under the machine-local durable dir.
 //   - `sidecar run` spawns/binds a local socket and writes the sidecar's spool.
+//   - `sidecar set-enrollment` writes the enrollment credential into the
+//     host-level durable dir.
 // Neither verb is claimed as a `CAPABILITY_REGISTRY` `cliArgv0` backend
 // identity, so `check-front-door`'s C2c treats both as first-class stackctl
 // verbs (mediation N/A) — declaring `mutating` here is still required so
@@ -32,12 +40,14 @@ import type { MediationClass, MountedVerb } from '../command-surface.js';
 import { buildGrammarSurfaceCommand } from '../surface-builder.js';
 
 const PLANE_MEDIATION: Readonly<Record<string, MediationClass>> = {
-  'provision-token': 'mutating',
   serve: 'mutating',
+  'issue-enrollment': 'mutating',
+  revoke: 'mutating',
 };
 
 const SIDECAR_MEDIATION: Readonly<Record<string, MediationClass>> = {
   run: 'mutating',
+  'set-enrollment': 'mutating',
 };
 
 /** The fleet-control-plane mounted verbs (`plane`, `sidecar`). */
@@ -47,15 +57,20 @@ export const FLEET_VERBS: readonly MountedVerb[] = [
       buildGrammarSurfaceCommand({
         verb: 'plane',
         description:
-          'The fleet control plane: provision the accepted bearer token into machine-local custody, or serve the plane HTTP endpoint.',
+          'The fleet control plane: serve the plane HTTP endpoint, booting against the fleet registry (accepted tokens come from enrollment, not a CLI-provisioned token).',
         specs: PLANE_SPECS,
         summaries: {
-          'provision-token': 'place a bearer token into this installation\'s machine-local token custody (PT-015)',
           serve: 'start the runnable plane HTTP endpoint, listening on --port until stopped',
+          'issue-enrollment':
+            'mint a fresh enrollment credential and register it in the fleet registry',
+          revoke:
+            'revoke a telemetry token or an enrollment credential (effective at next plane serve)',
         },
         flagDescriptions: {
-          token: 'the bearer token value (provision-token: the token to store; serve: the accepted bearer)',
           port: 'TCP port to listen on (serve; required)',
+          label: 'optional operator label for the credential (e.g. the remote host name)',
+          token: 'a telemetry token to revoke (revoke; mutually exclusive with --enrollment)',
+          enrollment: 'an enrollment credential to revoke (revoke; mutually exclusive with --token)',
         },
       }),
     meta: { deprecatedAliasOf: null, subActionMediation: PLANE_MEDIATION },
@@ -69,9 +84,12 @@ export const FLEET_VERBS: readonly MountedVerb[] = [
         specs: SIDECAR_SPECS,
         summaries: {
           run: 'elect + run the sidecar daemon for this installation, staying alive until SIGINT/SIGTERM',
+          'set-enrollment':
+            'store the operator-issued enrollment credential in host-level custody, for a later self-enroll',
         },
         flagDescriptions: {
           'plane-url': 'the plane\'s base URL (else falls back to STACKCTL_CP_URL)',
+          token: 'the enrollment credential to store (set-enrollment; required)',
         },
       }),
     meta: { deprecatedAliasOf: null, subActionMediation: SIDECAR_MEDIATION },

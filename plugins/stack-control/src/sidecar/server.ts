@@ -168,6 +168,13 @@ export interface ElectionWon {
 export interface ElectionLost {
   readonly kind: 'lost';
   readonly reason: LossReason;
+  /**
+   * The pid of the already-elected owner, read from the owner registry when
+   * available (both `live-owner` paths, and best-effort on `address-in-use`);
+   * `undefined` when no owner record can be read. Surfaced so `sidecar run` can
+   * name the winner on stderr instead of exiting silently.
+   */
+  readonly ownerPid?: number;
 }
 
 /** The election result. Winning yields a live `SidecarServer`; losing is a
@@ -382,7 +389,7 @@ export async function electSidecar(config: ElectionConfig): Promise<ElectionOutc
     // The path is held. Is there a LIVE listener behind it?
     const connect = await probeConnect(config.socketPath);
     if (connect === 'connected') {
-      return { kind: 'lost', reason: 'live-owner' };
+      return { kind: 'lost', reason: 'live-owner', ownerPid: config.ownerRegistry.read()?.pid };
     }
     if (connect.code === 'ENOENT') {
       // The inode vanished between our bind and connect (a concurrent
@@ -404,7 +411,7 @@ export async function electSidecar(config: ElectionConfig): Promise<ElectionOutc
     if (owner !== undefined && config.probe.isAlive(owner)) {
       // The owner process is genuinely alive (e.g. mid-restart). Defer —
       // stealing a live sidecar's endpoint is the failure PT-002 forbids.
-      return { kind: 'lost', reason: 'live-owner' };
+      return { kind: 'lost', reason: 'live-owner', ownerPid: owner.pid };
     }
 
     // Stale: no live listener AND (no record | dead owner | recycled PID).
@@ -413,8 +420,9 @@ export async function electSidecar(config: ElectionConfig): Promise<ElectionOutc
     config.ownerRegistry.clear();
   }
 
-  // Persistent contention across every recovery attempt — concede silently.
-  return { kind: 'lost', reason: 'address-in-use' };
+  // Persistent contention across every recovery attempt — concede (a caller
+  // now surfaces this on stderr rather than exiting silently).
+  return { kind: 'lost', reason: 'address-in-use', ownerPid: config.ownerRegistry.read()?.pid };
 }
 
 /**

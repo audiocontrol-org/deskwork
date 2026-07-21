@@ -19,9 +19,9 @@ function descriptor(verb: string) {
 }
 
 describe('plane --help (T120)', () => {
-  it('is mounted in the command surface with its two subactions', () => {
+  it('is mounted in the command surface with its subactions', () => {
     const d = descriptor('plane');
-    expect(d.subActions.map((s) => s.name).sort()).toEqual(['provision-token', 'serve']);
+    expect(d.subActions.map((s) => s.name).sort()).toEqual(['issue-enrollment', 'revoke', 'serve']);
   });
 
   it('every subaction is declared mutating (Decision 4)', () => {
@@ -43,9 +43,9 @@ describe('plane --help (T120)', () => {
 });
 
 describe('sidecar --help (T120)', () => {
-  it('is mounted in the command surface with its one subaction', () => {
+  it('is mounted in the command surface with its subactions', () => {
     const d = descriptor('sidecar');
-    expect(d.subActions.map((s) => s.name)).toEqual(['run']);
+    expect(d.subActions.map((s) => s.name)).toEqual(['run', 'set-enrollment']);
   });
 
   it('the subaction is declared mutating (Decision 4)', () => {

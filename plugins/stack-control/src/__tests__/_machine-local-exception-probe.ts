@@ -23,7 +23,6 @@
 import { expect } from 'vitest';
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { runCli } from './_run-helpers.js';
 import {
   diffSnapshots,
   snapshotDirTree,
@@ -72,23 +71,6 @@ export interface MachineLocalOp {
 }
 
 export const MACHINE_LOCAL_OPS: readonly MachineLocalOp[] = [
-  {
-    // The real 036 operator verb. cwd = the installation, mirroring how an
-    // operator runs it. Writes the token (handler) AND — via cli.ts's emit path
-    // — mints the installationId + advances the high-water mark. All three are
-    // machine-local; none belongs in the tree.
-    name: 'plane provision-token (CLI verb)',
-    run: (fixture) => {
-      const r = runCli(['plane', 'provision-token', '--token', 'probe-bearer-xyz'], {
-        cwd: fixture.installationRoot,
-      });
-      expect(r.status, `provision-token failed: ${r.stderr}`).toBe(0);
-      // The token is a credential — the verb must never echo it (contract § C6).
-      expect(`${r.stdout}${r.stderr}`).not.toContain('probe-bearer-xyz');
-    },
-    mustCreate: ['bearer-token'],
-    exactDurable: false,
-  },
   {
     // identity.ts (T026) in-process: mint-once persists installationId, and
     // NOTHING else, into the machine-local durable dir.

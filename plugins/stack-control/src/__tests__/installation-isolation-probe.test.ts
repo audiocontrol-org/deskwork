@@ -48,8 +48,8 @@
 //      and turns the tripwire into a loud proof that no row leaked durable
 //      identity anywhere it shouldn't.
 //   2. A new describe block EXPLICITLY bounds the exception for the 036 write
-//      surface (`plane provision-token`, `mintOrReadInstallationId`,
-//      `advanceHighWaterMark`, token custody): it asserts the write lands in the
+//      surface (`mintOrReadInstallationId`, `advanceHighWaterMark`, token
+//      custody): it asserts the write lands in the
 //      machine-local durable store (exception real + exercised), that store is
 //      the ONLY outside-tree write (outer tree byte-identical + tripwire empty),
 //      and the INSTALLATION tree receives nothing (a machine-local write never

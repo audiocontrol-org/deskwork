@@ -125,6 +125,26 @@ export interface PlaneRuntimeOptions {
    * registry untouched, and roll the ingest bookkeeping back so a retry re-accepts.
    */
   readonly eventLog?: EventLog;
+  /**
+   * When provided, mounts `POST /v1/enroll` (specs/037 Task 3) on the
+   * sidecar route table using the given handler verbatim. The handler
+   * authenticates by enrollment credential internally (`http/enroll.ts`,
+   * Task 2), so it is NOT wrapped in the telemetry `withAuth` guard the
+   * other sidecar routes use — enroll requests carry a credential, not an
+   * already-provisioned bearer token. Absent by default: a plane serving
+   * without a fleet registry offers no enroll route.
+   */
+  readonly enrollment?: { readonly handler: RouteHandler };
+  /**
+   * Called at the start of every bearer-gated request, before the token is
+   * verified. `serve` wires this to the fleet registry's
+   * `reloadEnrollmentIfChanged` so a token revoked by a separate process (the
+   * `revoke` CLI) is refused by a running plane without a restart — the
+   * symmetric dual of the enroll path refreshing before it mints. A no-op when
+   * the enrollment file is unchanged; absent by default (tests that pass static
+   * maps need no refresh).
+   */
+  readonly refreshBeforeAuth?: () => void;
 }
 
 export interface PlaneRuntime {
@@ -225,6 +245,9 @@ export function createPlaneRuntime(options: PlaneRuntimeOptions): PlaneRuntime {
   // --- auth guard ---------------------------------------------------------
   function withAuth(handler: RouteHandler): RouteHandler {
     return async (ctx: RouteContext): Promise<void> => {
+      // Pick up a revocation (or credential change) a separate process wrote
+      // since the last request, before deciding on this token.
+      options.refreshBeforeAuth?.();
       const token = parseBearer(ctx.req.headers.authorization);
       const outcome = tokenRegistry.verify(token);
       if (!outcome.ok) {
@@ -284,10 +307,15 @@ export function createPlaneRuntime(options: PlaneRuntimeOptions): PlaneRuntime {
         instanceDetail: withAuth(consumerHandlers.instanceDetail),
         instanceRuns: withAuth(consumerHandlers.instanceRuns),
       };
+      const enrollRoute: readonly ExtraRoute[] =
+        options.enrollment === undefined
+          ? []
+          : [{ method: 'POST', pattern: '/v1/enroll', handler: options.enrollment.handler }];
       const sidecarRoutes: readonly ExtraRoute[] = [
         { method: 'POST', pattern: '/v1/ingest', handler: withAuth(ingestHandler) },
         { method: 'GET', pattern: '/v1/sidecar/stream', handler: withAuth(sidecarStreamHandler) },
         { method: 'POST', pattern: '/v1/sidecar/liveness', handler: withAuth(livenessHandler) },
+        ...enrollRoute,
         ...buildDashboardRoutes(options.acceptedTokens),
       ];
       return createPlaneServer(guardedConsumer, sidecarRoutes);
