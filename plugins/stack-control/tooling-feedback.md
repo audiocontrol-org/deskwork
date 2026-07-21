@@ -164,3 +164,8 @@
 
 ## session-end 2026-07-20
 - roadmap close cascade fails loud when a node's 'ref:' field holds a design-doc PATH: the cascade treats ref values as backlog ids to close, so 037's 'ref: docs/.../…-design.md' blocked 'roadmap advance --to closed' until changed to 'design:'. 'ref:' is overloaded (backlog ids AND doc pointers); either validate ref values at authoring time or have the cascade skip obvious non-id paths.
+
+## session-end 2026-07-21
+- Dashboard is unusable in practice because it authenticates to the plane's own /v1/* API by injecting a stolen sidecar telemetry token snapshotted at plane startup (dashboard/serve.ts). Root: the read side has no consumer credential tier. Captured: roadmap design:feature/fleet-dashboard rewrite + TASK-477.
+- A live/idle sidecar is invisible in /v1/instances because instances are event-derived (instance-registry.ts folds invocation events into accumulators; heartbeats only annotate). Bare 'sidecar run' enrolls + heartbeats (200) but never surfaces. Captured TASK-476.
+- Hosting a plane/sidecar inside an agent session is unreliable: run_in_background tasks get reaped between turns. A persistent plane must be run in an operator terminal (or nohup-detached). Env friction, not a stackctl bug.
