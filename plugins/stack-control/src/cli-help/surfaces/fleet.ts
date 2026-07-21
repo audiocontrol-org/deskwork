@@ -8,7 +8,9 @@
 //     accepted tokens now come from enrollment (`POST /v1/enroll`), not an
 //     operator-run CLI verb.
 //   - `sidecar` (src/subcommands/sidecar.ts) — `run` (elect + run the
-//     sidecar daemon for this installation).
+//     sidecar daemon for this installation) and `set-enrollment` (store the
+//     operator-issued enrollment credential in host-level custody, for a
+//     later self-enroll).
 //
 // Both are built via `buildGrammarSurfaceCommand`, driven by each module's own
 // exported `SUBACTION_SPECS` (the same non-drift pattern `backlog`/`inbox` use
@@ -23,6 +25,8 @@
 //   - `plane serve` opens a network service and writes the durable command
 //     store under the machine-local durable dir.
 //   - `sidecar run` spawns/binds a local socket and writes the sidecar's spool.
+//   - `sidecar set-enrollment` writes the enrollment credential into the
+//     host-level durable dir.
 // Neither verb is claimed as a `CAPABILITY_REGISTRY` `cliArgv0` backend
 // identity, so `check-front-door`'s C2c treats both as first-class stackctl
 // verbs (mediation N/A) — declaring `mutating` here is still required so
@@ -41,6 +45,7 @@ const PLANE_MEDIATION: Readonly<Record<string, MediationClass>> = {
 
 const SIDECAR_MEDIATION: Readonly<Record<string, MediationClass>> = {
   run: 'mutating',
+  'set-enrollment': 'mutating',
 };
 
 /** The fleet-control-plane mounted verbs (`plane`, `sidecar`). */
@@ -77,9 +82,12 @@ export const FLEET_VERBS: readonly MountedVerb[] = [
         specs: SIDECAR_SPECS,
         summaries: {
           run: 'elect + run the sidecar daemon for this installation, staying alive until SIGINT/SIGTERM',
+          'set-enrollment':
+            'store the operator-issued enrollment credential in host-level custody, for a later self-enroll',
         },
         flagDescriptions: {
           'plane-url': 'the plane\'s base URL (else falls back to STACKCTL_CP_URL)',
+          token: 'the enrollment credential to store (set-enrollment; required)',
         },
       }),
     meta: { deprecatedAliasOf: null, subActionMediation: SIDECAR_MEDIATION },

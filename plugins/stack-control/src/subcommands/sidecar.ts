@@ -27,21 +27,27 @@
 // No `any`, no `as`, no `@ts-ignore` (Constitution Principle VI). Relative
 // `.js` imports under node16 module resolution (no `@/` alias configured).
 
+import { openEnrollmentCustody } from '../machine-state/enrollment-custody.js';
+import { locateHostState } from '../machine-state/locate.js';
 import { runSidecarDaemon } from '../sidecar/daemon.js';
 import type { SubactionGrammar } from './document-verb-shared.js';
 
-const SIDECAR_USAGE = 'usage: sidecar run [--plane-url <url>]';
+const SIDECAR_USAGE =
+  'usage: sidecar (run [--plane-url <url>] | set-enrollment --token <cred>)';
 const RUN_USAGE = 'usage: sidecar run [--plane-url <url>]';
+const SET_ENROLLMENT_USAGE = 'usage: sidecar set-enrollment --token <cred>';
 
 /**
  * The `sidecar` verb's per-subaction grammar — read by the cli-help surface
  * builder (`src/cli-help/surfaces/fleet.ts`) so `--help` cannot drift from
- * what `parseRunArgs` actually accepts. Descriptive metadata only: it does
- * not drive `runSidecar`'s own strict hand-rolled parsing above, so this
- * module's runtime behavior and exit codes are unchanged by its presence.
+ * what `parseRunArgs`/`parseSetEnrollmentArgs` actually accept. Descriptive
+ * metadata only: it does not drive `runSidecar`'s own strict hand-rolled
+ * parsing above, so this module's runtime behavior and exit codes are
+ * unchanged by its presence.
  */
 export const SUBACTION_SPECS: Readonly<Record<string, SubactionGrammar>> = {
   run: { valueFlags: ['plane-url'], apply: false, positionals: 0 },
+  'set-enrollment': { valueFlags: ['token'], apply: false, positionals: 0 },
 };
 
 interface RunArgs {
@@ -110,10 +116,62 @@ async function runSidecarRun(args: string[]): Promise<void> {
   });
 }
 
+interface SetEnrollmentArgs {
+  readonly token: string;
+}
+
+// Strict arg parsing for `set-enrollment`: accept ONLY a required
+// `--token <value>`; reject a missing value, a missing flag, an unknown flag,
+// or a stray positional with exit 2 — mirrors `parseRunArgs` above.
+function parseSetEnrollmentArgs(args: string[]): SetEnrollmentArgs {
+  let token: string | undefined;
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === undefined) continue;
+    if (arg === '--token') {
+      const value = args[i + 1];
+      if (value === undefined || value.startsWith('--')) {
+        process.stderr.write(
+          `sidecar set-enrollment: --token <cred> requires a value (${SET_ENROLLMENT_USAGE})\n`,
+        );
+        process.exit(2);
+      }
+      token = value;
+      i++; // consume the value
+      continue;
+    }
+    process.stderr.write(
+      `sidecar set-enrollment: unexpected argument '${arg}' (${SET_ENROLLMENT_USAGE})\n`,
+    );
+    process.exit(2);
+  }
+  if (token === undefined) {
+    process.stderr.write(
+      `sidecar set-enrollment: --token <cred> is required (${SET_ENROLLMENT_USAGE})\n`,
+    );
+    process.exit(2);
+  }
+  return { token };
+}
+
 /**
- * `stackctl sidecar <subaction> [...]`. The only subaction today is `run`. A
- * missing or unrecognized subaction is a usage error (exit 2), matching every
- * other stackctl verb's strict-arg contract.
+ * `sidecar set-enrollment --token <cred>` — store the operator-issued
+ * enrollment credential into HOST-LEVEL custody (shared across every
+ * installation on this host), so a later `sidecar run` can self-enroll
+ * (Task 10). Never echoes the credential value.
+ */
+async function runSidecarSetEnrollment(args: string[]): Promise<void> {
+  const { token } = parseSetEnrollmentArgs(args);
+
+  openEnrollmentCustody(locateHostState().durableDir).write(token);
+
+  process.stdout.write('sidecar: enrollment credential stored\n');
+}
+
+/**
+ * `stackctl sidecar <subaction> [...]`. Subactions: `run`, `set-enrollment`.
+ * A missing or unrecognized subaction is a usage error (exit 2), matching
+ * every other stackctl verb's strict-arg contract.
  */
 export async function runSidecar(args: string[]): Promise<void> {
   const [subaction, ...rest] = args;
@@ -125,6 +183,11 @@ export async function runSidecar(args: string[]): Promise<void> {
 
   if (subaction === 'run') {
     await runSidecarRun(rest);
+    return;
+  }
+
+  if (subaction === 'set-enrollment') {
+    await runSidecarSetEnrollment(rest);
     return;
   }
 
