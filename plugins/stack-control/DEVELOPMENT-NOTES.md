@@ -2,6 +2,58 @@
 
 ---
 
+## 2026-07-21: Connect this host's sidecar to the global control plane (operator-run dogfood)
+
+**Goal:** Enroll and connect this machine's (`orion-m1`) stack-control sidecar to the fleet control plane running on `orion-m4` over the tailnet — the first cross-host uplink of the just-landed multi-host enrollment feature, driven live as an operator dogfood.
+
+**Accomplished:**
+- Pulled the multi-host enrollment feature onto this checkout (`feature/fleet-control-plane`, up to `5e461967`) and `npm install`'d to sync `node_modules`; reverted the spurious `package-lock.json` peer-churn each time so the tree stayed clean.
+- **Connected the sidecar end-to-end.** `sidecar set-enrollment` → `sidecar run --plane-url http://orion-m4.tail8254f4.ts.net:47800`. Verified falsifiably: `sidecar: elected`, a `bearer-token` persisted to custody (enroll succeeded), and an authenticated `GET /v1/instances` on the plane returns this host (`orion-m1.local`, this checkout path). Sidecar left running (self-elected, enrolled, uplinking).
+- **Surfaced two friction issues; the plane-host agent fixed both and I pulled + verified them live:**
+  - `6a45604a` — plane reloads `enrollment.json` live (issued/revoked credentials work without a `plane serve` restart).
+  - `616463ea` — `sidecar run` announces a lost election on stderr naming the owner PID, instead of exiting silently. Verified live: a competing launch now prints `sidecar: lost election — pid 96535 already elected for this installation (live-owner)`.
+
+**Didn't Work:**
+- **Round 1 enrollment → `401 unknown-credential`.** Root-caused in source: a running `plane serve` snapshotted `enrollment.json` at startup and never re-read it, so a credential issued *after* serve started was invisible — issuing was silently restart-effective (same caveat as `revoke`). Operator restarted the plane; this is exactly what fix `6a45604a` then eliminated.
+- **Round 2 — a zombie sidecar held the election.** My initial `pkill -f "stackctl sidecar run"` killed the background *task wrapper* but not the real `node … cli.ts sidecar run` daemon (whose argv doesn't contain "stackctl"), so it survived — still bound to the dead old credential — and two relaunches silently *lost the election*. Diagnosed via `lsof` on the socket + a connect probe, killed the survivor by PID, cleared the stale socket, relaunched → clean win + enroll. Fix `616463ea` makes this failure self-announcing going forward.
+
+**Course Corrections:**
+- [PROCESS] Early source-exploration `Bash` calls were denied — the operator wanted the plain `git pull` done, not a code spelunk first. Corrected to act directly on the stated request.
+- [PROCESS] Relaunching a daemon without first *confirming the prior one actually exited* (trusting the task-wrapper's exit code over the real process) caused the round-2 election churn. Confirm the PID is gone before rebind.
+
+**Insights:**
+- The sidecar/plane split has two independent "restart-effective, not live" surfaces (credential issuance and election ownership) whose silence is the real cost — both round-trips this session were *diagnosis* time, not mechanism failures. Both fixes this session converted silence into an observable signal (live reload; stderr announcement), which is the right shape.
+- Dogfooding across two real hosts surfaced both issues in ~one round-trip each — the friction was in the *feedback gap*, exactly what the live run exists to expose.
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Session-authored code commits: 0 (operator-run *connect + verify* session, not implementation) — plus the session-end doc commit.
+- Commit provenance: the 22 below are the full multi-host enrollment feature landed on this branch since the merge-base. **2 arrived via `git pull` during this session** (`6a45604a` live enrollment reload, `616463ea` lost-election-visible — both authored by the parallel plane-host agent); the other 20 predate this session. The count reflects the branch window, not work authored here.
+- Commits in merge-base window (auto-derived): 22
+  - fix(fleet): sidecar run announces a lost election on stderr instead of exiting silently
+  - fix(fleet): live enrollment-file reload so issued credentials work without a plane restart
+  - docs(fleet): live two-host acceptance walkthrough (operator-run)
+  - docs(fleet): plane/sidecar skills for enrollment-based multi-host
+  - fix(fleet): extract token-resolution under file cap; bound enroll timeout so stop() cannot hang
+  - feat(fleet): sidecar run auto-enrolls when it has a credential but no token
+  - fix(fleet): drop as-cast in enroll client + guard 200 body parse + cover edge branches
+  - feat(fleet): sidecar enroll client (POST /v1/enroll)
+  - feat(fleet): sidecar set-enrollment stores the host enrollment credential
+  - feat(fleet): plane revoke (token|enrollment), restart-effective per design scope
+  - fix(fleet): declare issue-enrollment in the plane help surface (non-drift)
+  - feat(fleet): plane issue-enrollment mints a host enrollment credential
+  - feat(fleet)!: plane serve on the fleet registry; remove provision-token + single-token binding
+  - feat(machine-state): host-level enrollment-credential custody
+  - feat(fleet): mount /v1/enroll on the plane runtime behind the fleet registry
+  - fix(fleet): enroll handler returns 400 on malformed JSON; cover missing-bearer + 409
+  - feat(fleet): POST /v1/enroll handler over the fleet registry
+  - fix(fleet): escape binding key + cover corrupt-file throw + dedupe addCredential
+  - fix(fleet): remove stray NUL bytes from fleet-registry.ts written by prior commit
+  - feat(fleet): fleet registry — enroll/revoke + two-file persistence
+  - plan(fleet-control-plane): multi-host enrollment implementation plan
+  - design(fleet-control-plane): multi-host self-enrollment design
+- Files changed: 39
+- Backlog touched: (none)
+
 ## 2026-07-20: Ship → validate → release the fleet control plane (v0.59.0)
 
 **Goal:** Take the fleet control plane (036) + instance observability (037) from the govern-graduated boundary all the way out: ship to main, build a UI to *validate* it works end to end, close it as a validated first version, and cut a real release.
