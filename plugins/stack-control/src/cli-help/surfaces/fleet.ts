@@ -35,6 +35,7 @@ import { buildGrammarSurfaceCommand } from '../surface-builder.js';
 
 const PLANE_MEDIATION: Readonly<Record<string, MediationClass>> = {
   serve: 'mutating',
+  'issue-enrollment': 'mutating',
 };
 
 const SIDECAR_MEDIATION: Readonly<Record<string, MediationClass>> = {
@@ -52,9 +53,12 @@ export const FLEET_VERBS: readonly MountedVerb[] = [
         specs: PLANE_SPECS,
         summaries: {
           serve: 'start the runnable plane HTTP endpoint, listening on --port until stopped',
+          'issue-enrollment':
+            'mint a fresh enrollment credential and register it in the fleet registry',
         },
         flagDescriptions: {
           port: 'TCP port to listen on (serve; required)',
+          label: 'optional operator label for the credential (e.g. the remote host name)',
         },
       }),
     meta: { deprecatedAliasOf: null, subActionMediation: PLANE_MEDIATION },
