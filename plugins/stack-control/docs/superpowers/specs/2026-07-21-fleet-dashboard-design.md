@@ -50,7 +50,9 @@ under `plugins/stack-control/src/dashboard/` is removed when this ships.
 - **Human authentication and browser session security.** No login page, password
   handling, OAuth/OIDC flow, browser session, cookie-security scheme, token
   refresh, user database, authorization role, or identity-provider integration.
-  Browser-facing trust is delegated to deployment infrastructure (decision 13).
+  Browser-facing access control is delegated to the zero-trust service-mesh layer
+  (decision 13) — enforced as per-connection identity + authz, not a trusted
+  perimeter.
 
 ## solution-space
 
@@ -195,32 +197,40 @@ Five axes, each with the chosen option and the rejected alternative(s) + reason.
     match no route and return the plane's standard **404** (no diagnostic-redirect
     surface) — the expected 404 is itself a testable contract. Per
     `.claude/rules/agent-discipline.md` § "Zero backwards compatibility."
-13. **Browser-facing trust boundary — delegated to deployment infrastructure
-    (settled, not an open question).** The dashboard implements **no** human
+13. **Browser-facing access control — zero-trust delegation to the service mesh
+    (settled, not an open question).** **Posture lean: zero trust.** There is **no
+    safe inner network and no secure perimeter**; nothing is trusted by virtue of
+    where it sits on the network. The dashboard implements **no** human
     authentication, browser session management, identity-provider integration, or
-    application-level user authorization. Browser-facing authentication and access
-    policy are delegated to deployment infrastructure — an ingress proxy,
-    service-mesh gateway, identity-aware proxy, mTLS boundary, or equivalent. The
-    dashboard server **assumes requests reaching its browser-facing listener have
-    already crossed that trusted perimeter**, and MUST NOT expose a secondary or
-    fallback application authentication mechanism. The *specific* proxy (Istio,
-    Envoy, an ingress controller, Cloudflare Access, oauth2-proxy, …) is deployment
-    policy and is **not** selected by this design.
-    - **Two separate trust relationships.** *Human → perimeter → dashboard* belongs
-      entirely to infrastructure. *Dashboard → plane* is a deliberately simple
-      configured machine secret (`FLEET_PLANE_URL`, `FLEET_PLANE_READ_TOKEN`, per
-      decision 9): the BFF attaches the read token **only** to its allowlisted
-      upstream read requests; browser JavaScript never sees it. The plane's
-      reader-vs-telemetry invariant (decision 6) is authorization at an API
-      boundary, **not** a human-security system.
-    - **Bind safeguard (concrete, testable).** The dashboard binds to **loopback by
-      default** where the topology permits. A non-loopback bind MUST be **explicit**
-      and MUST be paired with infrastructure that prevents untrusted clients from
-      reaching the listener directly. The general invariant (covers container /
-      mesh, where a sidecar proxy reaches the dashboard over the pod network so
-      loopback may not apply): *the dashboard listener MUST either be locally
-      constrained or protected from direct untrusted access by deployment-level
-      network policy; the application provides no fallback browser-authentication
+    application-level user authorization — not because it is "behind a wall," but
+    because that access control is enforced at the infrastructure layer as
+    **per-connection identity + authorization on every hop** (service-mesh mTLS +
+    authorization policy, or an equivalent identity-aware access layer). The
+    dashboard delegates browser-facing access control to that layer, MUST NOT expose
+    a secondary or fallback application authentication mechanism, and MUST NOT treat
+    any connection as trustworthy because of its network origin. The *specific* mesh
+    / access layer (Istio, Linkerd, Envoy, Cloudflare Access, oauth2-proxy, …) is
+    deployment policy and is **not** selected by this design. Rationale (operator,
+    2026-07-21): build as little novel security code as possible — no one here is a
+    security expert — so authentication lives in a mature mesh, never hand-rolled.
+    - **Two hops, both explicitly authenticated (no implicit trust).** *Human →
+      dashboard* is authenticated and authorized per connection by the mesh
+      (identity + authz policy), never by network location. *Dashboard → plane* is a
+      configured machine credential (`FLEET_PLANE_URL`, `FLEET_PLANE_READ_TOKEN`,
+      per decision 9): the BFF presents the read token on its allowlisted upstream
+      reads (browser JavaScript never sees it), and the plane authorizes it by
+      **credential class regardless of network position** (decision 6). Where the
+      mesh is present this hop is also mTLS-identified; either way the plane trusts
+      the credential, not the network.
+    - **Bind safeguard — fail-closed default, not perimeter trust (concrete,
+      testable).** The dashboard binds to **loopback by default** so it is never
+      accidentally exposed as an unauthenticated listener. A non-loopback bind MUST
+      be **explicit** AND MUST be fronted by the mesh's per-connection identity +
+      authz on that listener. The invariant (covers container / mesh, where the
+      sidecar reaches the dashboard over the pod network so loopback may not apply):
+      *no configuration permits reaching the dashboard listener without passing the
+      mesh's identity + authorization check — "being on the network" never grants
+      access, and the application provides no fallback browser-authentication
       mechanism.*
 
 ### Surface → endpoint mapping (Decision 5 detail)
@@ -280,11 +290,15 @@ that is a **new** plane projection — flagged here, not silently assumed.
   settles topology (BFF), entity root (instance), lifecycle (static-minimal), the
   invariants (decision 6), the mapping (above), SSE (BFF same-origin), the process
   boundary (decision 9), and cutover (decision 12).
-- **Third-party follow-on review (2026-07-21):** argued the browser-facing trust
-  boundary should be delegated to deployment infrastructure (identity-aware proxy /
-  mesh), so the dashboard implements no human auth at all, holds only the machine
-  read credential for the plane, and binds to loopback by default. Adopted verbatim
-  in intent as decision 13 and the expanded out-of-scope list.
+- **Third-party follow-on review + operator clarification (2026-07-21):** the
+  review argued browser-facing access control should be delegated to deployment
+  infrastructure so the dashboard implements no human auth, holds only the machine
+  read credential for the plane, and binds to loopback by default. The operator
+  reframed the *posture* — **zero trust, explicitly not perimeter-based**: there is
+  no safe inner network; access is per-connection identity + authorization via a
+  service mesh, chosen because "I would like to build as little novel security code
+  as possible; none of us is a security expert." Captured as decision 13 and the
+  expanded out-of-scope list.
 - **Superseded sketch:** `docs/superpowers/specs/2026-07-19-fleet-dashboard-design.md`
   — its surface sketch (columns, drawer tabs, delta-not-full-push) remains a
   starting point; its plane-embedded / plane-as-only-reader architecture is the
