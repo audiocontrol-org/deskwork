@@ -35,8 +35,9 @@ import { loadFleetRegistry, mintCredential } from '../plane/fleet-registry.js';
 import { createEnrollHandler } from '../plane/http/enroll.js';
 import type { SubactionGrammar } from './document-verb-shared.js';
 
-const PLANE_USAGE = 'usage: plane serve [...]';
+const PLANE_USAGE = 'usage: plane serve [...] | plane issue-enrollment [--label <host>]';
 const SERVE_USAGE = 'usage: plane serve --port <n>';
+const ISSUE_ENROLLMENT_USAGE = 'usage: plane issue-enrollment [--label <host>]';
 
 /**
  * The `plane` verb's per-subaction grammar — read by the cli-help surface
@@ -49,6 +50,7 @@ const SERVE_USAGE = 'usage: plane serve --port <n>';
  */
 export const SUBACTION_SPECS: Readonly<Record<string, SubactionGrammar>> = {
   serve: { valueFlags: ['port'], apply: false, positionals: 0 },
+  'issue-enrollment': { valueFlags: ['label'], apply: false, positionals: 0 },
 };
 
 interface ServeArgs {
@@ -158,10 +160,61 @@ async function runServe(args: string[]): Promise<void> {
   });
 }
 
+interface IssueEnrollmentArgs {
+  readonly label: string | undefined;
+}
+
+// Strict arg parsing for `issue-enrollment`: optional `--label <value>`;
+// reject a missing value, an unknown flag, or a stray positional with exit 2
+// (mirrors `parseServeArgs` above — no flag silently ignored).
+function parseIssueEnrollmentArgs(args: string[]): IssueEnrollmentArgs {
+  let label: string | undefined;
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === undefined) continue;
+    if (arg === '--label') {
+      const value = args[i + 1];
+      if (value === undefined || value.startsWith('--')) {
+        process.stderr.write(`plane issue-enrollment: --label <host> requires a value (${ISSUE_ENROLLMENT_USAGE})\n`);
+        process.exit(2);
+      }
+      label = value;
+      i++; // consume the value
+      continue;
+    }
+    process.stderr.write(`plane issue-enrollment: unexpected argument '${arg}' (${ISSUE_ENROLLMENT_USAGE})\n`);
+    process.exit(2);
+  }
+  return { label };
+}
+
 /**
- * `stackctl plane <subaction> [...]`. `serve` is the only subaction. A
- * missing or unrecognized subaction is a usage error (exit 2), matching
- * every other stackctl verb's strict-arg contract.
+ * `plane issue-enrollment [--label <host>]` — mint a fresh enrollment
+ * credential on THIS plane host, register it in the fleet registry, and
+ * print it once to stdout. This is the one secret the operator carries to a
+ * foreign host's sidecar so it can self-enroll (`POST /v1/enroll`); unlike a
+ * telemetry token (never echoed — see `no-creds-in-cli.test.ts`), printing
+ * the enrollment credential here is the intended, correct behavior — there
+ * is no other channel for the operator to retrieve it.
+ */
+async function runIssueEnrollment(args: string[]): Promise<void> {
+  const { label } = parseIssueEnrollmentArgs(args);
+
+  const root = process.cwd();
+  const location = locateMachineState(root);
+  const registry = loadFleetRegistry(join(location.durableDir, 'plane'));
+
+  const credential = mintCredential();
+  registry.addCredential(credential, label ?? 'unlabeled');
+
+  process.stdout.write(`plane: minted enrollment credential (label: ${label ?? 'unlabeled'})\n`);
+  process.stdout.write(`${credential}\n`);
+}
+
+/**
+ * `stackctl plane <subaction> [...]`. `serve` and `issue-enrollment` are the
+ * subactions. A missing or unrecognized subaction is a usage error (exit
+ * 2), matching every other stackctl verb's strict-arg contract.
  */
 export async function runPlane(args: string[]): Promise<void> {
   const [subaction, ...rest] = args;
@@ -173,6 +226,11 @@ export async function runPlane(args: string[]): Promise<void> {
 
   if (subaction === 'serve') {
     await runServe(rest);
+    return;
+  }
+
+  if (subaction === 'issue-enrollment') {
+    await runIssueEnrollment(rest);
     return;
   }
 
