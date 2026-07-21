@@ -32,7 +32,7 @@
  */
 
 import { randomBytes } from 'node:crypto';
-import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 /** File authorization mode for both persisted fleet-registry files. */
@@ -80,6 +80,15 @@ export interface FleetRegistry {
   addCredential(credential: string, label: string): void;
   revokeToken(token: string): void;
   revokeCredential(credential: string): void;
+  /**
+   * Re-read `enrollment.json` if it changed on disk since this handle last saw
+   * it, refreshing the credential + revocation state in place. Called by the
+   * enroll path (before the credential check) and the auth path (before token
+   * verification) so a credential issued — or a token revoked — by a separate
+   * process (the `issue-enrollment` / `revoke` CLI) is honored by a running
+   * plane without a restart. A no-op when the file is unchanged.
+   */
+  reloadEnrollmentIfChanged(): void;
 }
 
 interface CredentialRecord {
@@ -167,11 +176,33 @@ function parseTelemetryFile(raw: string, path: string): TelemetryFileShape {
   return { tokens };
 }
 
+/**
+ * Write JSON atomically: write a uniquely-named sibling temp file, then
+ * `rename` it over the target. `rename` is atomic on POSIX, so a concurrent
+ * reader (a running plane re-reading the file it does not own) sees either the
+ * complete old file or the complete new one — never a half-written file. This
+ * is the precondition that makes {@link FleetRegistry.reloadEnrollmentIfChanged}
+ * safe to call at request time.
+ */
 function writeJsonFile(path: string, data: unknown): void {
-  writeFileSync(path, `${JSON.stringify(data, null, 2)}\n`, { encoding: 'utf8', mode: FLEET_FILE_MODE });
+  const tmp = `${path}.${process.pid}.${randomBytes(6).toString('hex')}.tmp`;
+  writeFileSync(tmp, `${JSON.stringify(data, null, 2)}\n`, { encoding: 'utf8', mode: FLEET_FILE_MODE });
   if (process.platform !== 'win32') {
-    chmodSync(path, FLEET_FILE_MODE);
+    chmodSync(tmp, FLEET_FILE_MODE);
   }
+  renameSync(tmp, path);
+}
+
+/**
+ * A cheap change signature for `enrollment.json` — `mtimeMs:size`. `''` when the
+ * file is absent. Size is folded in alongside mtime so an add/revoke (which
+ * always changes the file's byte length) is detected even on a filesystem whose
+ * mtime granularity would otherwise alias two writes in the same tick.
+ */
+function enrollmentSignatureOf(path: string): string {
+  const st = statSync(path, { throwIfNoEntry: false });
+  if (st === undefined) return '';
+  return `${st.mtimeMs}:${st.size}`;
 }
 
 /**
@@ -223,12 +254,41 @@ export function loadFleetRegistry(planeDurableDir: string): FleetRegistry {
     instances.set(token, `${binding.host}:${binding.path}`);
   }
 
+  // The change signature this handle last saw for enrollment.json. Updated on
+  // every write THIS handle makes (so a self-write never triggers a reload) and
+  // on every reload (so a peer's write is picked up exactly once).
+  let enrollmentSignature = enrollmentSignatureOf(enrollmentPath);
+
   function persistEnrollment(): void {
     writeJsonFile(enrollmentPath, enrollmentFile);
+    enrollmentSignature = enrollmentSignatureOf(enrollmentPath);
   }
 
   function persistTelemetry(): void {
     writeJsonFile(telemetryPath, telemetryFile);
+  }
+
+  function reloadEnrollmentIfChanged(): void {
+    const signature = enrollmentSignatureOf(enrollmentPath);
+    if (signature === '' || signature === enrollmentSignature) return;
+    const fresh = parseEnrollmentFile(readFileSync(enrollmentPath, 'utf8'), enrollmentPath);
+    enrollmentSignature = signature;
+    // Refresh the read model in place so the runtime's captured references to
+    // credentialSet / revokedTokenSet / active / instances stay valid.
+    enrollmentFile.credentials = fresh.credentials;
+    enrollmentFile.revokedTokens = fresh.revokedTokens;
+    enrollmentFile.revokedCredentials = fresh.revokedCredentials;
+    revokedCredentialSet.clear();
+    for (const credential of fresh.revokedCredentials) revokedCredentialSet.add(credential);
+    credentialSet.clear();
+    for (const record of fresh.credentials) {
+      if (!revokedCredentialSet.has(record.credential)) credentialSet.add(record.credential);
+    }
+    for (const token of fresh.revokedTokens) {
+      revokedTokenSet.add(token);
+      active.delete(token);
+      instances.delete(token);
+    }
   }
 
   function findTokenForIdentity(identity: EnrollIdentity): string | undefined {
@@ -259,7 +319,11 @@ export function loadFleetRegistry(planeDurableDir: string): FleetRegistry {
     enrollmentCredentials(): Set<string> {
       return credentialSet;
     },
+    reloadEnrollmentIfChanged,
     enroll(credential: string, identity: EnrollIdentity): EnrollOutcome {
+      // Honor a credential a separate process (issue-enrollment) added after
+      // this handle loaded — the credential works the first time it is used.
+      reloadEnrollmentIfChanged();
       if (!credentialSet.has(credential)) {
         return { ok: false, reason: 'unknown-credential' };
       }

@@ -128,6 +128,7 @@ export function buildServeRuntime(installationRoot: string): { readonly runtime:
     revokedTokens: registry.revokedTokens(),
     commandStoreDir: join(planeDurableDir, 'commands'),
     enrollment: { handler: createEnrollHandler(registry) },
+    refreshBeforeAuth: () => registry.reloadEnrollmentIfChanged(),
   });
 
   return { runtime };

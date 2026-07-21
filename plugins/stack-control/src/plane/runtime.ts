@@ -135,6 +135,16 @@ export interface PlaneRuntimeOptions {
    * without a fleet registry offers no enroll route.
    */
   readonly enrollment?: { readonly handler: RouteHandler };
+  /**
+   * Called at the start of every bearer-gated request, before the token is
+   * verified. `serve` wires this to the fleet registry's
+   * `reloadEnrollmentIfChanged` so a token revoked by a separate process (the
+   * `revoke` CLI) is refused by a running plane without a restart — the
+   * symmetric dual of the enroll path refreshing before it mints. A no-op when
+   * the enrollment file is unchanged; absent by default (tests that pass static
+   * maps need no refresh).
+   */
+  readonly refreshBeforeAuth?: () => void;
 }
 
 export interface PlaneRuntime {
@@ -235,6 +245,9 @@ export function createPlaneRuntime(options: PlaneRuntimeOptions): PlaneRuntime {
   // --- auth guard ---------------------------------------------------------
   function withAuth(handler: RouteHandler): RouteHandler {
     return async (ctx: RouteContext): Promise<void> => {
+      // Pick up a revocation (or credential change) a separate process wrote
+      // since the last request, before deciding on this token.
+      options.refreshBeforeAuth?.();
       const token = parseBearer(ctx.req.headers.authorization);
       const outcome = tokenRegistry.verify(token);
       if (!outcome.ok) {
