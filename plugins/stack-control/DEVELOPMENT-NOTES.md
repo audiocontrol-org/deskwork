@@ -2,6 +2,40 @@
 
 ---
 
+## 2026-07-21: <!-- session title -->
+
+**Goal:** <!-- compose: what we set out to do -->
+
+**Accomplished:**
+- <!-- compose -->
+
+**Didn't Work:**
+- <!-- compose -->
+
+**Course Corrections:**
+- <!-- compose -->
+
+**Insights:**
+- <!-- compose -->
+
+**Quantitative (auto-derived from git; verify before publishing):**
+- Commits: 13
+  - tasks(fleet-dashboard): generate tasks.md (26 tasks, tier-tagged, TDD)
+  - plan(fleet-dashboard): home the dashboard under plugins/stack-control (spin-out)
+  - plan(fleet-dashboard): implementation plan + Phase 0/1 artifacts
+  - spec(fleet-dashboard): clarify default fleet-table membership
+  - spec(fleet-dashboard): author specs/038-fleet-dashboard from approved design
+  - roadmap(fleet): approve fleet-dashboard design; add sidecar-zero-trust-auth item
+  - docs(fleet): tighten sidecar zero-trust brief per third review
+  - docs(fleet): revise sidecar zero-trust brief per team review
+  - docs(fleet): sidecar zero-trust posture brief for team review
+  - design(fleet-dashboard): reframe browser-facing access control as zero-trust
+  - design(fleet-dashboard): delegate browser-facing auth to infrastructure
+  - design(fleet-dashboard): settle topology, entity root, credential lifecycle (review pass)
+  - design(fleet-dashboard): out-of-process app + minimal read credential
+- Files changed: 14
+- Backlog touched: (none)
+
 ## 2026-07-21: Multi-host fleet enrollment — design → SDD build → live-dogfood fixes (plane-host / orion-m4)
 
 **Goal:** Make the fleet control plane actually multi-host (a sidecar on another machine can report into one running plane), then dogfood it live against a real second host (`orion-m1`) and fix whatever the live run surfaces. This session ran the plane on `orion-m4`; a parallel session ran the sidecar on `orion-m1` (its own entry, below).
