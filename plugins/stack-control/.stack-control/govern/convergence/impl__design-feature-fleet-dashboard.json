@@ -3,25 +3,27 @@
   "mode": "impl",
   "item": "design:feature/fleet-dashboard",
   "governedShaBase": "95903c90",
-  "headSha": "e4ae38af0cf1cb453edba7a0568953411db8081b",
+  "headSha": "f42ae272b12d45f11234e04e0fc087766f83065c",
   "chunkIds": [
-    "041b59a0434fa337"
+    "3b682b36a883b9ee",
+    "df74254050793067"
   ],
   "rounds": 1,
-  "liftedFindings": [
-    {
-      "id": "041b59a0434fa337::AUDIT-BARRAGE-codex-01",
-      "title": "Production stream connection is not actually established before the snapshot",
-      "severity": "high"
-    }
-  ],
+  "liftedFindings": [],
   "closedInLoopFindings": [],
   "seamResult": {
-    "boundaryPairs": [],
+    "boundaryPairs": [
+      {
+        "a": "3b682b36a883b9ee",
+        "b": "df74254050793067"
+      }
+    ],
     "findings": [],
     "suppressedCompatible": 0
   },
-  "splitClusterRefs": [],
-  "outcome": "override-eligible",
+  "splitClusterRefs": [
+    "041b59a0434fa337"
+  ],
+  "outcome": "converged",
   "anchorRoot": "/Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control"
 }
