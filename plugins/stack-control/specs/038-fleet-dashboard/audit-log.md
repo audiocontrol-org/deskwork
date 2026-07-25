@@ -118,3 +118,31 @@ Surface:    fleet-dashboard/src/server/stream-relay.ts:307-323
 `resync()` fetches the authoritative snapshot first, broadcasts it, and only then opens the upstream SSE connection. Any plane delta committed after `instanceSnapshot()` is read but before `connectUpstream()` is established is in neither channel: it is not in the snapshot and it will not be replayed by the newly opened stream. The same `resync()` function is used for initial start and post-drop recovery, so this affects both first load and reconnect.
 
 The blast radius is high because the dashboard can show a permanently stale fleet view until some later delta or manual reload happens, violating the stated snapshot-then-deltas / reconnect-resync contract. A reasonable fix needs a gap-closing mechanism: for example, a cursor/sequence handshake with the plane, or a relay protocol that connects in a way that cannot miss events between the snapshot boundary and the stream boundary.
+
+## 2026-07-25 — audit-barrage lift (end-govern-after_implement)
+
+### AUDIT-20260725-07 — Same env var name, incompatible parsing semantics between the plane and the dashboard BFF
+
+Finding-ID: AUDIT-20260725-07
+Status:     resolved (fixed 7088ddf4 — plane reads FLEET_PLANE_READ_TOKENS (plural, clean break); dashboard keeps singular FLEET_PLANE_READ_TOKEN and fails loud on a comma; docs disambiguate. RED 6e0491bf. Same defect as -08)
+Severity:   high
+Per-lane:   claude=high
+Decision:   single-model (gate-counted high)
+Surface:    fleet-dashboard/src/server/config.ts (`requireNonEmpty(env, 'FLEET_PLANE_READ_TOKEN')`) vs src/subcommands/plane.ts (`readerCredentialsFromEnv`)
+
+The plane process and the dashboard BFF process both read `FLEET_PLANE_READ_TOKEN` from their respective environments, but they parse it with different multiplicities. `src/subcommands/plane.ts`'s `readerCredentialsFromEnv` (new in this diff) explicitly treats the value as a **comma-separated list** of independently-revocable reader credentials — the ledger entry for T009 says so verbatim ("read-credential config from comma-separated `FLEET_PLANE_READ_TOKEN` at boot… independent per FR-010"). But `fleet-dashboard/src/server/config.ts`'s `loadConfig` → `requireNonEmpty(env, 'FLEET_PLANE_READ_TOKEN')` takes the raw string as a single opaque credential and hands it straight to `plane-client.ts`'s `Authorization: Bearer <token>` header with no splitting.
+
+If an operator sets the same value for both processes (a very likely setup path — same variable name, same conceptual "read token," shared `.env`/secrets-manager entry), e.g. `FLEET_PLANE_READ_TOKEN="reader1,reader2"`, the plane will register two valid credentials `reader1` and `reader2`, while the dashboard will send the literal string `Bearer reader1,reader2`, which matches neither. The plane refuses with 401 `unknown`; `plane-client.ts`'s `getJson` sees `!response.ok` and throws `PlaneClientError`; `routes.ts`/`drill-in-routes.ts` catch that and return 503 `upstream_unavailable` — "the fleet plane is unreachable." This masks a credential-format mismatch as a connectivity outage, which is exactly the kind of misdiagnosis an operator would burn real time on during first-time setup. A fix would be to either pick distinct env-var names for the two multiplicities (e.g. `FLEET_PLANE_READ_TOKENS` for the plane's list vs `FLEET_PLANE_READ_TOKEN` for the BFF's single value) or have the dashboard config also accept (and use the first of) a comma-separated list.
+
+### AUDIT-20260725-08 — Dashboard forwards comma-separated read-token lists as one invalid bearer token
+
+Finding-ID: AUDIT-20260725-08
+Status:     resolved (fixed 7088ddf4 — same defect/fix as AUDIT-20260725-07: distinct env-var names + dashboard fail-loud comma rejection)
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    fleet-dashboard/src/server/config.ts:60-68; fleet-dashboard/src/server/plane-client.ts:158-163; src/subcommands/plane.ts:108-121
+
+The plane serve path parses `FLEET_PLANE_READ_TOKEN` as one-or-more comma-separated credentials, trims each token, and registers each separately (`src/subcommands/plane.ts:108-121`). The dashboard config, however, reads the same variable as a single opaque string (`fleet-dashboard/src/server/config.ts:60-68`), and the plane client sends that raw string as `Authorization: Bearer ${planeReadToken}` (`fleet-dashboard/src/server/plane-client.ts:158-163`).
+
+If an operator configures the plane for rotation or multi-reader access with `FLEET_PLANE_READ_TOKEN=r1,r2` and gives the dashboard the same env value, the plane accepts `r1` and `r2`, but the dashboard sends `Bearer r1,r2`, which matches neither reader and makes every BFF upstream read fail. Blast radius is high because this is a plausible documented rotation shape and it breaks the shipped dashboard at startup/runtime with only 503s to the browser. Correct by making the dashboard variable unambiguously single-token and rejecting comma lists, or by giving the plane’s multi-reader list a distinct env var from the dashboard’s selected credential.

@@ -3,15 +3,20 @@
   "mode": "impl",
   "item": "design:feature/fleet-dashboard",
   "governedShaBase": "95903c90",
-  "headSha": "5f2982d09823682411d18acc4c0fa0678f95d215",
+  "headSha": "04cf4604d18fdd84c256a47bea5570390fd43852",
   "chunkIds": [
-    "a05ace3895b8bd87"
+    "db97071a0524123e"
   ],
   "rounds": 1,
   "liftedFindings": [
     {
-      "id": "a05ace3895b8bd87::AUDIT-BARRAGE-codex-01",
-      "title": "Snapshot-to-stream ordering can silently lose live deltas",
+      "id": "db97071a0524123e::AUDIT-BARRAGE-claude-01",
+      "title": "Same env var name, incompatible parsing semantics between the plane and the dashboard BFF",
+      "severity": "high"
+    },
+    {
+      "id": "db97071a0524123e::AUDIT-BARRAGE-codex-01",
+      "title": "Dashboard forwards comma-separated read-token lists as one invalid bearer token",
       "severity": "high"
     }
   ],

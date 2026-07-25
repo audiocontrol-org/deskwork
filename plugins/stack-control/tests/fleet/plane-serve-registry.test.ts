@@ -86,8 +86,8 @@ describe('plane serve reader-credential configuration (specs/038 T009)', () => {
       const root = roots.pop();
       if (root !== undefined) rmSync(root, { recursive: true, force: true });
     }
-    if (priorReadToken === undefined) delete process.env.FLEET_PLANE_READ_TOKEN;
-    else process.env.FLEET_PLANE_READ_TOKEN = priorReadToken;
+    if (priorReadToken === undefined) delete process.env.FLEET_PLANE_READ_TOKENS;
+    else process.env.FLEET_PLANE_READ_TOKENS = priorReadToken;
   });
 
   function mkRoot(): string {
@@ -107,7 +107,7 @@ describe('plane serve reader-credential configuration (specs/038 T009)', () => {
 
   it('parses one-or-more comma-separated read credentials from the environment', () => {
     expect(readerCredentialsFromEnv({})).toEqual(new Map());
-    expect(readerCredentialsFromEnv({ FLEET_PLANE_READ_TOKEN: '  r1 , r2 ,, ' })).toEqual(
+    expect(readerCredentialsFromEnv({ FLEET_PLANE_READ_TOKENS: '  r1 , r2 ,, ' })).toEqual(
       new Map([
         ['r1', 'configured-reader-1'],
         ['r2', 'configured-reader-2'],
@@ -116,8 +116,8 @@ describe('plane serve reader-credential configuration (specs/038 T009)', () => {
   });
 
   it('accepts the configured reader on a read route and refuses an unknown credential', async () => {
-    priorReadToken = process.env.FLEET_PLANE_READ_TOKEN;
-    process.env.FLEET_PLANE_READ_TOKEN = 'configured-read-secret';
+    priorReadToken = process.env.FLEET_PLANE_READ_TOKENS;
+    process.env.FLEET_PLANE_READ_TOKENS = 'configured-read-secret';
     const base = await startFrom(mkRoot());
 
     const ok = await fetch(`${base}/v1/instances`, {
@@ -132,8 +132,8 @@ describe('plane serve reader-credential configuration (specs/038 T009)', () => {
   });
 
   it('with no read credential configured, consumer read routes fail closed (FR-012)', async () => {
-    priorReadToken = process.env.FLEET_PLANE_READ_TOKEN;
-    delete process.env.FLEET_PLANE_READ_TOKEN;
+    priorReadToken = process.env.FLEET_PLANE_READ_TOKENS;
+    delete process.env.FLEET_PLANE_READ_TOKENS;
     const base = await startFrom(mkRoot());
 
     const refused = await fetch(`${base}/v1/instances`, {
