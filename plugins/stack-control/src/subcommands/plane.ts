@@ -96,18 +96,28 @@ function parseServeArgs(args: string[]): ServeArgs {
 /**
  * Resolve the plane's accepted READ credentials (specs/038-fleet-dashboard,
  * US1/FR-011) from environment-backed, installation-anchored secret material.
- * `FLEET_PLANE_READ_TOKEN` carries one or more comma-separated read
- * credentials (the same secret the dashboard server holds in its own copy of
- * `FLEET_PLANE_READ_TOKEN`); each becomes an independently-revocable reader of
- * the consumer/read class, DISTINCT from telemetry tokens. Reading env writes
- * NOTHING to disk, so the installation-anchor invariant (no state written
- * outside the installation tree) holds trivially. Absent/empty → an empty map,
- * which fails read routes CLOSED (FR-012: no anonymous read, no telemetry
- * fallback) — a valid serving state, not an error.
+ * `FLEET_PLANE_READ_TOKENS` (PLURAL) carries one or more comma-separated read
+ * credentials — the plane's full SET of accepted readers; each becomes an
+ * independently-revocable reader of the consumer/read class, DISTINCT from
+ * telemetry tokens. Reading env writes NOTHING to disk, so the
+ * installation-anchor invariant (no state written outside the installation
+ * tree) holds trivially. Absent/empty → an empty map, which fails read
+ * routes CLOSED (FR-012: no anonymous read, no telemetry fallback) — a
+ * valid serving state, not an error.
+ *
+ * DELIBERATELY DISTINCT from the dashboard BFF's own `FLEET_PLANE_READ_TOKEN`
+ * (singular — fleet-dashboard/src/server/config.ts, FR-005), which holds
+ * exactly ONE credential (one of this plane's configured readers). Before
+ * this rename both processes read the SAME var name with INCOMPATIBLE
+ * multiplicities: the plane parsed it as a list, the dashboard sent it
+ * verbatim as one bearer token, so a shared comma-separated value silently
+ * broke the dashboard's upstream auth (AUDIT-20260725-07/AUDIT-20260725-08).
+ * This is a CLEAN BREAK — the old singular name is no longer read here, no
+ * back-compat alias.
  */
 export function readerCredentialsFromEnv(env: NodeJS.ProcessEnv): ReadonlyMap<string, string> {
   const map = new Map<string, string>();
-  const raw = env.FLEET_PLANE_READ_TOKEN;
+  const raw = env.FLEET_PLANE_READ_TOKENS;
   if (raw === undefined) {
     return map;
   }

@@ -4,7 +4,7 @@ Runnable scenarios that prove the feature end-to-end. Implementation details liv
 
 ## Prerequisites
 
-- A running control plane reachable at a base URL, configured with at least one **read credential** (the new credential class — see `contracts/plane-read-credential.md`).
+- A running control plane reachable at a base URL, configured with at least one **read credential** via the plane's `FLEET_PLANE_READ_TOKENS` (**plural** — one or more comma-separated readers; the new credential class — see `contracts/plane-read-credential.md`). This is a DIFFERENT env var from the dashboard's own `FLEET_PLANE_READ_TOKEN` below — see the dashboard README's "Rotating / revoking read credentials" section for why the two must not share a name (AUDIT-20260725-07/AUDIT-20260725-08).
 - At least one enrolled instance reporting to the plane (so the fleet is non-empty).
 - The dashboard (`plugins/stack-control/fleet-dashboard/`) built/runnable via stack-control's `tsx` toolchain.
 
@@ -12,7 +12,10 @@ Runnable scenarios that prove the feature end-to-end. Implementation details liv
 
 ```bash
 export FLEET_PLANE_URL="https://<plane-host>:<port>"
-export FLEET_PLANE_READ_TOKEN="<the configured read credential>"
+# The dashboard's OWN read credential — singular, exactly ONE of the
+# plane's FLEET_PLANE_READ_TOKENS entries. Do NOT reuse the plane's
+# comma-separated FLEET_PLANE_READ_TOKENS value here verbatim.
+export FLEET_PLANE_READ_TOKEN="<one of the plane's configured read credentials>"
 # start the dashboard server (loopback default)
 <documented start command for plugins/stack-control/fleet-dashboard>
 # open the dashboard origin in a browser (e.g. http://127.0.0.1:<port>/)

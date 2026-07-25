@@ -24,7 +24,7 @@ The server validates configuration at startup and exits with a descriptive error
 | Env Var | Required? | Default | Description |
 |---------|-----------|---------|-------------|
 | `FLEET_PLANE_URL` | **Yes** | — | Full URL of the plane's `/v1/*` read API (e.g., `http://localhost:7777`). Missing/empty value exits with an error. |
-| `FLEET_PLANE_READ_TOKEN` | **Yes** | — | The plane's read credential — a bearer token distinct from sidecar telemetry tokens. Missing/empty value exits with an error. |
+| `FLEET_PLANE_READ_TOKEN` | **Yes** | — | The dashboard's own read credential — exactly ONE bearer token, one of the plane's configured readers (see **Rotating / revoking read credentials** below). Missing/empty value exits with an error; a comma-separated value also exits with an error (that shape belongs to the plane's own `FLEET_PLANE_READ_TOKENS`, plural, not this var). |
 | `HOST` | No | `127.0.0.1` | The address the server binds to. Loopback (`127.0.0.1`, `localhost`, `::1`) requires no opt-in. A non-loopback bind requires explicit opt-in via `FLEET_DASHBOARD_ALLOW_NON_LOOPBACK=true` and **must be fronted by deployment infrastructure** (service mesh / identity-aware proxy) enforcing authentication and authorization per connection. |
 | `PORT` | No | `8080` | The port the server binds to. Must be an integer between 1 and 65535. |
 | `FLEET_DASHBOARD_ALLOW_NON_LOOPBACK` | No | — | Explicit opt-in for non-loopback binding. **Only recognized when set to exactly `true`**. A non-loopback `HOST` without this flag set to `true` causes the server to exit with an error. See **Zero-Trust Posture** below. |
@@ -66,9 +66,14 @@ This architecture ensures the read credential cannot leak through the browser an
 
 ### Rotating / revoking read credentials
 
-`FLEET_PLANE_READ_TOKEN` (set on the **plane**, not the dashboard) accepts one or more comma-separated read credentials — each becomes an independently-revocable reader, distinct from sidecar telemetry tokens (FR-010).
+The plane and the dashboard hold **distinctly-named** env vars for a reason (AUDIT-20260725-07/AUDIT-20260725-08): they carry different multiplicities, and sharing one name between them is a real first-time-setup footgun (a shared comma-separated value silently breaks the dashboard's upstream auth — the plane accepts it as a list, the dashboard sends it verbatim as one bearer token, and the resulting 401 surfaces as a misleading "plane unreachable" 503).
 
-- **To revoke a read credential**: remove its entry from the plane's `FLEET_PLANE_READ_TOKEN` and restart the plane. The remaining credentials keep working; telemetry tokens are unaffected — revoking a reader never re-credentials or otherwise impacts the rest of the fleet.
+| Env Var | Set on | Multiplicity | Purpose |
+|---|---|---|---|
+| `FLEET_PLANE_READ_TOKENS` (**plural**) | the **plane** | one or more comma-separated credentials | The plane's full SET of accepted reader credentials — each becomes an independently-revocable reader, distinct from sidecar telemetry tokens (FR-010). |
+| `FLEET_PLANE_READ_TOKEN` (**singular**) | the **dashboard** | exactly one credential | The ONE credential this dashboard presents to the plane — it MUST be one of the plane's `FLEET_PLANE_READ_TOKENS` entries. A comma-separated value here is refused at boot (config-load time) rather than failing silently at request time. |
+
+- **To revoke a read credential**: remove its entry from the plane's `FLEET_PLANE_READ_TOKENS` and restart the plane. The remaining credentials keep working; telemetry tokens are unaffected — revoking a reader never re-credentials or otherwise impacts the rest of the fleet.
 - **Read-credential changes take effect on plane restart.** The read-credential lifecycle is static-minimal for this feature (FR-011): there is no live hot-reload for read credentials (unlike file-backed telemetry enrollment), and interactive mint/list/revoke commands are out of scope.
 - The dashboard server's own `FLEET_PLANE_READ_TOKEN` (see **Configuration** above) holds the single credential it uses to authenticate itself to the plane — one of the plane's configured readers. Rotating the dashboard's copy also requires a dashboard restart to take effect.
 

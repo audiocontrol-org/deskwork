@@ -59,7 +59,7 @@ const LOOPBACK_HOSTS: ReadonlySet<string> = new Set(['127.0.0.1', 'localhost', '
  */
 export function loadConfig(env: EnvSource): DashboardConfig {
   const planeUrl = requireNonEmpty(env, 'FLEET_PLANE_URL');
-  const planeReadToken = requireNonEmpty(env, 'FLEET_PLANE_READ_TOKEN');
+  const planeReadToken = requireSingleCredential(requireNonEmpty(env, 'FLEET_PLANE_READ_TOKEN'));
   const host = resolveHost(env);
   const port = resolvePort(env);
 
@@ -74,6 +74,38 @@ function requireNonEmpty(env: EnvSource, key: string): string {
     throw new DashboardConfigError(
       `fleet-dashboard config: missing required environment variable '${key}' ` +
         `(no default — refusing to start)`,
+    );
+  }
+  return value;
+}
+
+/**
+ * Refuse a comma-separated `FLEET_PLANE_READ_TOKEN` (AUDIT-20260725-07 /
+ * AUDIT-20260725-08). The dashboard holds exactly ONE read credential — one
+ * of the plane's own configured readers — and sends it verbatim as
+ * `Authorization: Bearer <token>` (plane-client.ts). The plane's OWN
+ * accepted-reader SET is a separate, PLURAL env var
+ * (`FLEET_PLANE_READ_TOKENS`, src/subcommands/plane.ts's
+ * `readerCredentialsFromEnv`) read by a different process. Before this
+ * check, an operator who set the same comma-separated value for both
+ * processes (a very plausible shared-`.env` setup — same conceptual "read
+ * token") got a silent 401 from the plane that the dashboard's routes then
+ * surfaced as a 503 "upstream unreachable", masking a credential-FORMAT
+ * mismatch as a connectivity OUTAGE. Failing loud here, at config-load time,
+ * turns that into an immediate, self-explanatory boot error (Constitution
+ * V) instead of a silent runtime failure — and there is no "use the first
+ * token" fallback: fallbacks on a credential value are exactly the bug
+ * class this check exists to prevent.
+ */
+function requireSingleCredential(value: string): string {
+  if (value.includes(',')) {
+    throw new DashboardConfigError(
+      `fleet-dashboard config: FLEET_PLANE_READ_TOKEN must be a single credential, but the ` +
+        `configured value contains a comma ('${value}'). The dashboard holds exactly ONE read ` +
+        `credential — one of the plane's configured readers. A comma-separated LIST of readers ` +
+        `belongs to the PLANE's own FLEET_PLANE_READ_TOKENS (plural) environment variable, not ` +
+        `the dashboard's FLEET_PLANE_READ_TOKEN (singular) — refusing to start with an ` +
+        `ambiguous credential`,
     );
   }
   return value;
