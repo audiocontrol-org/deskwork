@@ -51,6 +51,9 @@ import { buildEventFrame, serializeFrame } from '../../src/telemetry/protocol.js
 import { runSidecarDaemon } from '../../src/sidecar/daemon.js';
 
 const TOKEN = 'sidecar-daemon-bearer-token-abc';
+// specs/038 US1: reads authenticate with a read credential (a DISTINCT class
+// from the telemetry token); invariant pinned in read-credential-class.test.ts.
+const READ_TOKEN = 'sidecar-daemon-read-token';
 
 /** Fake `IntervalScheduler` — records registrations without arming a real
  * timer (no 15s keepalive wait). Mirrors the FakeScheduler in
@@ -166,6 +169,7 @@ async function startPlane(installationId: string): Promise<RunningPlane> {
   const dir = mkdtempSync(join(tmpdir(), 'scf-sidecar-daemon-plane-'));
   const runtime = createPlaneRuntime({
     acceptedTokens: new Map([[TOKEN, installationId]]),
+    readCredentials: new Map([[READ_TOKEN, 'reader']]),
     commandStoreDir: dir,
     scheduler: new FakeScheduler(),
   });
@@ -398,7 +402,7 @@ async function pollUntil(
 }
 
 async function fleetHasRun(baseUrl: string, runId: string): Promise<boolean> {
-  const res = await fetch(`${baseUrl}/v1/fleet`, { headers: bearer(TOKEN) });
+  const res = await fetch(`${baseUrl}/v1/fleet`, { headers: bearer(READ_TOKEN) });
   if (res.status !== 200) return false;
   const body: unknown = await res.json();
   if (typeof body !== 'object' || body === null || !('entries' in body)) return false;

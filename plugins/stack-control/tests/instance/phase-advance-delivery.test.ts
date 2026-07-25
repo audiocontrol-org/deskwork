@@ -71,6 +71,9 @@ import { loadRoadmap } from '../../src/roadmap/roadmap-model.js';
 import { emitAdvance } from '../../src/subcommands/workflow-advance.js';
 
 const TOKEN = 'phase-advance-delivery-bearer-token';
+// specs/038 US1: reads authenticate with a read credential (a DISTINCT class
+// from the telemetry token); invariant pinned in read-credential-class.test.ts.
+const READ_TOKEN = 'read-phase-advance-delivery';
 const ITEM = 'multi:feature/phase-delivery';
 // open-design: planned → designing (the committed transition driven below). The
 // instance's currentBearing derives as `{ phase, item }` (no `from`).
@@ -199,7 +202,7 @@ async function pollUntil(predicate: () => Promise<boolean>, timeoutMs: number, l
 
 async function bearingAtPlane(baseUrl: string, id: string): Promise<unknown> {
   const res = await fetch(`${baseUrl}/v1/instances/${encodeURIComponent(id)}`, {
-    headers: { authorization: `Bearer ${TOKEN}` },
+    headers: { authorization: `Bearer ${READ_TOKEN}` },
   });
   if (res.status !== 200) return undefined;
   const body: unknown = await res.json();
@@ -246,6 +249,7 @@ describe('D-E (FR-027 Scenario 3): a committed `workflow advance --apply` delive
     const dir = mkdtempSync(join(tmpdir(), 'scf-phase-delivery-plane-'));
     const runtime = createPlaneRuntime({
       acceptedTokens: new Map([[TOKEN, installationId]]),
+      readCredentials: new Map([[READ_TOKEN, 'reader']]),
       commandStoreDir: dir,
       scheduler: new FakeScheduler(),
     });

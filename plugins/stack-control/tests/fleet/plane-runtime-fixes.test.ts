@@ -27,6 +27,9 @@ import { runHistoryObjectKey } from '../../src/plane/http/api.js';
 
 const TOKEN_A = 'token-a-owner';
 const TOKEN_B = 'token-b-caller';
+// specs/038 US1: reads authenticate with a read credential (a DISTINCT class
+// from the telemetry tokens); invariant pinned in read-credential-class.test.ts.
+const READ_TOKEN = 'read-runtime-fixes';
 const INST_A = '11111111-1111-4111-8111-111111111111';
 const INST_B = '22222222-2222-4222-8222-222222222222';
 
@@ -63,6 +66,7 @@ async function startPlane(options: StartOptions = {}): Promise<RunningPlane> {
   dirsToClean.add(dir);
   const runtime = createPlaneRuntime({
     acceptedTokens: options.tokens ?? new Map([[TOKEN_A, INST_A]]),
+    readCredentials: new Map([[READ_TOKEN, 'reader']]),
     commandStoreDir: dir,
     cdnReader: options.cdnReader,
   });
@@ -200,7 +204,7 @@ describe('history/timings serve the injected CdnReader archive (AUDIT-20260717-1
       body: runStartedBody(runId, INST_A),
     });
 
-    const history = await fetch(`${plane.baseUrl}/v1/runs/${runId}/history`, { headers: bearer(TOKEN_A) });
+    const history = await fetch(`${plane.baseUrl}/v1/runs/${runId}/history`, { headers: bearer(READ_TOKEN) });
     expect(history.status).toBe(200);
     const historyBody: unknown = await history.json();
     expect(historyBody).toMatchObject({
@@ -208,7 +212,7 @@ describe('history/timings serve the injected CdnReader archive (AUDIT-20260717-1
       record: { phases: { execution: { durationMs: 4200 }, governance: { durationMs: 1500 } } },
     });
 
-    const timings = await fetch(`${plane.baseUrl}/v1/runs/${runId}/timings`, { headers: bearer(TOKEN_A) });
+    const timings = await fetch(`${plane.baseUrl}/v1/runs/${runId}/timings`, { headers: bearer(READ_TOKEN) });
     expect(timings.status).toBe(200);
     const timingsBody: unknown = await timings.json();
     expect(timingsBody).toMatchObject({
@@ -232,7 +236,7 @@ describe('sidecar-facing handlers enforce authed installation == body-claimed in
     expect(spoof.status).toBe(403);
 
     // B's fleet state must NOT have been poisoned by A's token.
-    const fleet = await fetch(`${plane.baseUrl}/v1/fleet`, { headers: bearer(TOKEN_B) });
+    const fleet = await fetch(`${plane.baseUrl}/v1/fleet`, { headers: bearer(READ_TOKEN) });
     expect(fleet.status).toBe(200);
     const snapshot: unknown = await fleet.json();
     if (typeof snapshot !== 'object' || snapshot === null || !('entries' in snapshot)) {
@@ -254,7 +258,7 @@ describe('sidecar-facing handlers enforce authed installation == body-claimed in
     });
     expect(accepted.status).toBe(200);
 
-    const fleet = await fetch(`${plane.baseUrl}/v1/fleet`, { headers: bearer(TOKEN_A) });
+    const fleet = await fetch(`${plane.baseUrl}/v1/fleet`, { headers: bearer(READ_TOKEN) });
     const snapshot: unknown = await fleet.json();
     const { entries } = snapshot as { entries: unknown };
     if (!Array.isArray(entries)) throw new Error('expected entries array');
@@ -308,7 +312,7 @@ describe("plane fleet state survives a restart over the same dir (AUDIT-20260717
     if (idx >= 0) activePlanes.splice(idx, 1);
 
     const second = await startPlane({ dir });
-    const fleet = await fetch(`${second.baseUrl}/v1/fleet`, { headers: bearer(TOKEN_A) });
+    const fleet = await fetch(`${second.baseUrl}/v1/fleet`, { headers: bearer(READ_TOKEN) });
     expect(fleet.status).toBe(200);
     const snapshot: unknown = await fleet.json();
     if (typeof snapshot !== 'object' || snapshot === null || !('entries' in snapshot)) {

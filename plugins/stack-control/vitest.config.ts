@@ -5,7 +5,13 @@ export default defineConfig({
     // src/__tests__ holds the front-door verb tests; tests/ holds the
     // spec-governance extension's Vitest suite (tasks.md paths). Both are
     // collected so every RED-first test actually runs (Constitution I).
-    include: ['src/__tests__/**/*.test.ts', 'tests/**/*.test.ts'],
+    // fleet-dashboard tests are under fleet-dashboard/tests/ (shared tooling).
+    include: [
+      'src/__tests__/**/*.test.ts',
+      'src/plane/__tests__/**/*.test.ts',
+      'tests/**/*.test.ts',
+      'fleet-dashboard/**/*.test.ts',
+    ],
     globals: false,
     // Hermetic git harness (TASK-116): neutralize the host global/system git
     // config so throwaway-repo fixtures never inherit commit.gpgsign=true and

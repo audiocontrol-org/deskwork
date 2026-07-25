@@ -24,6 +24,9 @@ import { createPlaneRuntime } from '../../src/plane/runtime.js';
 import { boundPort } from '../_bound-port.js';
 
 const TOKEN = 'token-instance-runs';
+// specs/038 US1: reads authenticate with a read credential (a DISTINCT class
+// from the telemetry token); invariant pinned in read-credential-class.test.ts.
+const READ_TOKEN = 'read-instance-runs';
 const INST = '55555555-5555-5555-8555-555555555555';
 
 interface RunningPlane {
@@ -39,6 +42,7 @@ async function startPlane(): Promise<RunningPlane> {
   dirsToClean.add(dir);
   const runtime = createPlaneRuntime({
     acceptedTokens: new Map([[TOKEN, INST]]),
+    readCredentials: new Map([[READ_TOKEN, 'reader']]),
     commandStoreDir: dir,
   });
   const server = runtime.createServer();
@@ -56,6 +60,12 @@ async function startPlane(): Promise<RunningPlane> {
 
 function bearer(): Record<string, string> {
   return { authorization: `Bearer ${TOKEN}`, 'content-type': 'application/json' };
+}
+
+/** Read-route auth — the reader-credential class (specs/038 US1), distinct from
+ * the telemetry `bearer()` used for ingest. */
+function readerBearer(): Record<string, string> {
+  return { authorization: `Bearer ${READ_TOKEN}` };
 }
 
 /** A run.started telemetry event owned by a given instance (host:path) and run. */
@@ -124,7 +134,7 @@ describe('GET /v1/instances/:id/runs — per-instance runs facet (T037)', () => 
 
     const idA = 'host-a:/tmp/proj-a';
     const res = await fetch(`${plane.baseUrl}/v1/instances/${encodeURIComponent(idA)}/runs`, {
-      headers: bearer(),
+      headers: readerBearer(),
     });
     expect(res.status).toBe(200);
     const runIds = runIdsOf(await res.json(), 'runs');
@@ -138,7 +148,7 @@ describe('GET /v1/instances/:id/runs — per-instance runs facet (T037)', () => 
 
     const idB = 'host-b:/tmp/proj-b'; // never ingested
     const res = await fetch(`${plane.baseUrl}/v1/instances/${encodeURIComponent(idB)}/runs`, {
-      headers: bearer(),
+      headers: readerBearer(),
     });
     expect(res.status).toBe(200);
     expect(runIdsOf(await res.json(), 'runs')).toEqual([]);
@@ -149,7 +159,7 @@ describe('GET /v1/instances/:id/runs — per-instance runs facet (T037)', () => 
     await ingestRun(plane, 'host-a', '/tmp/proj-a', 'run-a');
     await ingestRun(plane, 'host-b', '/tmp/proj-b', 'run-b');
 
-    const res = await fetch(`${plane.baseUrl}/v1/fleet`, { headers: bearer() });
+    const res = await fetch(`${plane.baseUrl}/v1/fleet`, { headers: readerBearer() });
     expect(res.status).toBe(200);
     const runIds = runIdsOf(await res.json(), 'entries');
     expect(runIds).toContain('run-a');

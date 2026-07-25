@@ -28,6 +28,10 @@ import { createCdnReader, createInMemoryCache } from '../../src/storage/cdn-read
 import type { ObjectMetadata, ObjectStorePort, PutObjectInput } from '../../src/storage/port.js';
 
 const TOKEN = 'token-heartbeat-e2e';
+// specs/038 US1: reads authenticate with a read credential (a DISTINCT class
+// from the telemetry token above); the class invariant is pinned in
+// src/plane/__tests__/read-credential-class.test.ts.
+const READ_TOKEN = 'read-heartbeat-e2e';
 const INST = '55555555-5555-4555-8555-555555555555';
 const HOST = 'idle-host';
 const PATH = '/tmp/heartbeat/proj-idle';
@@ -81,6 +85,7 @@ async function startPlane(): Promise<RunningPlane> {
   const countingStore = new CountingObjectStore();
   const runtime = createPlaneRuntime({
     acceptedTokens: new Map([[TOKEN, INST]]),
+    readCredentials: new Map([[READ_TOKEN, 'reader']]),
     commandStoreDir: dir,
     cdnReader: createCdnReader({ origin: countingStore, cache: createInMemoryCache() }),
   });
@@ -159,7 +164,7 @@ async function getInstance(
   id: string = ID,
 ): Promise<Record<string, unknown>> {
   const res = await fetch(`${plane.baseUrl}/v1/instances/${encodeURIComponent(id)}`, {
-    headers: { authorization: `Bearer ${TOKEN}` },
+    headers: { authorization: `Bearer ${READ_TOKEN}` },
   });
   expect(res.status).toBe(200);
   const body: unknown = await res.json();

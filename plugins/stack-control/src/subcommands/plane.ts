@@ -94,6 +94,44 @@ function parseServeArgs(args: string[]): ServeArgs {
 }
 
 /**
+ * Resolve the plane's accepted READ credentials (specs/038-fleet-dashboard,
+ * US1/FR-011) from environment-backed, installation-anchored secret material.
+ * `FLEET_PLANE_READ_TOKENS` (PLURAL) carries one or more comma-separated read
+ * credentials — the plane's full SET of accepted readers; each becomes an
+ * independently-revocable reader of the consumer/read class, DISTINCT from
+ * telemetry tokens. Reading env writes NOTHING to disk, so the
+ * installation-anchor invariant (no state written outside the installation
+ * tree) holds trivially. Absent/empty → an empty map, which fails read
+ * routes CLOSED (FR-012: no anonymous read, no telemetry fallback) — a
+ * valid serving state, not an error.
+ *
+ * DELIBERATELY DISTINCT from the dashboard BFF's own `FLEET_PLANE_READ_TOKEN`
+ * (singular — fleet-dashboard/src/server/config.ts, FR-005), which holds
+ * exactly ONE credential (one of this plane's configured readers). Before
+ * this rename both processes read the SAME var name with INCOMPATIBLE
+ * multiplicities: the plane parsed it as a list, the dashboard sent it
+ * verbatim as one bearer token, so a shared comma-separated value silently
+ * broke the dashboard's upstream auth (AUDIT-20260725-07/AUDIT-20260725-08).
+ * This is a CLEAN BREAK — the old singular name is no longer read here, no
+ * back-compat alias.
+ */
+export function readerCredentialsFromEnv(env: NodeJS.ProcessEnv): ReadonlyMap<string, string> {
+  const map = new Map<string, string>();
+  const raw = env.FLEET_PLANE_READ_TOKENS;
+  if (raw === undefined) {
+    return map;
+  }
+  const credentials = raw
+    .split(',')
+    .map((token) => token.trim())
+    .filter((token) => token.length > 0);
+  credentials.forEach((credential, index) => {
+    map.set(credential, `configured-reader-${index + 1}`);
+  });
+  return map;
+}
+
+/**
  * Build the runnable plane runtime for `installationRoot`'s fleet registry
  * (Task 1's `loadFleetRegistry`, rooted at `<durableDir>/plane/fleet/`).
  * Pure assembly, factored out of `runServe` so a test can prove the wiring
@@ -126,6 +164,10 @@ export function buildServeRuntime(installationRoot: string): { readonly runtime:
     acceptedTokens: registry.activeTokens(),
     acceptedInstances: registry.instanceBindings(),
     revokedTokens: registry.revokedTokens(),
+    // Reader-credential class (specs/038 US1) — env-backed, installation-
+    // anchored, DISTINCT from the telemetry tokens above. Consumer read routes
+    // verify against these; absent → reads fail closed (FR-012).
+    readCredentials: readerCredentialsFromEnv(process.env),
     commandStoreDir: join(planeDurableDir, 'commands'),
     enrollment: { handler: createEnrollHandler(registry) },
     refreshBeforeAuth: () => registry.reloadEnrollmentIfChanged(),

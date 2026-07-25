@@ -31,6 +31,10 @@ import { createPlaneRuntime } from '../../src/plane/runtime.js';
 
 const TOKEN = 'accepted-bearer-token-abc';
 const REVOKED_TOKEN = 'revoked-bearer-token-xyz';
+// specs/038 US1: consumer READ routes now verify a read credential (a DISTINCT
+// class from the telemetry token); the class invariant is pinned in
+// src/plane/__tests__/read-credential-class.test.ts.
+const READ_TOKEN = 'read-plane-serve';
 const INSTALLATION_ID = '11111111-1111-4111-8111-111111111111';
 
 /** Fake `IntervalScheduler` — records registrations and fires the most
@@ -131,6 +135,7 @@ async function startPlane(): Promise<RunningPlane> {
   const scheduler = new FakeScheduler();
   const runtime = createPlaneRuntime({
     acceptedTokens: new Map([[TOKEN, INSTALLATION_ID]]),
+    readCredentials: new Map([[READ_TOKEN, 'reader']]),
     revokedTokens: new Set([REVOKED_TOKEN]),
     commandStoreDir: dir,
     scheduler,
@@ -181,7 +186,7 @@ describe('plane serve — assembled runtime end-to-end (T124, plane-client-api.m
     const ingestBody: unknown = await ingest.json();
     expect(ingestBody).toMatchObject({ kind: 'accepted' });
 
-    const fleet = await fetch(`${baseUrl}/v1/fleet`, { headers: bearer(TOKEN) });
+    const fleet = await fetch(`${baseUrl}/v1/fleet`, { headers: bearer(READ_TOKEN) });
     expect(fleet.status).toBe(200);
     const snapshot: unknown = await fleet.json();
     if (typeof snapshot !== 'object' || snapshot === null || !('entries' in snapshot)) {
@@ -202,20 +207,24 @@ describe('plane serve — assembled runtime end-to-end (T124, plane-client-api.m
     });
   });
 
-  it('(2) GET /v1/fleet with NO bearer ⇒ 401; with a REVOKED token ⇒ 401 reason revoked (never downgraded, FR-088)', async () => {
+  it('(2) telemetry-guarded route with NO bearer ⇒ 401; REVOKED ⇒ 401 reason revoked; unknown ⇒ 401 reason unknown (never downgraded, FR-088)', async () => {
+    // specs/038 US1: the telemetry-token revoked-vs-unknown distinction is now
+    // probed on a TELEMETRY-guarded route (/v1/health/store) — the consumer READ
+    // routes verify the DISTINCT read-credential class (a telemetry token is
+    // simply not a reader there), covered by read-credential-class.test.ts.
     active = await startPlane();
     const { baseUrl } = active;
 
-    const anon = await fetch(`${baseUrl}/v1/fleet`);
+    const anon = await fetch(`${baseUrl}/v1/health/store`);
     expect(anon.status).toBe(401);
 
-    const revoked = await fetch(`${baseUrl}/v1/fleet`, { headers: bearer(REVOKED_TOKEN) });
+    const revoked = await fetch(`${baseUrl}/v1/health/store`, { headers: bearer(REVOKED_TOKEN) });
     expect(revoked.status).toBe(401);
     const revokedBody: unknown = await revoked.json();
     expect(revokedBody).toMatchObject({ reason: 'revoked' });
 
     // An unknown (never-accepted, never-revoked) token is distinctly 'unknown'.
-    const unknown = await fetch(`${baseUrl}/v1/fleet`, { headers: bearer('never-heard-of-this-token') });
+    const unknown = await fetch(`${baseUrl}/v1/health/store`, { headers: bearer('never-heard-of-this-token') });
     expect(unknown.status).toBe(401);
     const unknownBody: unknown = await unknown.json();
     expect(unknownBody).toMatchObject({ reason: 'unknown' });
@@ -301,7 +310,7 @@ describe('plane serve — assembled runtime end-to-end (T124, plane-client-api.m
       body: JSON.stringify(makeRawEvent({ runId: 'run-42', type: 'run.started', invocationSequence: 1 })),
     });
 
-    const detail = await fetch(`${baseUrl}/v1/runs/run-42`, { headers: bearer(TOKEN) });
+    const detail = await fetch(`${baseUrl}/v1/runs/run-42`, { headers: bearer(READ_TOKEN) });
     expect(detail.status).toBe(200);
     const raw = await detail.text();
     // Artifact refs (when present) must be installation-relative — never
