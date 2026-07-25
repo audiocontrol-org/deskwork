@@ -12,117 +12,67 @@
  * snapshot fans out to every still-connected subscriber (FR-016) — a resync,
  * never a silent gap.
  *
- * Both the upstream connection ({@link ConnectUpstream}) and the plane
- * client are injected (composition, interface-first DI — mirrors
- * `plane-client.ts`'s `PlaneClientDeps`), so the fan-out/reconnect logic in
- * this module is fully testable without real network I/O or real timers:
- * `tests/server/stream-relay.test.ts` (T012) drives drop/reconnect by
- * calling the injected handlers directly. The REAL, network-backed
- * `ConnectUpstream` lives in `plane-stream-connector.ts` — kept in its own
- * file so this module stays under the project's 300–500 line file cap and
- * so the fan-out logic never depends on `fetch`/SSE-framing details.
+ * Ordering discipline (AUDIT-20260725-06): a resync opens the upstream SSE
+ * FIRST and BUFFERS every delta it emits — including the plane stream's own
+ * opening snapshot-as-deltas burst — WITHOUT applying/broadcasting them yet.
+ * It THEN reads the authoritative snapshot (GET /v1/instances), seeds the
+ * in-memory map from it, and FOLDS the buffered deltas on top before going
+ * live. Because the stream is subscribed before the snapshot is read, no plane
+ * event committed around the snapshot boundary can fall into a gap between the
+ * two channels; and because deltas are keyed by instance id, folding a
+ * buffered delta the snapshot already reflects is a harmless idempotent
+ * overwrite (see {@link applyDelta}). The same resync backs both initial
+ * `start()` and post-drop recovery, so both first-load and reconnect close the
+ * gap.
  *
- * Per FR-017 the instance payload carried on a delta / in a snapshot is
- * passed through VERBATIM — the same "no reshaping, no new projection"
- * discipline `plane-client.ts` follows for its return values. Since that
- * payload originates as unknown upstream JSON, it is represented as
- * {@link FleetInstanceRecord} (an opaque record with a validated `id`
- * field) rather than importing the plane's internal `InstanceState` type —
- * this package has no dependency on `src/plane/*` (R5: the dashboard is a
- * standalone subtree that will spin out of this repository).
+ * Both the upstream connection ({@link ConnectUpstream}) and the plane client
+ * are injected (composition, interface-first DI — mirrors `plane-client.ts`'s
+ * `PlaneClientDeps`), so the fan-out/reconnect logic in this module is fully
+ * testable without real network I/O or real timers:
+ * `tests/server/stream-relay.test.ts` (T012) drives drop/reconnect by calling
+ * the injected handlers directly. The REAL, network-backed `ConnectUpstream`
+ * lives in `plane-stream-connector.ts`. The pure event/delta vocabulary,
+ * validation and folds live in `stream-relay-model.ts` (re-exported below so
+ * existing importers are unaffected).
  *
  * No `any`, no `as`, no `@ts-ignore` (Constitution Principle VI). Relative
  * `.js` imports under node16 resolution — this package has no `@/` alias.
  */
 
 import type { PlaneClient } from './plane-client.js';
+import {
+  applyDelta,
+  extractInstances,
+  StreamRelayError,
+  type ConnectUpstream,
+  type FleetInstanceRecord,
+  type InstanceDelta,
+  type RelayEvent,
+  type ScheduleReconnect,
+  type UpstreamConnection,
+  type UpstreamHandlers,
+} from './stream-relay-model.js';
 
-/** Raised for a malformed upstream response this relay cannot silently
- * absorb (e.g. a plane snapshot body missing its `instances` array, or an
- * instance entry missing a string `id`). Never a fallback — a malformed
- * upstream shape is a bug to surface loudly, not paper over. */
-export class StreamRelayError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'StreamRelayError';
-  }
-}
-
-/** An opaque plane instance record, passed through verbatim (FR-017) except
- * for the one field this module needs to key its in-memory `FleetView` by:
- * a validated string `id`. */
-export interface FleetInstanceRecord {
-  readonly id: string;
-  readonly [key: string]: unknown;
-}
-
-/**
- * The instance-stream delta vocabulary (mirrors the plane's own
- * `InstanceDelta`, src/plane/http/instance-api.ts, by kind name — but
- * defined independently here since this package does not import
- * `src/plane/*` types, R5).
- */
-export type InstanceDelta =
-  | { readonly kind: 'instance-upserted'; readonly instance: FleetInstanceRecord }
-  | { readonly kind: 'instance-removed'; readonly id: string };
-
-/** The event vocabulary a relay subscriber receives, in order: exactly one
- * `snapshot` before any `delta` (FR-015); a `disconnected` when the single
- * upstream connection drops, immediately followed (once the resync
- * completes) by a fresh `snapshot` that resumes the same ordering guarantee
- * (FR-016). */
-export type RelayEvent =
-  | { readonly kind: 'snapshot'; readonly instances: readonly FleetInstanceRecord[] }
-  | { readonly kind: 'delta'; readonly delta: InstanceDelta }
-  | { readonly kind: 'disconnected' };
-
-/**
- * The handlers a {@link ConnectUpstream} implementation drives. `onDrop`
- * MUST fire AT MOST ONCE per `connectUpstream()` call, and MUST NOT fire
- * after the connection's `close()` was called (a deliberate teardown is not
- * a drop) — mirrors the sidecar SSE client's `onClosed` contract
- * (src/sidecar/uplink/sse-client.ts).
- */
-export interface UpstreamHandlers {
-  readonly onDelta: (delta: InstanceDelta) => void;
-  readonly onDrop: () => void;
-}
-
-/** A live upstream connection handle. `close()` is idempotent-safe and,
- * per the {@link UpstreamHandlers} contract, suppresses any further
- * `onDrop()` from this connection. */
-export interface UpstreamConnection {
-  close(): void;
-}
-
-/** The DI seam for the ONE upstream `/v1/instances/stream` connection this
- * relay holds. Called exactly once on `start()` and once more per
- * reconnect after a drop — NEVER once per browser subscriber (research
- * R1's fan-out invariant is structural: `subscribe()` never calls this). */
-export type ConnectUpstream = (handlers: UpstreamHandlers) => UpstreamConnection;
-
-/**
- * Schedules a post-drop reconnect retry after the relay's retry interval and
- * returns a canceller.
- *
- * This is the DI seam that makes drop-recovery deterministically testable
- * (AUDIT-20260725-01/03): production wiring omits it and gets the
- * {@link defaultScheduleReconnect} `setTimeout`-backed default — mirroring
- * `index.ts`'s boot-time `RELAY_RETRY_INTERVAL_MS` cadence — while tests
- * inject a manually-pumped scheduler so `drop -> reject -> retry -> success`
- * is driven without real timers.
- *
- * The returned canceller MUST make `retry` un-fireable so `stop()` can cancel
- * a pending retry — no leaked timer, no retry after teardown. This is NOT a
- * fallback/mock: it is a real, named dependency whose only default is the
- * production `setTimeout` implementation.
- */
-export type ScheduleReconnect = (retry: () => void) => () => void;
+export {
+  applyDelta,
+  extractInstances,
+  isInstanceDelta,
+  StreamRelayError,
+} from './stream-relay-model.js';
+export type {
+  ConnectUpstream,
+  FleetInstanceRecord,
+  InstanceDelta,
+  RelayEvent,
+  ScheduleReconnect,
+  UpstreamConnection,
+  UpstreamHandlers,
+} from './stream-relay-model.js';
 
 /** Dependencies for {@link createStreamRelay}. `planeClient` /
  * `connectUpstream` are supplied by the caller (composition/DI, mirroring
- * `PlaneClientDeps`); `scheduleReconnect` is an optional DI seam that
- * defaults to the production `setTimeout`-backed scheduler. */
+ * `PlaneClientDeps`); `scheduleReconnect` / `maxBufferedDeltas` are optional
+ * DI seams that default to production values. */
 export interface StreamRelayDeps {
   /** Only the re-snapshot read is needed here — narrowed via `Pick` so this
    * module's dependency on `PlaneClient` is exactly the one method it
@@ -132,11 +82,24 @@ export interface StreamRelayDeps {
   /** Optional DI seam for the post-drop reconnect retry cadence; defaults to
    * a `setTimeout`-backed scheduler. See {@link ScheduleReconnect}. */
   readonly scheduleReconnect?: ScheduleReconnect;
+  /** Optional cap on how many upstream deltas a single resync will buffer
+   * while awaiting the authoritative snapshot (AUDIT-20260725-06 self
+   * red-team: a hung snapshot GET must not let the pre-live buffer grow
+   * without bound). On overflow the resync attempt is aborted and retried
+   * with a fresh connection rather than accumulating unbounded memory.
+   * Defaults to {@link DEFAULT_MAX_BUFFERED_DELTAS}. */
+  readonly maxBufferedDeltas?: number;
 }
 
 /** Interval between post-drop reconnect resync attempts, mirroring
  * `index.ts`'s boot-time `RELAY_RETRY_INTERVAL_MS`. */
 const RECONNECT_RETRY_INTERVAL_MS = 5000;
+
+/** Default ceiling on deltas buffered during one resync's subscribe-before-
+ * snapshot window. Large enough that a healthy fleet's opening burst plus
+ * any churn during a single snapshot round-trip fits comfortably; small
+ * enough that a wedged snapshot GET cannot leak unbounded memory. */
+const DEFAULT_MAX_BUFFERED_DELTAS = 100_000;
 
 /** The production {@link ScheduleReconnect}: a real `setTimeout`, cancellable
  * via the returned `clearTimeout` closure. */
@@ -152,9 +115,11 @@ export interface RelaySubscription {
 }
 
 export interface StreamRelay {
-  /** Fetches the initial snapshot and opens the single upstream
-   * connection. Callers (production wiring, tests) call this once before
-   * relying on `subscribe()` to deliver anything. */
+  /** Opens the single upstream connection, buffers its opening burst, reads
+   * the authoritative snapshot, reconciles, and goes live. Callers
+   * (production wiring, tests) call this once before relying on `subscribe()`
+   * to deliver anything. Rejects on failure so `index.ts`'s boot-time retry
+   * can back off. */
   start(): Promise<void>;
   /** Register a browser-facing subscriber. If the initial snapshot has
    * already landed, `onEvent` is invoked synchronously with the current
@@ -167,89 +132,40 @@ export interface StreamRelay {
 }
 
 // ---------------------------------------------------------------------------
-// Runtime validation of unknown upstream JSON (no `any`, no `as`).
-// ---------------------------------------------------------------------------
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function isFleetInstanceRecord(value: unknown): value is FleetInstanceRecord {
-  return isRecord(value) && typeof value.id === 'string';
-}
-
-/**
- * Whether `value` is a well-formed {@link InstanceDelta}. Exported so the
- * real, network-backed connector (`plane-stream-connector.ts`) can validate
- * every frame it parses off the wire before ever calling `onDelta` — a
- * malformed upstream frame is dropped there, never forwarded downstream.
- */
-export function isInstanceDelta(value: unknown): value is InstanceDelta {
-  if (!isRecord(value)) {
-    return false;
-  }
-  if (value.kind === 'instance-upserted') {
-    return isFleetInstanceRecord(value.instance);
-  }
-  if (value.kind === 'instance-removed') {
-    return typeof value.id === 'string';
-  }
-  return false;
-}
-
-/** Extract + validate the `instances` array out of a plane
- * `GET /v1/instances` response body (returned as `unknown` by
- * `PlaneClient.instanceSnapshot`, FR-017 — no reshaping). Throws
- * {@link StreamRelayError} on any malformed shape rather than silently
- * dropping or coercing entries. */
-function extractInstances(body: unknown): readonly FleetInstanceRecord[] {
-  if (!isRecord(body) || !Array.isArray(body.instances)) {
-    throw new StreamRelayError(
-      'stream-relay: plane instance snapshot response is missing an "instances" array',
-    );
-  }
-  const instances: FleetInstanceRecord[] = [];
-  for (const entry of body.instances) {
-    if (!isFleetInstanceRecord(entry)) {
-      throw new StreamRelayError(
-        'stream-relay: plane instance snapshot entry is missing a string "id" field',
-      );
-    }
-    instances.push(entry);
-  }
-  return instances;
-}
-
-// ---------------------------------------------------------------------------
 // The relay.
 // ---------------------------------------------------------------------------
 
-function applyDelta(
-  instances: readonly FleetInstanceRecord[],
-  delta: InstanceDelta,
-): readonly FleetInstanceRecord[] {
-  if (delta.kind === 'instance-upserted') {
-    const withoutExisting = instances.filter((instance) => instance.id !== delta.instance.id);
-    return [...withoutExisting, delta.instance];
-  }
-  return instances.filter((instance) => instance.id !== delta.id);
+/**
+ * One subscribe-buffer-snapshot-reconcile attempt's state. While `live` is
+ * false, every upstream delta is buffered rather than applied; the attempt's
+ * `connection` is the upstream it owns; `aborted` records that the connection
+ * dropped (or the buffer overflowed) before reconcile, so the awaiting resync
+ * abandons this attempt instead of going live on a dead/stale connection.
+ */
+interface ResyncEpisode {
+  readonly buffer: InstanceDelta[];
+  live: boolean;
+  aborted: boolean;
+  connection: UpstreamConnection | undefined;
 }
 
 /**
  * Build a {@link StreamRelay}. Nothing async happens until `start()` is
  * called — no implicit fire-and-forget work in the constructor — so both
- * production wiring and tests control exactly when the initial snapshot
- * fetch + upstream connect fire.
+ * production wiring and tests control exactly when the upstream connect +
+ * snapshot fetch fire.
  */
 export function createStreamRelay(deps: StreamRelayDeps): StreamRelay {
   const scheduleReconnect = deps.scheduleReconnect ?? defaultScheduleReconnect;
+  const maxBufferedDeltas = deps.maxBufferedDeltas ?? DEFAULT_MAX_BUFFERED_DELTAS;
   const listeners = new Set<(event: RelayEvent) => void>();
   let currentInstances: readonly FleetInstanceRecord[] = [];
   let ready = false;
-  let upstreamConnection: UpstreamConnection | undefined;
+  // The episode that currently owns the live/buffering upstream connection.
+  let activeEpisode: ResyncEpisode | undefined;
   // Drop-recovery state (AUDIT-20260725-01/03): `reconnecting` guards against
-  // a concurrent `onDrop` spawning a parallel retry loop; `stopped` makes a
-  // teardown cancel every in-flight/pending recovery; `cancelPendingRetry`
+  // a concurrent live `onDrop` spawning a parallel retry loop; `stopped` makes
+  // a teardown cancel every in-flight/pending recovery; `cancelPendingRetry`
   // cancels a scheduled-but-not-yet-fired retry from `stop()`.
   let reconnecting = false;
   let stopped = false;
@@ -262,9 +178,7 @@ export function createStreamRelay(deps: StreamRelayDeps): StreamRelay {
    * exception that kills the whole BFF process for every connected dashboard,
    * and — in {@link broadcast}'s fan-out — must never abort delivery to the
    * remaining subscribers. Used both by the fan-out loop AND by `subscribe()`'s
-   * synchronous initial-snapshot delivery (which does not go through
-   * `broadcast`), so neither path can be crashed by a bad listener. Log and
-   * continue.
+   * synchronous initial-snapshot delivery. Log and continue.
    */
   function deliver(listener: (event: RelayEvent) => void, event: RelayEvent): void {
     try {
@@ -284,54 +198,135 @@ export function createStreamRelay(deps: StreamRelayDeps): StreamRelay {
     }
   }
 
-  const handlers: UpstreamHandlers = {
-    onDelta(delta: InstanceDelta): void {
-      currentInstances = applyDelta(currentInstances, delta);
-      broadcast({ kind: 'delta', delta });
-    },
-    onDrop(): void {
-      // AUDIT-20260725-01/03: a drop that arrives while a reconnect loop
-      // already owns recovery must NOT re-broadcast `disconnected` or spawn a
-      // second, parallel retry loop — and a drop after `stop()` is ignored
-      // entirely (a deliberate teardown is not a recoverable outage).
-      if (reconnecting || stopped) {
-        return;
-      }
-      ready = false;
-      broadcast({ kind: 'disconnected' });
-      reconnecting = true;
-      attemptReconnect();
-    },
-  };
-
-  async function resync(): Promise<void> {
-    const body = await deps.planeClient.instanceSnapshot();
-    if (stopped) {
-      // A teardown (`stop()`) raced this in-flight snapshot fetch — do NOT
-      // re-arm `ready`, broadcast, or open a fresh upstream connection after
-      // stop (channel: reconnect-after-stop).
+  /**
+   * A live upstream connection dropped (FR-016). This is the ONLY drop path
+   * that surfaces `disconnected` and starts recovery; a drop during an
+   * episode's pre-live buffering window is handled inline by that episode's
+   * handlers (it just aborts the in-flight attempt, which the retry loop
+   * re-drives). A drop that arrives while a reconnect loop already owns
+   * recovery must NOT re-broadcast or spawn a second loop; a drop after
+   * `stop()` is ignored (a deliberate teardown is not a recoverable outage).
+   */
+  function handleLiveDrop(): void {
+    if (reconnecting || stopped) {
       return;
     }
-    currentInstances = extractInstances(body);
-    ready = true;
-    broadcast({ kind: 'snapshot', instances: currentInstances });
-    // Defensive: an upstream that reported its own drop is already dead,
-    // but closing it again before replacing it is a harmless no-op per the
-    // `UpstreamConnection.close()` contract, and keeps exactly one live
-    // connection reference at all times.
-    upstreamConnection?.close();
-    upstreamConnection = deps.connectUpstream(handlers);
+    ready = false;
+    broadcast({ kind: 'disconnected' });
+    reconnecting = true;
+    attemptReconnect();
+  }
+
+  /**
+   * Open a fresh upstream connection and start BUFFERING its deltas (including
+   * the plane stream's opening snapshot-as-deltas burst) — the subscribe-first
+   * half of the gap-closing resync (AUDIT-20260725-06). The previous
+   * connection, if any, is closed first so exactly one upstream connection is
+   * ever open. Returns the episode the caller reconciles + promotes to live.
+   */
+  function openBufferingEpisode(): ResyncEpisode {
+    activeEpisode?.connection?.close();
+    const episode: ResyncEpisode = { buffer: [], live: false, aborted: false, connection: undefined };
+    const handlers: UpstreamHandlers = {
+      onDelta(delta: InstanceDelta): void {
+        if (episode.live) {
+          currentInstances = applyDelta(currentInstances, delta);
+          broadcast({ kind: 'delta', delta });
+          return;
+        }
+        if (episode.aborted) {
+          return;
+        }
+        episode.buffer.push(delta);
+        if (episode.buffer.length > maxBufferedDeltas) {
+          // Self red-team: a wedged snapshot GET must not let the pre-live
+          // buffer grow without bound. Abort this attempt (free the buffer,
+          // drop the connection); the awaiting resync sees `aborted` and the
+          // retry loop opens a fresh one.
+          episode.aborted = true;
+          episode.buffer.length = 0;
+          episode.connection?.close();
+        }
+      },
+      onDrop(): void {
+        if (episode.live) {
+          handleLiveDrop();
+          return;
+        }
+        // Dropped while still buffering (plane flapping): mark the attempt so
+        // the in-flight resync abandons it rather than going live on a corpse.
+        episode.aborted = true;
+      },
+    };
+    const connection = deps.connectUpstream(handlers);
+    episode.connection = connection;
+    // The overflow / buffering-drop branch above may have fired synchronously
+    // during connect (before `connection` was assigned); honour it now.
+    if (episode.aborted) {
+      connection.close();
+    }
+    activeEpisode = episode;
+    return episode;
+  }
+
+  /**
+   * One subscribe-buffer-snapshot-reconcile attempt. Opens + buffers the
+   * upstream, reads the authoritative snapshot, folds the buffered deltas onto
+   * it, then goes live and broadcasts the reconciled snapshot. Any failure
+   * after the connection is opened closes it (no leaked upstream) and rejects,
+   * so the caller (`start()`'s boot retry, or the post-drop {@link
+   * attemptReconnect} loop) opens a fresh attempt.
+   */
+  async function resync(): Promise<void> {
+    const episode = openBufferingEpisode();
+    try {
+      const body = await deps.planeClient.instanceSnapshot();
+      if (stopped) {
+        // A teardown raced this in-flight snapshot fetch — do NOT go live or
+        // broadcast after stop (channel: reconnect-after-stop).
+        episode.connection?.close();
+        return;
+      }
+      if (activeEpisode !== episode || episode.aborted) {
+        // The connection this attempt opened dropped (or overflowed) before we
+        // could reconcile, or a newer attempt superseded it — never go live on
+        // a dead/stale connection.
+        throw new StreamRelayError(
+          'stream-relay: upstream connection dropped before snapshot reconcile — retrying',
+        );
+      }
+      // Seed from the authoritative snapshot, then fold the buffered deltas on
+      // top (idempotent by id) so any event around the snapshot boundary is
+      // captured (AUDIT-20260725-06).
+      let reconciled = extractInstances(body);
+      for (const delta of episode.buffer) {
+        reconciled = applyDelta(reconciled, delta);
+      }
+      currentInstances = reconciled;
+      episode.buffer.length = 0;
+      episode.live = true;
+      ready = true;
+      broadcast({ kind: 'snapshot', instances: currentInstances });
+    } catch (err: unknown) {
+      // Any failure after we opened the buffering connection must close it so a
+      // failed/aborted resync never leaks an upstream connection.
+      episode.connection?.close();
+      if (activeEpisode === episode) {
+        activeEpisode = undefined;
+      }
+      throw err;
+    }
   }
 
   /**
    * Drive one post-drop resync attempt, RETRYING on failure instead of
    * firing-and-forgetting (AUDIT-20260725-01/03). The most likely trigger of
    * a drop is the plane restarting / being briefly unreachable, so the very
-   * first re-snapshot often hits the still-down plane and rejects; catching
-   * that rejection and retrying on an interval (mirroring `index.ts`'s
-   * boot-time retry loop) is what makes FR-016's "recovers on reconnect" hold
-   * — instead of crashing (an unhandled rejection, fatal since Node 15) or
-   * stalling forever (`ready` stuck `false`, no subscriber ever re-snapshotted).
+   * first attempt often hits the still-down plane and rejects; catching that
+   * rejection and retrying on an interval (mirroring `index.ts`'s boot-time
+   * retry loop) is what makes FR-016's "recovers on reconnect" hold — instead
+   * of crashing (an unhandled rejection, fatal since Node 15) or stalling
+   * forever (`ready` stuck `false`, no subscriber ever re-snapshotted).
    */
   function attemptReconnect(): void {
     if (stopped) {
@@ -390,7 +385,8 @@ export function createStreamRelay(deps: StreamRelayDeps): StreamRelay {
         cancelPendingRetry = undefined;
       }
       reconnecting = false;
-      upstreamConnection?.close();
+      activeEpisode?.connection?.close();
+      activeEpisode = undefined;
     },
   };
 }

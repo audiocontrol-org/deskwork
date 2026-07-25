@@ -408,19 +408,22 @@ describe('stream-relay — post-drop resync retries instead of crashing/stalling
       firstConn.handlers.onDrop();
       await flushAsync(); // first post-drop resync attempt runs and rejects
 
-      // Still on the original (dead) connection — no reconnect yet — and a
-      // retry has been scheduled rather than the rejection being lost.
-      expect(connections).toHaveLength(1);
+      // A retry has been scheduled rather than the rejection being lost. Per
+      // AUDIT-20260725-06 each resync attempt now opens the upstream BEFORE it
+      // reads the snapshot, so a failed attempt has already opened (and closed)
+      // a fresh connection — one connection per attempt (was snapshot-first, so
+      // the old ordering opened none until a snapshot succeeded).
+      expect(connections).toHaveLength(2);
       expect(pending.length).toBe(1);
       expect(calls.length).toBe(2);
 
       await flushOne(); // second attempt rejects, reschedules
-      expect(connections).toHaveLength(1);
+      expect(connections).toHaveLength(3);
       expect(pending.length).toBe(1);
       expect(calls.length).toBe(3);
 
       await flushOne(); // third attempt succeeds -> fresh snapshot + reconnect
-      expect(connections).toHaveLength(2);
+      expect(connections).toHaveLength(4);
       expect(calls.length).toBe(4);
       expect(events).toEqual([
         { kind: 'snapshot', instances: [{ id: 'a:b' }] },
@@ -500,10 +503,12 @@ describe('stream-relay — post-drop resync retries instead of crashing/stalling
     relay.stop();
 
     // The scheduled retry is cancelled (no leaked timer), and nothing
-    // reconnects or re-fetches after stop.
+    // reconnects or re-fetches after stop. Per AUDIT-20260725-06 the one failed
+    // attempt already opened+closed a buffering connection (subscribe-first),
+    // so `connections` records 2 — but no THIRD is ever opened after stop.
     expect(pending.length).toBe(0);
     await flushAsync();
-    expect(connections).toHaveLength(1);
+    expect(connections).toHaveLength(2);
     expect(calls.length).toBe(2);
   });
 
@@ -536,8 +541,11 @@ describe('stream-relay — post-drop resync retries instead of crashing/stalling
     await flushAsync();
 
     // The in-flight fetch resolved AFTER stop() — it must not re-arm the relay
-    // or open a fresh upstream connection.
-    expect(connections).toHaveLength(1);
+    // or go live. Per AUDIT-20260725-06 the recovery attempt opened its
+    // buffering connection (subscribe-first) before the fetch, so `connections`
+    // records 2; `stop()` closed it and the late snapshot is discarded (no
+    // snapshot broadcast, no live delivery).
+    expect(connections).toHaveLength(2);
     expect(events).toEqual([
       { kind: 'snapshot', instances: [{ id: 'a:b' }] },
       { kind: 'disconnected' },
@@ -573,7 +581,10 @@ describe('stream-relay — post-drop resync retries instead of crashing/stalling
 
     await flushOne(); // recovery succeeds -> authoritative snapshot
 
-    expect(connections).toHaveLength(2);
+    // Per AUDIT-20260725-06 each resync attempt opens the upstream before the
+    // snapshot, so the failed first recovery attempt + the successful second
+    // one add two connections on top of start's — three total.
+    expect(connections).toHaveLength(3);
     expect(events).toEqual([
       { kind: 'snapshot', instances: [{ id: 'a:b' }] },
       { kind: 'disconnected' },
@@ -684,6 +695,128 @@ describe('stream-relay — snapshot-to-stream gap cannot lose a live delta (AUDI
     expect(events).toEqual([
       { kind: 'snapshot', instances: [{ id: 'a:b' }, { id: 'c:d' }] },
     ]);
+  });
+
+  it('stop() during the subscribe-buffer-snapshot window tears down cleanly — no snapshot broadcast after stop', async () => {
+    // Channel: stop() called after the upstream is opened + buffering but
+    // before the authoritative snapshot resolves. The buffering connection
+    // must be closed (no leaked upstream) and the relay must never go live.
+    const { connectUpstream, connections } = createFakeUpstream();
+    const deferred = createDeferred<unknown>();
+    const planeClient: StreamRelayDeps['planeClient'] = {
+      instanceSnapshot: async () => deferred.promise,
+    };
+    const relay = createStreamRelay({ planeClient, connectUpstream });
+
+    const events: RelayEvent[] = [];
+    relay.subscribe((event) => events.push(event)); // subscribes before ready
+
+    const startResult = relay.start(); // opens upstream + buffers; GET in flight
+
+    const conn = connections[0];
+    if (conn === undefined) throw new Error('expected a buffering upstream connection');
+    // The plane stream's opening burst arrives while buffering.
+    conn.handlers.onDelta({ kind: 'instance-upserted', instance: { id: 'buffered:1' } });
+
+    relay.stop(); // teardown during the buffer-snapshot window
+    deferred.resolve(snapshotBody(['a:b']));
+    await startResult;
+    await flushAsync();
+
+    // The relay never went live: no snapshot (and none of the buffered deltas)
+    // ever reached the subscriber, and the buffering connection was closed.
+    expect(events).toEqual([]);
+    expect(conn.closed).toBe(true);
+  });
+
+  it('a buffering connection that drops mid-reconnect is abandoned; a fresh attempt completes the resync with exactly one live stream', async () => {
+    // Channel: onDrop on the connection a recovery attempt is still buffering
+    // (before it reconciled). The attempt must be abandoned (its partial buffer
+    // discarded, its connection closed) rather than going live on a corpse, and
+    // the retry loop must open a FRESH connection — never a duplicate live one.
+    const { connectUpstream, connections } = createFakeUpstream();
+    const { scheduleReconnect, pending, flushOne } = createManualReconnectScheduler();
+    const secondGet = createDeferred<unknown>();
+    let call = 0;
+    const planeClient: StreamRelayDeps['planeClient'] = {
+      instanceSnapshot: async () => {
+        call += 1;
+        if (call === 1) return snapshotBody(['a:b']); // start()
+        if (call === 2) return secondGet.promise; // recovery attempt 1 — held
+        return snapshotBody(['a:b', 'z:z']); // recovery attempt 2 succeeds
+      },
+    };
+    const relay = createStreamRelay({ planeClient, connectUpstream, scheduleReconnect });
+
+    await relay.start();
+
+    const events: RelayEvent[] = [];
+    relay.subscribe((event) => events.push(event));
+
+    const firstConn = connections[0];
+    if (firstConn === undefined) throw new Error('expected a start connection');
+    firstConn.handlers.onDrop(); // live drop -> recovery attempt 1 opens conn#2, buffers
+
+    const secondConn = connections[1];
+    if (secondConn === undefined) throw new Error('expected a recovery connection');
+    // conn#2 buffers a delta, then DROPS before its snapshot resolves.
+    secondConn.handlers.onDelta({ kind: 'instance-upserted', instance: { id: 'buffered:x' } });
+    secondConn.handlers.onDrop(); // buffering drop -> attempt aborted
+
+    secondGet.resolve(snapshotBody(['a:b'])); // resolves AFTER the abort
+    await flushAsync(); // resync sees the abort -> throws -> retry scheduled
+
+    expect(pending.length).toBe(1);
+    expect(secondConn.closed).toBe(true); // the abandoned attempt's connection is closed
+    // conn#2 never went live: neither its buffered delta nor a snapshot from it
+    // reached the subscriber.
+    expect(events).toEqual([
+      { kind: 'snapshot', instances: [{ id: 'a:b' }] },
+      { kind: 'disconnected' },
+    ]);
+
+    await flushOne(); // recovery attempt 2 opens conn#3, GET succeeds -> live
+
+    const thirdConn = connections[2];
+    if (thirdConn === undefined) throw new Error('expected a fresh recovery connection');
+    // Exactly one live upstream: only the fresh conn#3 is open.
+    expect(firstConn.closed).toBe(true);
+    expect(secondConn.closed).toBe(true);
+    expect(thirdConn.closed).toBe(false);
+    expect(events).toEqual([
+      { kind: 'snapshot', instances: [{ id: 'a:b' }] },
+      { kind: 'disconnected' },
+      { kind: 'snapshot', instances: [{ id: 'a:b' }, { id: 'z:z' }] },
+    ]);
+  });
+
+  it('caps the pre-live buffer so a wedged snapshot GET cannot leak unbounded memory (self red-team)', async () => {
+    // Round-0 self red-team: if the authoritative snapshot GET hangs, the
+    // subscribe-first buffer would grow without bound. The cap aborts the
+    // attempt (freeing the buffer, closing the connection) so the caller retries
+    // with a fresh connection instead of accumulating memory forever.
+    const { connectUpstream, connections } = createFakeUpstream();
+    const hung = createDeferred<unknown>();
+    const planeClient: StreamRelayDeps['planeClient'] = {
+      instanceSnapshot: async () => hung.promise, // start's snapshot never resolves
+    };
+    const relay = createStreamRelay({ planeClient, connectUpstream, maxBufferedDeltas: 3 });
+
+    const startResult = relay.start();
+
+    const conn = connections[0];
+    if (conn === undefined) throw new Error('expected a buffering connection');
+    // Flood the buffer past the cap while the snapshot GET is wedged.
+    for (let i = 0; i < 6; i += 1) {
+      conn.handlers.onDelta({ kind: 'instance-upserted', instance: { id: `flood:${i}` } });
+    }
+    // Overflow aborted the attempt and closed the connection (bounded memory).
+    expect(conn.closed).toBe(true);
+
+    // Unwedging the GET does not resurrect the aborted attempt: it rejects so
+    // the boot/reconnect retry opens a fresh one.
+    hung.resolve(snapshotBody(['late']));
+    await expect(startResult).rejects.toThrow();
   });
 });
 
