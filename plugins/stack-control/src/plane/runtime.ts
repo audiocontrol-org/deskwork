@@ -57,7 +57,13 @@ import type { CdnReader } from '../storage/cdn-reader.js';
 import { createCommandStore, type CommandStore } from './commands/store.js';
 import { createCommandDispatch, type CommandDispatch } from './commands/dispatch.js';
 import { NODE_INTERVAL_SCHEDULER, type IntervalScheduler } from './http/stream.js';
-import { createTokenRegistry, parseBearer, type TokenRegistry } from './http/auth.js';
+import {
+  createReadCredentialRegistry,
+  createTokenRegistry,
+  parseBearer,
+  type ReadCredentialRegistry,
+  type TokenRegistry,
+} from './http/auth.js';
 import { type ArchiveSignals, type UplinkSignals } from './health.js';
 import {
   createPlaneServer,
@@ -98,6 +104,24 @@ export interface PlaneRuntimeOptions {
   /** Tokens explicitly revoked — refused with reason 'revoked', never
    * downgraded (FR-088). Defaults to empty. */
   readonly revokedTokens?: ReadonlySet<string>;
+  /**
+   * Accepted READ credentials (specs/038-fleet-dashboard, US1), each mapped to
+   * an opaque reader label. This is a credential class DISTINCT from
+   * {@link acceptedTokens}: the consumer read routes verify against THIS set
+   * (via a separate `ReadCredentialRegistry`), never the telemetry registry, so
+   * a telemetry token cannot read the fleet (FR-009) and a read credential
+   * cannot ingest (FR-008). Defaults to empty — with no reader configured every
+   * consumer read route refuses (fail closed, FR-012: no anonymous read, no
+   * fallback to accepting a telemetry token). The runtime closes over this map
+   * reference, so a source that mutates it in place (the plane's existing
+   * live-reload seam) takes effect without a restart.
+   */
+  readonly readCredentials?: ReadonlyMap<string, string>;
+  /** Read credentials explicitly revoked — refused with reason 'revoked',
+   * independently of any other reader or any telemetry credential (FR-010).
+   * The runtime closes over this set reference so mutating it refuses that
+   * reader on the next request. Defaults to empty. */
+  readonly revokedReadCredentials?: ReadonlySet<string>;
   /** Directory backing the durable command store (FR-056) and the
    * late-event durable hand-off (FR-066). Created if absent. */
   readonly commandStoreDir: string;
@@ -180,6 +204,14 @@ export function createPlaneRuntime(options: PlaneRuntimeOptions): PlaneRuntime {
   const tokenRegistry: TokenRegistry = createTokenRegistry({
     active: options.acceptedTokens,
     revoked: options.revokedTokens ?? new Set(),
+  });
+  // The reader-credential class (specs/038 US1) — a SEPARATE verification path
+  // from the telemetry registry above. The two share no verification result:
+  // consumer read routes go through `withConsumerAuth` (this registry);
+  // ingest/sidecar/liveness/command routes stay on `withAuth` (tokenRegistry).
+  const readCredentialRegistry: ReadCredentialRegistry = createReadCredentialRegistry({
+    active: options.readCredentials ?? new Map(),
+    revoked: options.revokedReadCredentials ?? new Set(),
   });
 
   // --- live state ---------------------------------------------------------
@@ -268,6 +300,32 @@ export function createPlaneRuntime(options: PlaneRuntimeOptions): PlaneRuntime {
     };
   }
 
+  // --- consumer read guard (specs/038 US1) --------------------------------
+  // Guards the CONSUMER READ routes against the reader-credential class — a
+  // DISTINCT verification path from `withAuth`'s telemetry registry (research
+  // R3). A telemetry token presented here is refused (it is not in the reader
+  // set, FR-009); with no reader configured every read route refuses (fail
+  // closed, FR-012). Read handlers are pure recompute-on-read over the event
+  // log and need no authenticated installation/instance identity, so this guard
+  // sets none.
+  function withConsumerAuth(handler: RouteHandler): RouteHandler {
+    return async (ctx: RouteContext): Promise<void> => {
+      // Pick up a reader revocation (or credential change) a separate process
+      // wrote since the last request — the SAME live-reload seam the telemetry
+      // guard uses — before deciding on this credential.
+      options.refreshBeforeAuth?.();
+      const credential = parseBearer(ctx.req.headers.authorization);
+      const outcome = readCredentialRegistry.verify(credential);
+      if (!outcome.ok) {
+        // The reason is surfaced verbatim — a revoked reader stays 'revoked',
+        // distinguishable from an unknown reader (FR-010), never anonymous.
+        respondJson(ctx.res, 401, { error: 'unauthorized', reason: outcome.reason });
+        return;
+      }
+      await handler(ctx);
+    };
+  }
+
   // --- handlers (extracted to runtime-handlers.ts, T015) ------------------
   // The raw (pre-auth) handler bodies live in the sibling module to keep both
   // files under the Constitution VI file cap; they close over the live state
@@ -292,20 +350,28 @@ export function createPlaneRuntime(options: PlaneRuntimeOptions): PlaneRuntime {
   // --- wire the server ----------------------------------------------------
   return {
     createServer(): Server {
+      // THE COUPLING FIX (specs/038 US1): the nine CONSUMER READ routes
+      // (contracts/plane-read-credential.md § Route classes) are guarded by the
+      // reader-credential class via `withConsumerAuth`; they NO LONGER verify
+      // against the telemetry registry. The command routes (issueRunCommand,
+      // commandStatus, issueFleetCommand) and store-health are NOT read routes
+      // and are not in the reader contract, so they stay on the telemetry
+      // `withAuth` guard (unchanged) — as do ingest/sidecar/liveness/enroll
+      // below.
       const guardedConsumer: PlaneRouteHandlers = {
-        fleetSnapshot: withAuth(consumerHandlers.fleetSnapshot),
-        fleetStream: withAuth(consumerHandlers.fleetStream),
-        runDetail: withAuth(consumerHandlers.runDetail),
-        runHistory: withAuth(consumerHandlers.runHistory),
-        runTimings: withAuth(consumerHandlers.runTimings),
+        fleetSnapshot: withConsumerAuth(consumerHandlers.fleetSnapshot),
+        fleetStream: withConsumerAuth(consumerHandlers.fleetStream),
+        runDetail: withConsumerAuth(consumerHandlers.runDetail),
+        runHistory: withConsumerAuth(consumerHandlers.runHistory),
+        runTimings: withConsumerAuth(consumerHandlers.runTimings),
         issueRunCommand: withAuth(consumerHandlers.issueRunCommand),
         commandStatus: withAuth(consumerHandlers.commandStatus),
         issueFleetCommand: withAuth(consumerHandlers.issueFleetCommand),
         storeHealth: withAuth(consumerHandlers.storeHealth),
-        instanceSnapshot: withAuth(consumerHandlers.instanceSnapshot),
-        instanceStream: withAuth(consumerHandlers.instanceStream),
-        instanceDetail: withAuth(consumerHandlers.instanceDetail),
-        instanceRuns: withAuth(consumerHandlers.instanceRuns),
+        instanceSnapshot: withConsumerAuth(consumerHandlers.instanceSnapshot),
+        instanceStream: withConsumerAuth(consumerHandlers.instanceStream),
+        instanceDetail: withConsumerAuth(consumerHandlers.instanceDetail),
+        instanceRuns: withConsumerAuth(consumerHandlers.instanceRuns),
       };
       const enrollRoute: readonly ExtraRoute[] =
         options.enrollment === undefined

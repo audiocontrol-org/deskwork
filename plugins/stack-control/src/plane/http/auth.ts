@@ -20,10 +20,47 @@
  * task (T121/T124).
  */
 
+/** The refusal reason shared by both credential-verification paths. */
+export type CredentialRefusal = 'missing' | 'unknown' | 'revoked';
+
 /** The result of verifying a bearer token against the registry. */
 export type AuthOutcome =
   | { readonly ok: true; readonly installationId: string }
-  | { readonly ok: false; readonly reason: 'missing' | 'unknown' | 'revoked' };
+  | { readonly ok: false; readonly reason: CredentialRefusal };
+
+/**
+ * The core credential lookup, shared by the telemetry and reader verification
+ * paths WITHOUT sharing a verification RESULT: each registry closes over its
+ * OWN `active`/`revoked` collections and calls this pure helper against them,
+ * so a credential in one registry's set is never consulted by the other. The
+ * two paths remain structurally distinct (research R3) while the missing →
+ * revoked (terminal) → unknown → ok decision order is expressed once.
+ */
+function resolveCredential(
+  active: ReadonlyMap<string, string>,
+  revoked: ReadonlySet<string>,
+  credential: string | undefined,
+):
+  | { readonly ok: true; readonly value: string }
+  | { readonly ok: false; readonly reason: CredentialRefusal } {
+  if (credential === undefined || credential === '') {
+    return { ok: false, reason: 'missing' };
+  }
+
+  // Revoked is checked first and wins even if the credential also appears in
+  // `active` — revocation is terminal, never downgraded to a plain "unknown"
+  // and never allowed to resolve to `ok: true`.
+  if (revoked.has(credential)) {
+    return { ok: false, reason: 'revoked' };
+  }
+
+  const value = active.get(credential);
+  if (value === undefined) {
+    return { ok: false, reason: 'unknown' };
+  }
+
+  return { ok: true, value };
+}
 
 /** Verifies bearer tokens, resolving each to its owning installation. */
 export interface TokenRegistry {
@@ -51,23 +88,68 @@ export function createTokenRegistry(seed: {
 
   return {
     verify(bearerToken: string | undefined): AuthOutcome {
-      if (bearerToken === undefined || bearerToken === '') {
-        return { ok: false, reason: 'missing' };
+      const resolution = resolveCredential(active, revoked, bearerToken);
+      if (!resolution.ok) {
+        return { ok: false, reason: resolution.reason };
       }
+      return { ok: true, installationId: resolution.value };
+    },
+  };
+}
 
-      // Revoked is checked first and wins even if the token also appears in
-      // `active` — revocation is terminal (FR-088), never downgraded to a
-      // plain "unknown" and never allowed to resolve to `ok: true`.
-      if (revoked.has(bearerToken)) {
-        return { ok: false, reason: 'revoked' };
+// ---------------------------------------------------------------------------
+// Reader-credential class (specs/038-fleet-dashboard, US1 — FR-007..012).
+//
+// A SEPARATE verification path from the telemetry `TokenRegistry` (research
+// R3). The consumer read routes verify against a `ReadCredentialRegistry`;
+// ingest/sidecar/liveness routes stay on the telemetry `TokenRegistry`. The
+// two never share a verification result — the load-bearing structural property
+// that makes the class invariant (a reader is refused on ingest routes; a
+// telemetry token is refused on read routes) impossible to violate by
+// construction, rather than by a `kind`-tagged shared registry whose single
+// generic result is exactly how a reader could leak onto an ingest route.
+// ---------------------------------------------------------------------------
+
+/** The result of verifying a read credential. Carries a `readerId` (an opaque
+ * reader label) rather than an installationId — read access is a consumer
+ * concern, not a per-installation identity. */
+export type ReadAuthOutcome =
+  | { readonly ok: true; readonly readerId: string }
+  | { readonly ok: false; readonly reason: CredentialRefusal };
+
+/** Verifies read credentials of the consumer/read class. */
+export interface ReadCredentialRegistry {
+  /**
+   * Resolves a read credential to its reader label, or reports why it was
+   * refused. A revoked reader is refused with reason 'revoked' (distinguishable
+   * from an unknown reader), never downgraded and never accepted. With an empty
+   * active set (no reader configured) EVERY credential is refused — the
+   * fail-closed guarantee (FR-012): no anonymous read, no telemetry fallback.
+   */
+  verify(credential: string | undefined): ReadAuthOutcome;
+}
+
+/**
+ * Builds an in-memory ReadCredentialRegistry from a seed of active read
+ * credentials (credential -> readerId) and revoked ones. Read credentials are
+ * independently revocable (FR-010): the registry closes over the CALLER's
+ * `active`/`revoked` collection references, so mutating the passed `revoked`
+ * set (the plane's existing live-reload seam) refuses that reader on the next
+ * request without touching any other reader or any telemetry credential.
+ */
+export function createReadCredentialRegistry(seed: {
+  readonly active: ReadonlyMap<string, string>;
+  readonly revoked: ReadonlySet<string>;
+}): ReadCredentialRegistry {
+  const { active, revoked } = seed;
+
+  return {
+    verify(credential: string | undefined): ReadAuthOutcome {
+      const resolution = resolveCredential(active, revoked, credential);
+      if (!resolution.ok) {
+        return { ok: false, reason: resolution.reason };
       }
-
-      const installationId = active.get(bearerToken);
-      if (installationId === undefined) {
-        return { ok: false, reason: 'unknown' };
-      }
-
-      return { ok: true, installationId };
+      return { ok: true, readerId: resolution.value };
     },
   };
 }
