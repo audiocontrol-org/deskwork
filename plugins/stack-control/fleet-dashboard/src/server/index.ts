@@ -10,15 +10,12 @@
  */
 
 import { createServer } from 'node:http';
-import { parseArgs } from 'node:util';
-
-const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 8080;
-const HOST = '127.0.0.1'; // Loopback default
+import { loadConfig } from './config.js';
 
 async function main(): Promise<void> {
   try {
-    // TODO: T004 — load config (FLEET_PLANE_URL, FLEET_PLANE_READ_TOKEN, bind opts)
-    // TODO: T013 — initialize plane-client
+    const config = loadConfig(process.env);
+    // TODO: T013 — initialize plane-client (config.planeUrl / config.planeReadToken)
     // TODO: T015 — wire routes (mounted on the http server)
 
     const server = createServer((req, res) => {
@@ -33,9 +30,9 @@ async function main(): Promise<void> {
       );
     });
 
-    server.listen(PORT, HOST, () => {
+    server.listen(config.port, config.host, () => {
       // eslint-disable-next-line no-console
-      console.log(`Fleet Dashboard BFF starting on ${HOST}:${PORT}`);
+      console.log(`Fleet Dashboard BFF starting on ${config.host}:${config.port}`);
     });
 
     server.on('error', (err) => {
