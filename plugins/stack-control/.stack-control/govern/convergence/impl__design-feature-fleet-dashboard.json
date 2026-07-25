@@ -3,25 +3,20 @@
   "mode": "impl",
   "item": "design:feature/fleet-dashboard",
   "governedShaBase": "95903c90",
-  "headSha": "8d5db4a6008a77fdada8486171deb7502f628f3d",
+  "headSha": "f3a9407e89836432bfd13531ed4b4bc038e066b3",
   "chunkIds": [
     "a05ace3895b8bd87"
   ],
   "rounds": 1,
   "liftedFindings": [
     {
-      "id": "a05ace3895b8bd87::AUDIT-BARRAGE-claude-01",
-      "title": "Fire-and-forget resync after upstream drop crashes the entire BFF on the exact scenario FR-016 is meant to survive",
-      "severity": "blocking"
-    },
-    {
-      "id": "a05ace3895b8bd87::AUDIT-BARRAGE-claude-02",
-      "title": "SSE broadcast has no per-listener error isolation and no `error` handler on the response — one client disconnect can crash the process for every connected dashboard",
+      "id": "a05ace3895b8bd87::AUDIT-BARRAGE-claude-01+AUDIT-BARRAGE-codex-02",
+      "title": "FR-010 \"independent revocation\" for read credentials has no production wiring — a leaked read credential cannot be revoked without a full plane restart",
       "severity": "high"
     },
     {
-      "id": "a05ace3895b8bd87::AUDIT-BARRAGE-codex-02",
-      "title": "Relay reconnect permanently stalls if the re-snapshot fails after a drop",
+      "id": "a05ace3895b8bd87::AUDIT-BARRAGE-codex-01",
+      "title": "PlaneClientError can leak the read token through injected fetch errors",
       "severity": "high"
     }
   ],
