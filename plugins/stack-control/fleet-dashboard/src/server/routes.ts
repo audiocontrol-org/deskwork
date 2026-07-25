@@ -54,7 +54,10 @@ const API_INSTANCES_PATH = '/api/instances';
 const API_STREAM_PATH = '/api/stream';
 const INCLUDE_ALL_VALUE = 'all';
 
-function writeJson(res: ServerResponse, status: number, body: unknown): void {
+/** Exported so drill-in-routes.ts (T019, US3) reuses the exact same
+ * JSON-response shape instead of re-implementing it — one write helper for
+ * the whole `/api/*` surface. */
+export function writeJson(res: ServerResponse, status: number, body: unknown): void {
   res.writeHead(status, { 'content-type': 'application/json' });
   res.end(JSON.stringify(body));
 }
@@ -64,8 +67,9 @@ function writeJson(res: ServerResponse, status: number, body: unknown): void {
  * contract) or an unexpected non-`PlaneClientError` throw. Never forwards
  * `err.message` to the browser: this module cannot itself audit that an
  * unexpected error's message is credential-free, so it never takes the
- * risk (FR-003). */
-function writeUpstreamUnavailable(res: ServerResponse): void {
+ * risk (FR-003). Exported so drill-in-routes.ts (T019, US3) returns the
+ * IDENTICAL upstream-unavailable shape rather than a near-duplicate. */
+export function writeUpstreamUnavailable(res: ServerResponse): void {
   writeJson(res, 503, {
     error: 'upstream_unavailable',
     message: 'the fleet plane is unreachable',
