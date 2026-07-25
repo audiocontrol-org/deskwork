@@ -1,0 +1,7 @@
+{"id":"T001","tierLabel":"fast","model":"haiku","commitRange":"95903c90..648cb736","reviewClean":true,"note":"dashboard subtree + tsconfig/vitest wiring + tsx entrypoint + README; tsc clean, full suite green"}
+{"id":"T002","tierLabel":"fast","model":"haiku","commitRange":"95903c90..648cb736","reviewClean":true,"note":"loopback-default tsx start entrypoint + README start-command note"}
+{"id":"T005","tierLabel":"fast","model":"haiku","commitRange":"648cb736..f22b4f27","reviewClean":true,"note":"RED four-cell truth table; delivered in single opus unit dispatch (US1)"}
+{"id":"T006","tierLabel":"fast","model":"haiku","commitRange":"648cb736..f22b4f27","reviewClean":true,"note":"RED fail-closed + independent-revocation; delivered in single opus unit dispatch (US1)"}
+{"id":"T007","tierLabel":"powerful","model":"opus","commitRange":"648cb736..f22b4f27","reviewClean":true,"note":"reader-credential verifier in auth.ts, DI interface, distinct from telemetry TokenRegistry"}
+{"id":"T008","tierLabel":"powerful","model":"opus","commitRange":"648cb736..f22b4f27","reviewClean":true,"note":"coupling fix: consumer read routes rewired to withConsumerAuth; 17 test files migrated; full suite 3711/3711 green, no read route on telemetry registry"}
+{"id":"T009","tierLabel":"balanced","model":"sonnet","commitRange":"648cb736..f22b4f27","reviewClean":true,"note":"read-credential config + live-reload wiring (src/subcommands/plane.ts), installation-anchored; delivered in opus unit dispatch"}
