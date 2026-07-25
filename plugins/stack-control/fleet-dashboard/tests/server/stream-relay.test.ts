@@ -20,6 +20,7 @@ import {
   createStreamRelay,
   isInstanceDelta,
   type ConnectUpstream,
+  type InstanceDelta,
   type RelayEvent,
   type ScheduleReconnect,
   type StreamRelayDeps,
@@ -578,6 +579,110 @@ describe('stream-relay — post-drop resync retries instead of crashing/stalling
       { kind: 'disconnected' },
       { kind: 'delta', delta: { kind: 'instance-upserted', instance: { id: 'ghost:1' } } },
       { kind: 'snapshot', instances: [{ id: 'a:b' }] },
+    ]);
+  });
+});
+
+/**
+ * A fake plane modeling BOTH read channels the relay uses over ONE evolving
+ * registry, so a test can reproduce AUDIT-20260725-06's snapshot-to-stream
+ * gap deterministically:
+ *
+ *   - `connectUpstream()` emits the registry's current ids as an initial
+ *     snapshot-as-deltas burst — `instance-upserted` per present id, mirroring
+ *     the plane's `/v1/instances/stream` which computes its opening burst from
+ *     `last = []` (src/plane/instance-handlers.ts) — and REGISTERS the
+ *     connection so any subsequent registry mutation is delivered to it as an
+ *     ongoing delta.
+ *   - `instanceSnapshot()` returns the registry state at call time; the FIRST
+ *     call also applies a scripted removal IMMEDIATELY AFTER capturing its
+ *     return value — a delta "committed around the snapshot read" — emitting an
+ *     ongoing `instance-removed` to every currently-connected stream.
+ *
+ * Under the OLD snapshot-first ordering the GET is read (and its removal
+ * applied) BEFORE any stream is connected, so the removal's ongoing delta is
+ * emitted to nobody, and the stream's later opening burst (upserts-only, per
+ * the plane) never mentions the already-gone instance — so the removal is
+ * LOST and the view stays permanently stale. Under the buffered-reconcile fix
+ * the stream is connected FIRST, so the removal's ongoing delta is buffered
+ * and folded into the reconcile — applied, never lost.
+ */
+function createGapPlane(
+  initialIds: readonly string[],
+  gapRemovedId: string,
+): {
+  readonly connectUpstream: ConnectUpstream;
+  readonly planeClient: StreamRelayDeps['planeClient'];
+  readonly connections: readonly FakeUpstreamConnection[];
+} {
+  let ids: string[] = [...initialIds];
+  const live = new Set<UpstreamHandlers>();
+  const connections: FakeUpstreamConnection[] = [];
+  let didMutate = false;
+
+  const connectUpstream: ConnectUpstream = (handlers: UpstreamHandlers): UpstreamConnection => {
+    const record: FakeUpstreamConnection = { handlers, closed: false };
+    connections.push(record);
+    for (const id of ids) {
+      handlers.onDelta({ kind: 'instance-upserted', instance: { id } });
+    }
+    live.add(handlers);
+    return {
+      close(): void {
+        record.closed = true;
+        live.delete(handlers);
+      },
+    };
+  };
+
+  const planeClient: StreamRelayDeps['planeClient'] = {
+    instanceSnapshot: async () => {
+      const body = { instances: ids.map((id) => ({ id })) };
+      if (!didMutate) {
+        didMutate = true;
+        ids = ids.filter((id) => id !== gapRemovedId);
+        const removal: InstanceDelta = { kind: 'instance-removed', id: gapRemovedId };
+        for (const handlers of live) {
+          handlers.onDelta(removal);
+        }
+      }
+      return body;
+    },
+  };
+
+  return { connectUpstream, planeClient, connections };
+}
+
+describe('stream-relay — snapshot-to-stream gap cannot lose a live delta (AUDIT-20260725-06)', () => {
+  it('a delta committed in the gap window (around the snapshot read, before the stream is live) is applied, not lost', async () => {
+    const { connectUpstream, planeClient } = createGapPlane(['a:b', 'gone:1'], 'gone:1');
+    const relay = createStreamRelay({ planeClient, connectUpstream });
+
+    await relay.start();
+
+    // A subscriber joining after start() sees the AUTHORITATIVE reconciled view.
+    // The gap-window removal of `gone:1` must be reflected — under the old
+    // snapshot-first ordering it leaks (the stream connects too late to observe
+    // it and its opening burst never re-removes an already-gone instance).
+    const events: RelayEvent[] = [];
+    relay.subscribe((event) => events.push(event));
+
+    expect(events).toEqual([{ kind: 'snapshot', instances: [{ id: 'a:b' }] }]);
+  });
+
+  it('a buffered instance-removed for an id present in the authoritative snapshot removes it after reconcile', async () => {
+    // The reconcile seeds from the GET snapshot (which still lists `gone:1`) and
+    // folds the buffered removal on top — an idempotent delete by id.
+    const { connectUpstream, planeClient } = createGapPlane(['a:b', 'c:d', 'gone:1'], 'gone:1');
+    const relay = createStreamRelay({ planeClient, connectUpstream });
+
+    await relay.start();
+
+    const events: RelayEvent[] = [];
+    relay.subscribe((event) => events.push(event));
+
+    expect(events).toEqual([
+      { kind: 'snapshot', instances: [{ id: 'a:b' }, { id: 'c:d' }] },
     ]);
   });
 });
