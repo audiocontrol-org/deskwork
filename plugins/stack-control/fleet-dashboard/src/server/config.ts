@@ -101,7 +101,7 @@ function requireSingleCredential(value: string): string {
   if (value.includes(',')) {
     throw new DashboardConfigError(
       `fleet-dashboard config: FLEET_PLANE_READ_TOKEN must be a single credential, but the ` +
-        `configured value contains a comma ('${value}'). The dashboard holds exactly ONE read ` +
+        `configured value contains a comma (value redacted). The dashboard holds exactly ONE read ` +
         `credential — one of the plane's configured readers. A comma-separated LIST of readers ` +
         `belongs to the PLANE's own FLEET_PLANE_READ_TOKENS (plural) environment variable, not ` +
         `the dashboard's FLEET_PLANE_READ_TOKEN (singular) — refusing to start with an ` +

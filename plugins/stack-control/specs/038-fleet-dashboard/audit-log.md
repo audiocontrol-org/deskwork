@@ -146,3 +146,18 @@ Surface:    fleet-dashboard/src/server/config.ts:60-68; fleet-dashboard/src/serv
 The plane serve path parses `FLEET_PLANE_READ_TOKEN` as one-or-more comma-separated credentials, trims each token, and registers each separately (`src/subcommands/plane.ts:108-121`). The dashboard config, however, reads the same variable as a single opaque string (`fleet-dashboard/src/server/config.ts:60-68`), and the plane client sends that raw string as `Authorization: Bearer ${planeReadToken}` (`fleet-dashboard/src/server/plane-client.ts:158-163`).
 
 If an operator configures the plane for rotation or multi-reader access with `FLEET_PLANE_READ_TOKEN=r1,r2` and gives the dashboard the same env value, the plane accepts `r1` and `r2`, but the dashboard sends `Bearer r1,r2`, which matches neither reader and makes every BFF upstream read fail. Blast radius is high because this is a plausible documented rotation shape and it breaks the shipped dashboard at startup/runtime with only 503s to the browser. Correct by making the dashboard variable unambiguously single-token and rejecting comma lists, or by giving the plane’s multi-reader list a distinct env var from the dashboard’s selected credential.
+
+## 2026-07-25 — audit-barrage lift (end-govern-after_implement)
+
+### AUDIT-20260725-09 — Comma rejection leaks the read credential into startup logs
+
+Finding-ID: AUDIT-20260725-09
+Status:     resolved (fixed — requireSingleCredential message now says "value redacted", no secret substring; stays actionable naming the plural var; RED test added asserting the message omits the credential. Fix-induced regression from the AUDIT-07/08 comma-rejection, caught round 5)
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    fleet-dashboard/src/server/config.ts:100-108, fleet-dashboard/src/server/index.ts:72-75
+
+`requireSingleCredential()` throws a `DashboardConfigError` whose message includes the raw configured value: `configured value contains a comma ('${value}')`. The server entrypoint then logs `String(err)` on startup failure. If an operator accidentally sets `FLEET_PLANE_READ_TOKEN=r1,r2`, the dashboard prints the actual reader credentials into process logs.
+
+Blast radius is high because this is a credential-handling fix path: the exact misconfiguration the new code catches now creates a secret disclosure channel. A reasonable fix is to keep the fail-loud message but redact the value entirely, e.g. “contains a comma” plus guidance naming the singular/plural env vars, with no secret substring in the error.

@@ -3,20 +3,15 @@
   "mode": "impl",
   "item": "design:feature/fleet-dashboard",
   "governedShaBase": "95903c90",
-  "headSha": "04cf4604d18fdd84c256a47bea5570390fd43852",
+  "headSha": "ae178f774d36941c866ecf4e0a46477c6c5e3718",
   "chunkIds": [
-    "db97071a0524123e"
+    "041b59a0434fa337"
   ],
   "rounds": 1,
   "liftedFindings": [
     {
-      "id": "db97071a0524123e::AUDIT-BARRAGE-claude-01",
-      "title": "Same env var name, incompatible parsing semantics between the plane and the dashboard BFF",
-      "severity": "high"
-    },
-    {
-      "id": "db97071a0524123e::AUDIT-BARRAGE-codex-01",
-      "title": "Dashboard forwards comma-separated read-token lists as one invalid bearer token",
+      "id": "041b59a0434fa337::AUDIT-BARRAGE-codex-01",
+      "title": "Comma rejection leaks the read credential into startup logs",
       "severity": "high"
     }
   ],

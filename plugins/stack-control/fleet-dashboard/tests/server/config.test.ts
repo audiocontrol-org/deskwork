@@ -66,6 +66,23 @@ describe('loadConfig — FLEET_PLANE_READ_TOKEN is single-valued (AUDIT-20260725
     );
   });
 
+  it('does not leak the raw credential value into the comma-rejection message (AUDIT-20260725-09)', () => {
+    const secretA = 'SECRET-reader-alpha';
+    const secretB = 'SECRET-reader-beta';
+    let thrown: unknown;
+    try {
+      loadConfig({ ...REQUIRED, FLEET_PLANE_READ_TOKEN: `${secretA},${secretB}` });
+    } catch (err) {
+      thrown = err;
+    }
+    expect(thrown).toBeInstanceOf(DashboardConfigError);
+    if (!(thrown instanceof DashboardConfigError)) throw new Error('expected a DashboardConfigError');
+    // The message must stay actionable (names the plural var) but MUST NOT echo the secret.
+    expect(thrown.message).toMatch(/FLEET_PLANE_READ_TOKENS/);
+    expect(thrown.message).not.toContain(secretA);
+    expect(thrown.message).not.toContain(secretB);
+  });
+
   it('the comma-rejection error names the plane-side plural var as the correct home for a list', () => {
     expectConfigError({ ...REQUIRED, FLEET_PLANE_READ_TOKEN: 'r1,r2' }, /FLEET_PLANE_READ_TOKENS/);
   });
