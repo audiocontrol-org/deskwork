@@ -219,18 +219,17 @@ describe('stream-relay — upstream drop -> reconnect -> re-snapshot (FR-016)', 
     if (firstConn === undefined) throw new Error('expected an initial upstream connection');
     firstConn.handlers.onDrop();
 
-    // Subscribe synchronously, in the same tick as the drop — before the
-    // fake plane client's Promise has had a chance to resolve.
+    // Subscribe synchronously, in the same tick as the drop — after the
+    // (already-broadcast-to-nobody, since this subscriber wasn't
+    // registered yet) disconnected signal. A late joiner never receives a
+    // past broadcast; it just waits for readiness.
     const events: RelayEvent[] = [];
     relay.subscribe((event) => events.push(event));
-    expect(events).toEqual([{ kind: 'disconnected' }]);
+    expect(events).toEqual([]);
 
     await flushAsync();
 
-    expect(events).toEqual([
-      { kind: 'disconnected' },
-      { kind: 'snapshot', instances: [{ id: 'g:h' }] },
-    ]);
+    expect(events).toEqual([{ kind: 'snapshot', instances: [{ id: 'g:h' }] }]);
   });
 
   it('deltas that arrive on the fresh upstream connection after reconnect keep applying', async () => {
