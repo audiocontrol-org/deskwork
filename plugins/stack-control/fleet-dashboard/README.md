@@ -19,15 +19,15 @@ Once the server is running, open your browser to `http://127.0.0.1:8080/`.
 
 ## Configuration
 
-### Required Environment Variables
+The server validates configuration at startup and exits with a descriptive error if any required variable is missing or invalid.
 
-- **`FLEET_PLANE_URL`**: The full URL of the plane's `/v1/*` API endpoint (e.g., `http://localhost:7777`). No default; server exits if missing.
-- **`FLEET_PLANE_READ_TOKEN`**: The plane's read credential (a bearer token distinct from telemetry tokens). No default; server exits if missing.
-
-### Optional Environment Variables
-
-- **`PORT`** (default: `8080`): The port the dashboard server binds to.
-- **`HOST`** (default: `127.0.0.1`): The address the server binds to. Loopback binding is the default security posture; non-loopback binds should only be used when the dashboard is deployed behind a service mesh or ingress controller that enforces authentication and authorization.
+| Env Var | Required? | Default | Description |
+|---------|-----------|---------|-------------|
+| `FLEET_PLANE_URL` | **Yes** | — | Full URL of the plane's `/v1/*` read API (e.g., `http://localhost:7777`). Missing/empty value exits with an error. |
+| `FLEET_PLANE_READ_TOKEN` | **Yes** | — | The plane's read credential — a bearer token distinct from sidecar telemetry tokens. Missing/empty value exits with an error. |
+| `HOST` | No | `127.0.0.1` | The address the server binds to. Loopback (`127.0.0.1`, `localhost`, `::1`) requires no opt-in. A non-loopback bind requires explicit opt-in via `FLEET_DASHBOARD_ALLOW_NON_LOOPBACK=true` and **must be fronted by deployment infrastructure** (service mesh / identity-aware proxy) enforcing authentication and authorization per connection. |
+| `PORT` | No | `8080` | The port the server binds to. Must be an integer between 1 and 65535. |
+| `FLEET_DASHBOARD_ALLOW_NON_LOOPBACK` | No | — | Explicit opt-in for non-loopback binding. **Only recognized when set to exactly `true`**. A non-loopback `HOST` without this flag set to `true` causes the server to exit with an error. See **Zero-Trust Posture** below. |
 
 ## Architecture
 
@@ -42,21 +42,27 @@ The BFF holds the read credential and is the sole authorized caller of the plane
 - `/api/instances` — the current fleet state (read from plane, cached in memory)
 - `/api/stream` — server-sent events for live instance delta updates
 
-### Browser
+### Browser UI (Deferred)
 
-The browser UI is deferred to a `/frontend-design` pass (see `src/client/CONTRACT.md`). The browser-facing API contract and visual design are captured in that document; framework and implementation are downstream.
+The browser UI's visual design and interaction model are deferred to a `/frontend-design` pass (see `src/client/CONTRACT.md` for the API contract). This document specifies the server and nonvisual interaction contracts; framework, layout, and styling are downstream of the design pass. The browser talks exclusively to the dashboard server's own origin; it never calls the plane directly.
 
 ## Security
 
 ### Loopback Binding (Default)
 
-The dashboard server binds to `127.0.0.1:8080` by default. This restricts access to the local machine. In a containerized or multi-host setup, non-loopback binds must be fronted by a service mesh or ingress controller that enforces authentication and authorization.
+The dashboard server binds to loopback by default (`127.0.0.1:8080`), restricting access to the local machine. This is the default security posture and requires no configuration.
 
-### Zero-Trust Posture
+For deployments that require non-loopback binding (containerized setups, multi-host environments, etc.), an explicit opt-in is **required** via `FLEET_DASHBOARD_ALLOW_NON_LOOPBACK=true`. A non-loopback bind without this flag causes the server to exit with an error. **Any non-loopback bind must be fronted by deployment infrastructure** (service mesh, identity-aware proxy, etc.) that enforces authentication and authorization per connection.
 
-- The plane read credential is stored server-side and is **never transmitted to the browser**.
-- The browser has no login/session/auth surface (no `WWW-Authenticate` challenges, no `Set-Cookie` auth headers).
-- All authorization is delegated to the service mesh / ingress controller in front of the dashboard server.
+### Zero-Trust Posture — No In-App Authentication
+
+The dashboard implements **zero in-app human authentication** — there is no login form, session management, OAuth/OIDC integration, cookies, roles, or user store. All browser-facing access control is delegated entirely to deployment infrastructure.
+
+- **Credential stays server-side**: The plane read credential is stored in the dashboard server process and is **never transmitted to or observable by the browser**.
+- **No browser auth surface**: The browser receives no `WWW-Authenticate` challenges, `Set-Cookie` auth headers, or any application-level authentication mechanism.
+- **Delegated to the mesh**: All identity and authorization decisions are made by the service mesh / identity-aware proxy in front of the dashboard server. The dashboard itself trusts nothing by network location and implements no fallback authentication.
+
+This architecture ensures the read credential cannot leak through the browser and decouples the dashboard from identity-provider operations.
 
 ## Development & Testing
 
