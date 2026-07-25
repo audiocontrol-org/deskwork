@@ -271,20 +271,45 @@ export function createStreamRelay(deps: StreamRelayDeps): StreamRelay {
 
   /**
    * One subscribe-buffer-snapshot-reconcile attempt. Opens + buffers the
-   * upstream, reads the authoritative snapshot, folds the buffered deltas onto
-   * it, then goes live and broadcasts the reconciled snapshot. Any failure
-   * after the connection is opened closes it (no leaked upstream) and rejects,
-   * so the caller (`start()`'s boot retry, or the post-drop {@link
-   * attemptReconnect} loop) opens a fresh attempt.
+   * upstream, AWAITS the establishment handshake (AUDIT-20260725-10), reads the
+   * authoritative snapshot, folds the buffered deltas onto it, then goes live
+   * and broadcasts the reconciled snapshot. Any failure after the connection is
+   * opened closes it (no leaked upstream) and rejects, so the caller
+   * (`start()`'s boot retry, or the post-drop {@link attemptReconnect} loop)
+   * opens a fresh attempt.
    */
   async function resync(): Promise<void> {
     const episode = openBufferingEpisode();
+    const connection = episode.connection;
     try {
+      if (connection === undefined) {
+        throw new StreamRelayError(
+          'stream-relay: upstream connection was not created before reconcile',
+        );
+      }
+      // AUDIT-20260725-10: `connectUpstream()` returning is NOT proof the plane
+      // accepted /v1/instances/stream — the production connector only STARTS the
+      // fetch and returns synchronously. Await the establishment handshake (SSE
+      // response headers received, parser ready) so the subscribe-before-snapshot
+      // ordering (AUDIT-20260725-06) genuinely holds: the upstream is registered
+      // at the plane BEFORE the authoritative snapshot read, so a delta committed
+      // around the snapshot boundary is buffered here, never dropped into a gap.
+      // Deltas arriving during this wait are buffered by the episode handlers. A
+      // rejection (connect refused / non-2xx / hung-connect header timeout) is
+      // caught below and abandons this attempt for the retry loop — never an
+      // infinite await (the fetch's own header timeout + `close()` bound it).
+      await connection.established;
+      if (stopped) {
+        // A teardown raced establishment — do NOT read the snapshot or go live
+        // after stop (channel: reconnect-after-stop).
+        connection.close();
+        return;
+      }
       const body = await deps.planeClient.instanceSnapshot();
       if (stopped) {
         // A teardown raced this in-flight snapshot fetch — do NOT go live or
         // broadcast after stop (channel: reconnect-after-stop).
-        episode.connection?.close();
+        connection.close();
         return;
       }
       if (activeEpisode !== episode || episode.aborted) {

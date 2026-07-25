@@ -920,6 +920,171 @@ describe('stream-relay — production async establishment closes the gap for rea
 
     expect(events).toEqual([{ kind: 'snapshot', instances: [{ id: 'a:b' }] }]);
   });
+
+  it('when establishment REJECTS (plane refuses/unreachable) the attempt is caught (no unhandled rejection) and retried until the SSE establishes', async () => {
+    // Channel: the establishment handshake rejects — the plane refused the SSE
+    // or is still unreachable. This must behave exactly like a snapshot-side
+    // resync failure: caught (never a fatal unhandled rejection), the attempt's
+    // connection closed, and the retry loop re-attempts until one establishes.
+    const rejections: unknown[] = [];
+    const onUnhandled = (reason: unknown): void => {
+      rejections.push(reason);
+    };
+    process.on('unhandledRejection', onUnhandled);
+    try {
+      const { scheduleReconnect, pending, flushOne } = createManualReconnectScheduler();
+      const connections: FakeUpstreamConnection[] = [];
+      let attempt = 0;
+      const connectUpstream: ConnectUpstream = (handlers: UpstreamHandlers): UpstreamConnection => {
+        attempt += 1;
+        const n = attempt;
+        const record: FakeUpstreamConnection = { handlers, closed: false };
+        connections.push(record);
+        // attempt 1 (start) + attempt 4 establish; attempts 2 and 3 (the first
+        // two post-drop tries) reject as if the plane were still restarting.
+        const established =
+          n === 1 || n >= 4
+            ? Promise.resolve()
+            : Promise.reject(new Error(`plane refused the SSE (attempt ${n})`));
+        return {
+          established,
+          close(): void {
+            record.closed = true;
+          },
+        };
+      };
+      const { planeClient, calls } = createFakePlaneClient([
+        snapshotBody(['a:b']), // start()
+        snapshotBody(['a:b', 'e:f']), // the attempt that finally establishes
+      ]);
+      const relay = createStreamRelay({ planeClient, connectUpstream, scheduleReconnect });
+
+      await relay.start();
+
+      const events: RelayEvent[] = [];
+      relay.subscribe((event) => events.push(event));
+
+      const firstConn = connections[0];
+      if (firstConn === undefined) throw new Error('expected an initial upstream connection');
+      firstConn.handlers.onDrop();
+      await flushAsync(); // attempt 2: establishment rejects -> caught -> retry scheduled
+
+      // A failed establishment opened (and closed) one connection and did NOT
+      // read the snapshot (only start's snapshot has been read so far).
+      expect(connections).toHaveLength(2);
+      expect(connections[1]?.closed).toBe(true);
+      expect(pending.length).toBe(1);
+      expect(calls.length).toBe(1);
+
+      await flushOne(); // attempt 3: establishment rejects again -> retry
+      expect(connections).toHaveLength(3);
+      expect(connections[2]?.closed).toBe(true);
+      expect(pending.length).toBe(1);
+      expect(calls.length).toBe(1);
+
+      await flushOne(); // attempt 4: establishes -> snapshot read -> live
+      expect(connections).toHaveLength(4);
+      expect(connections[3]?.closed).toBe(false);
+      expect(calls.length).toBe(2);
+      expect(events).toEqual([
+        { kind: 'snapshot', instances: [{ id: 'a:b' }] },
+        { kind: 'disconnected' },
+        { kind: 'snapshot', instances: [{ id: 'a:b' }, { id: 'e:f' }] },
+      ]);
+
+      // The whole point: an establishment rejection is never an unhandled
+      // rejection (fatal since Node 15) — every failed attempt was caught.
+      await flushAsync();
+      expect(rejections).toEqual([]);
+    } finally {
+      process.removeListener('unhandledRejection', onUnhandled);
+    }
+  });
+
+  it('stop() while a resync is awaiting establishment tears down cleanly — no snapshot read after stop, no leaked connection', async () => {
+    // Channel: stop() called while the attempt is blocked on the establishment
+    // handshake (before the SSE registered, before the snapshot GET). The
+    // buffering connection must be closed and the snapshot must NEVER be read.
+    const establishGate = createDeferred<void>();
+    const connections: FakeUpstreamConnection[] = [];
+    const connectUpstream: ConnectUpstream = (handlers: UpstreamHandlers): UpstreamConnection => {
+      const record: FakeUpstreamConnection = { handlers, closed: false };
+      connections.push(record);
+      return {
+        established: establishGate.promise,
+        close(): void {
+          record.closed = true;
+        },
+      };
+    };
+    let snapshotCalls = 0;
+    const planeClient: StreamRelayDeps['planeClient'] = {
+      instanceSnapshot: async () => {
+        snapshotCalls += 1;
+        return snapshotBody(['a:b']);
+      },
+    };
+    const relay = createStreamRelay({ planeClient, connectUpstream });
+
+    const events: RelayEvent[] = [];
+    relay.subscribe((event) => events.push(event)); // subscribes before ready
+
+    const startResult = relay.start(); // opens the upstream, awaits establishment
+
+    const conn = connections[0];
+    if (conn === undefined) throw new Error('expected a buffering upstream connection');
+
+    relay.stop(); // teardown WHILE awaiting establishment
+    establishGate.resolve(); // establishment resolves AFTER stop
+    await startResult;
+    await flushAsync();
+
+    // The snapshot was never read after stop, the connection was closed, and the
+    // relay never went live.
+    expect(snapshotCalls).toBe(0);
+    expect(conn.closed).toBe(true);
+    expect(connections).toHaveLength(1);
+    expect(events).toEqual([]);
+  });
+
+  it('establishment resolves but the authoritative snapshot GET then fails — existing retry semantics still hold', async () => {
+    // Channel: the SSE establishes, but the subsequent snapshot GET rejects. The
+    // relay must fall back to the same post-drop retry loop (AUDIT-01/03) and
+    // recover on a later attempt.
+    const { connectUpstream, connections } = createFakeUpstream(); // establishment always resolves
+    const { scheduleReconnect, pending, flushOne } = createManualReconnectScheduler();
+    const { planeClient, calls } = createScriptedPlaneClient([
+      () => snapshotBody(['a:b']), // start()
+      () => {
+        throw new PlaneClientError('snapshot GET failed after establishment');
+      },
+      () => snapshotBody(['a:b', 'e:f']), // recovery succeeds
+    ]);
+    const relay = createStreamRelay({ planeClient, connectUpstream, scheduleReconnect });
+
+    await relay.start();
+
+    const events: RelayEvent[] = [];
+    relay.subscribe((event) => events.push(event));
+
+    const firstConn = connections[0];
+    if (firstConn === undefined) throw new Error('expected an initial upstream connection');
+    firstConn.handlers.onDrop();
+    await flushAsync(); // attempt establishes then the snapshot fails -> retry
+
+    expect(connections).toHaveLength(2);
+    expect(calls.length).toBe(2);
+    expect(pending.length).toBe(1);
+
+    await flushOne(); // recovery establishes + snapshot succeeds -> live
+    expect(connections).toHaveLength(3);
+    expect(calls.length).toBe(3);
+    expect(events).toEqual([
+      { kind: 'snapshot', instances: [{ id: 'a:b' }] },
+      { kind: 'disconnected' },
+      { kind: 'snapshot', instances: [{ id: 'a:b' }, { id: 'e:f' }] },
+    ]);
+  });
 });
 
 describe('stream-relay — broadcast isolates a throwing subscriber (AUDIT-20260725-02)', () => {
