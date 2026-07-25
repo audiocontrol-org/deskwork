@@ -64,6 +64,14 @@ The dashboard implements **zero in-app human authentication** — there is no lo
 
 This architecture ensures the read credential cannot leak through the browser and decouples the dashboard from identity-provider operations.
 
+### Rotating / revoking read credentials
+
+`FLEET_PLANE_READ_TOKEN` (set on the **plane**, not the dashboard) accepts one or more comma-separated read credentials — each becomes an independently-revocable reader, distinct from sidecar telemetry tokens (FR-010).
+
+- **To revoke a read credential**: remove its entry from the plane's `FLEET_PLANE_READ_TOKEN` and restart the plane. The remaining credentials keep working; telemetry tokens are unaffected — revoking a reader never re-credentials or otherwise impacts the rest of the fleet.
+- **Read-credential changes take effect on plane restart.** The read-credential lifecycle is static-minimal for this feature (FR-011): there is no live hot-reload for read credentials (unlike file-backed telemetry enrollment), and interactive mint/list/revoke commands are out of scope.
+- The dashboard server's own `FLEET_PLANE_READ_TOKEN` (see **Configuration** above) holds the single credential it uses to authenticate itself to the plane — one of the plane's configured readers. Rotating the dashboard's copy also requires a dashboard restart to take effect.
+
 ## Development & Testing
 
 Tests follow the Test-First discipline (Constitution I) and are run via `vitest`:
