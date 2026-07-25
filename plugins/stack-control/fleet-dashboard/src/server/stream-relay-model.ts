@@ -77,9 +77,24 @@ export interface UpstreamHandlers {
 
 /** A live upstream connection handle. `close()` is idempotent-safe and,
  * per the {@link UpstreamHandlers} contract, suppresses any further
- * `onDrop()` from this connection. */
+ * `onDrop()` from this connection.
+ *
+ * `established` is the ESTABLISHMENT HANDSHAKE (AUDIT-20260725-10): it resolves
+ * the instant the upstream SSE is actually accepted at the plane — the
+ * `/v1/instances/stream` response headers have arrived and the delta parser is
+ * ready to receive the initial burst — and REJECTS if the connect attempt
+ * fails (transport error, or a non-2xx / bodyless response). The relay AWAITS
+ * this before it reads the authoritative snapshot, so the subscribe-before-
+ * snapshot ordering (AUDIT-20260725-06) holds against an async connector that
+ * only *starts* a `fetch` and returns synchronously — merely calling
+ * `connectUpstream()` is NOT proof the plane has registered the subscription.
+ * A rejection is treated exactly like a post-drop resync failure: the attempt
+ * is abandoned and the retry loop re-attempts. `established` MUST settle
+ * exactly once, and MUST NOT reject after `close()` in a way the relay treats
+ * as a live outage (a deliberate teardown is not a connect failure). */
 export interface UpstreamConnection {
   close(): void;
+  readonly established: Promise<void>;
 }
 
 /** The DI seam for the ONE upstream `/v1/instances/stream` connection this
@@ -87,7 +102,10 @@ export interface UpstreamConnection {
  * reconnect) — NEVER once per browser subscriber (research R1's fan-out
  * invariant is structural: `subscribe()` never calls this). Per
  * AUDIT-20260725-06 the relay opens this connection BEFORE it reads the
- * authoritative snapshot, so no delta between the two boundaries is lost. */
+ * authoritative snapshot; per AUDIT-20260725-10 it then AWAITS
+ * {@link UpstreamConnection.established} so the connection is genuinely
+ * registered at the plane before the snapshot GET, closing the gap for real
+ * against a fire-and-forget async connector. */
 export type ConnectUpstream = (handlers: UpstreamHandlers) => UpstreamConnection;
 
 /**

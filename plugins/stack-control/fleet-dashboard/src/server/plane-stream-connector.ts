@@ -50,6 +50,22 @@ export interface PlaneStreamConnectorDeps {
  * closes, or a transport error mid-read) all surface as exactly one
  * `handlers.onDrop()` call — UNLESS the caller already called `close()`
  * (a deliberate teardown is never reported as a drop).
+ *
+ * The returned {@link UpstreamConnection.established} handshake
+ * (AUDIT-20260725-10) resolves the instant the `fetch` resolves with an OK
+ * response whose body is a readable stream — i.e. the plane has accepted the
+ * SSE request and this module is about to consume the initial burst — and
+ * BEFORE any body parsing begins. It REJECTS if the connect fails (transport
+ * error), the response is non-2xx / bodyless, or a deliberate `close()` beats
+ * the response. This lets `stream-relay.ts` await genuine registration at the
+ * plane before it reads the authoritative snapshot, instead of racing the
+ * fire-and-forget `void run()` below. A hung connect that never yields
+ * response headers is bounded by the injected `fetch`'s own header timeout
+ * (undici's `headersTimeout`) — surfacing as a rejection here — and by
+ * `close()` aborting the request on teardown; the relay's retry / stop paths
+ * (never an infinite await) take it from there. Establishment failure carries
+ * only the URL and status, never the read credential (which lives in a
+ * request header, not the message).
  */
 export function createPlaneStreamConnector(deps: PlaneStreamConnectorDeps): ConnectUpstream {
   return (handlers: UpstreamHandlers): UpstreamConnection => {
@@ -65,6 +81,17 @@ export function createPlaneStreamConnector(deps: PlaneStreamConnectorDeps): Conn
       handlers.onDrop();
     };
 
+    // The establishment handshake. `settleEstablished` collapses resolve/reject
+    // into a single one-shot settle: a Promise settles only once, so the later
+    // reject in the `catch` after a successful `markEstablished()` is an inert
+    // no-op — no double-settle, no unhandled path.
+    let markEstablished!: () => void;
+    let failEstablished!: (reason: Error) => void;
+    const established = new Promise<void>((resolve, reject) => {
+      markEstablished = resolve;
+      failEstablished = reject;
+    });
+
     const url = new URL(INSTANCE_STREAM_PATH, deps.config.planeUrl).toString();
 
     const run = async (): Promise<void> => {
@@ -74,19 +101,33 @@ export function createPlaneStreamConnector(deps: PlaneStreamConnectorDeps): Conn
           signal: controller.signal,
         });
         if (closed) {
+          // Deliberate teardown beat the response — never a drop; reject the
+          // handshake so an awaiting resync abandons this attempt cleanly.
+          failEstablished(new Error(`plane instance stream closed before it established: ${url}`));
           return;
         }
         if (!response.ok || response.body === null) {
+          failEstablished(
+            new Error(
+              `plane instance stream did not establish (status ${response.status}): ${url}`,
+            ),
+          );
           fireDrop();
           return;
         }
+        // Headers received and the body is a readable stream: the SSE is
+        // ESTABLISHED at the plane. Signal the relay it may now read the
+        // authoritative snapshot — BEFORE we begin consuming the body.
+        markEstablished();
         await readDeltaFrames(response.body, handlers, () => closed);
       } catch {
         // Connect refused, DNS failure, TLS error, or a mid-stream
         // transport rejection all land here — a reestablish-class end, not
         // a crash. `fireDrop` filters out the case where `close()` already
         // ran (an aborted fetch rejects too, and that is a deliberate
-        // teardown, not a drop).
+        // teardown, not a drop). Reject the handshake in case headers never
+        // arrived; if it already resolved, this settle is a no-op.
+        failEstablished(new Error(`plane instance stream connect/transport error: ${url}`));
       }
       fireDrop();
     };
@@ -94,6 +135,7 @@ export function createPlaneStreamConnector(deps: PlaneStreamConnectorDeps): Conn
     void run();
 
     return {
+      established,
       close(): void {
         closed = true;
         controller.abort();

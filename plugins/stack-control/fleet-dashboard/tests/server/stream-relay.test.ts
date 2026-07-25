@@ -56,6 +56,10 @@ function createFakeUpstream(): {
     const record: FakeUpstreamConnection = { handlers, closed: false };
     connections.push(record);
     return {
+      // Already-established connection: the relay's `await established` is a
+      // single-microtask no-op, so this fake keeps modeling a synchronously-
+      // registered upstream (the shape most of these tests need).
+      established: Promise.resolve(),
       close(): void {
         record.closed = true;
       },
@@ -639,6 +643,7 @@ function createGapPlane(
     }
     live.add(handlers);
     return {
+      established: Promise.resolve(),
       close(): void {
         record.closed = true;
         live.delete(handlers);
@@ -817,6 +822,103 @@ describe('stream-relay — snapshot-to-stream gap cannot lose a live delta (AUDI
     // the boot/reconnect retry opens a fresh one.
     hung.resolve(snapshotBody(['late']));
     await expect(startResult).rejects.toThrow();
+  });
+});
+
+/**
+ * The async-establishment sibling of {@link createGapPlane}, modeling the REAL
+ * production connector's boundary (AUDIT-20260725-10): `createPlaneStreamConnector`
+ * only STARTS an async `fetch` and returns synchronously (`void run()`), so
+ * merely calling `connectUpstream()` does NOT register the subscription at the
+ * plane. Here the handlers become "live at the plane" (and the opening
+ * snapshot-as-deltas burst fires) ONLY when the returned `established` promise
+ * resolves — one microtask later — NOT synchronously in `connectUpstream()`.
+ *
+ * That is exactly the boundary the synchronous {@link createFakeUpstream} /
+ * {@link createGapPlane} fakes could not exercise: they registered handlers
+ * inside `connectUpstream()`, so a relay that read the snapshot without awaiting
+ * establishment still (accidentally) saw a live upstream. Under THIS fake, a
+ * relay that reads the snapshot before awaiting `established` reads it while the
+ * upstream is not yet registered — so the gap-window removal, emitted only to
+ * already-live handlers, is delivered to nobody and LOST (the stream's later
+ * opening burst is upserts-only and never re-removes an already-gone instance).
+ * A relay that AWAITS `established` first registers the upstream before the
+ * snapshot read, so the removal is buffered and folded — applied, never lost.
+ */
+function createAsyncEstablishGapPlane(
+  initialIds: readonly string[],
+  gapRemovedId: string,
+): {
+  readonly connectUpstream: ConnectUpstream;
+  readonly planeClient: StreamRelayDeps['planeClient'];
+  readonly connections: readonly FakeUpstreamConnection[];
+} {
+  let ids: string[] = [...initialIds];
+  const live = new Set<UpstreamHandlers>();
+  const connections: FakeUpstreamConnection[] = [];
+  let didMutate = false;
+
+  const connectUpstream: ConnectUpstream = (handlers: UpstreamHandlers): UpstreamConnection => {
+    const record: FakeUpstreamConnection = { handlers, closed: false };
+    connections.push(record);
+    // Establishment happens on a LATER microtask (models the fetch response
+    // headers arriving), NOT synchronously. Only then do the handlers register
+    // and the opening snapshot-as-deltas burst fire — mirroring the plane's
+    // `/v1/instances/stream`, which computes its opening burst from `last = []`.
+    const established = Promise.resolve().then(() => {
+      if (record.closed) {
+        return;
+      }
+      for (const id of ids) {
+        handlers.onDelta({ kind: 'instance-upserted', instance: { id } });
+      }
+      live.add(handlers);
+    });
+    return {
+      established,
+      close(): void {
+        record.closed = true;
+        live.delete(handlers);
+      },
+    };
+  };
+
+  const planeClient: StreamRelayDeps['planeClient'] = {
+    instanceSnapshot: async () => {
+      const body = { instances: ids.map((id) => ({ id })) };
+      if (!didMutate) {
+        didMutate = true;
+        ids = ids.filter((id) => id !== gapRemovedId);
+        const removal: InstanceDelta = { kind: 'instance-removed', id: gapRemovedId };
+        for (const handlers of live) {
+          handlers.onDelta(removal);
+        }
+      }
+      return body;
+    },
+  };
+
+  return { connectUpstream, planeClient, connections };
+}
+
+describe('stream-relay — production async establishment closes the gap for real (AUDIT-20260725-10)', () => {
+  it('a removal committed after the snapshot read, when the SSE only registers asynchronously, is NOT lost', async () => {
+    // RED against the AUDIT-06 relay: it opens the upstream then reads the
+    // snapshot WITHOUT awaiting establishment, so with an async-registering
+    // upstream the snapshot read fires before the handlers are live at the
+    // plane — the gap-window removal of `gone:1` reaches nobody and the view
+    // stays stale ([a:b, gone:1]). GREEN once resync awaits `established`
+    // before the snapshot: the upstream is registered first, the removal is
+    // buffered and folded, and the reconciled view is [a:b].
+    const { connectUpstream, planeClient } = createAsyncEstablishGapPlane(['a:b', 'gone:1'], 'gone:1');
+    const relay = createStreamRelay({ planeClient, connectUpstream });
+
+    await relay.start();
+
+    const events: RelayEvent[] = [];
+    relay.subscribe((event) => events.push(event));
+
+    expect(events).toEqual([{ kind: 'snapshot', instances: [{ id: 'a:b' }] }]);
   });
 });
 
