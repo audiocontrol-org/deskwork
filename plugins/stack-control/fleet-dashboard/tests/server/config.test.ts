@@ -58,6 +58,24 @@ describe('loadConfig — required plane credentials (FR-005)', () => {
   });
 });
 
+describe('loadConfig — FLEET_PLANE_READ_TOKEN is single-valued (AUDIT-20260725-07/08)', () => {
+  it('fails loud, naming both env vars, when FLEET_PLANE_READ_TOKEN contains a comma', () => {
+    expectConfigError(
+      { ...REQUIRED, FLEET_PLANE_READ_TOKEN: 'r1,r2' },
+      /FLEET_PLANE_READ_TOKEN.*FLEET_PLANE_READ_TOKENS|FLEET_PLANE_READ_TOKENS.*FLEET_PLANE_READ_TOKEN/s,
+    );
+  });
+
+  it('the comma-rejection error names the plane-side plural var as the correct home for a list', () => {
+    expectConfigError({ ...REQUIRED, FLEET_PLANE_READ_TOKEN: 'r1,r2' }, /FLEET_PLANE_READ_TOKENS/);
+  });
+
+  it('still loads a single-token FLEET_PLANE_READ_TOKEN with no comma', () => {
+    const config = loadConfig({ ...REQUIRED, FLEET_PLANE_READ_TOKEN: 'solo-reader-token' });
+    expect(config.planeReadToken).toBe('solo-reader-token');
+  });
+});
+
 describe('loadConfig — bind address (FR-024)', () => {
   it('binds to loopback (127.0.0.1) by default when HOST is unset', () => {
     const config = loadConfig(REQUIRED);
