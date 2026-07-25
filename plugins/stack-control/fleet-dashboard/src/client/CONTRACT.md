@@ -142,21 +142,176 @@ data: {
 
 ## Drill-In Endpoints (Phase 5, US3)
 
-These endpoints are scoped to Phase 5 and are listed for completeness:
+Implemented (T018–T019). Each endpoint proxies exactly one plane `/v1/*`
+route via the BFF's `PlaneClient` (server/plane-client.ts) and forwards the
+resolved body to the browser **verbatim** — no reshaping, no new
+projection (FR-017), same discipline as `/api/instances`.
 
 ### `GET /api/instances/:id` — Instance detail
 
-**What it returns**: Full `InstanceState` for a single instance (instance detail drawer source).
+**What it returns**: Full `InstanceState` for a single instance — the
+drawer's primary data source (state + `recentActivity`; see the
+"Instance Drawer Contents" section below).
+
+**Path parameter**: `:id` is the instance's `host:path` identity,
+**`encodeURIComponent`-escaped by the client** before being placed in the
+URL (an instance id MAY itself contain `/`, e.g. `myhost:/work/proj` →
+`/api/instances/myhost%3A%2Fwork%2Fproj`). The server decodes it back to
+the original id before proxying upstream.
 
 ### `GET /api/instances/:id/runs` — Instance's runs
 
-**What it returns**: Array of runs owned by the instance (drill-in surface).
+**What it returns**: Array of runs owned by the instance (drill-in
+surface; each element is a `Run` per data-model.md — `runId`, phase/
+status, etc.). Same `:id` encoding rule as above.
 
 ### `GET /api/runs/:id`, `GET /api/runs/:id/history`, `GET /api/runs/:id/timings`
 
-**What they return**: Run detail, history records, and phase timings (deep drill into a single run).
+**What they return**: Run detail, history records, and phase timings
+(deep drill into a single run, reached from a run row inside an open
+instance drawer). `:id` here is the run's `runId` (opaque; does not need
+`/`-escaping in practice, but the client MUST still `encodeURIComponent`
+it — the server does not assume run ids are `/`-free).
 
-**Note**: There is **no** instance-level history/timings endpoint. An instance's "history" is its `recentActivity` field + its owned runs; the dashboard does not aggregate an instance-level timeline beyond those two surfaces.
+**Note — no instance-level history/timings endpoint** (data-model.md):
+there is **no** `GET /api/instances/:id/history` or
+`GET /api/instances/:id/timings`. Both paths are deliberately
+**unrecognized** by the server and return `404 { "error": "not_found" }`
+— there is no plane projection this endpoint could proxy to. An
+instance's "history" is its `recentActivity` field (already served by
+`GET /api/instances(/:id)`) **plus** its owned runs
+(`GET /api/instances/:id/runs`); the drawer MUST compose those two
+surfaces to show instance activity and MUST NOT imply, request, or
+render an aggregated instance-level timeline the API does not provide.
+
+**Error handling**: identical to `/api/instances` — on upstream failure
+(plane unreachable, non-2xx, malformed body) the server returns
+`503 { "error": "upstream_unavailable", "message": "the fleet plane is unreachable" }`.
+The response is always credential-free (FR-003) and never forwards the
+underlying error's message. The drawer/run panel MUST render this as a
+transient, recoverable "can't load right now" state — never a crash and
+never a state indistinguishable from "this instance/run has no data yet"
+(see "Run with no history/timings yet" below).
+
+**Run with no history/timings yet** (spec.md § Edge Cases): a freshly
+started run may have an empty `history`/`timings` body (`[]` or `{}` —
+exact empty shape is plane-defined). This is a normal `200` response, not
+a `404` and not a `503`; the drawer renders an empty/partial state for
+that run, distinct from the unrecognized-endpoint `404` above and from
+the upstream-failure `503`.
+
+---
+
+## Instance Drawer Contents (FR-018, FR-019)
+
+Opening the drawer for an instance draws from three of the endpoints
+above, composed by the client (never a new server-side aggregation):
+
+1. **State** — the instance's own fields from `GET /api/instances/:id`
+   (`connection`, `liveness`, etc.) — the same shape already used for the
+   table row, so the drawer's header can reuse the table row's rendering
+   logic for connection/liveness.
+2. **Recent activity** — the `recentActivity` array, also from
+   `GET /api/instances/:id` (or already held in memory from the table's
+   snapshot/delta state for this instance — the client MAY reuse the
+   in-memory copy instead of re-fetching, since both come from the same
+   `InstanceState` shape; re-fetching on drawer-open is also valid and
+   guarantees freshness).
+3. **Runs** — `GET /api/instances/:id/runs`, rendered as a list; selecting
+   a run drills further into `GET /api/runs/:id` (+ `/history`, `/timings`
+   on demand — the client is not required to eagerly fetch history/timings
+   for every run in the list, only for the selected run, to avoid an
+   N+1 fetch fan-out when a drawer opens on an instance with many runs).
+
+---
+
+## Drawer State — Deep-Linkable URL (FR-020)
+
+**Requirement**: the drawer's open/closed state, and — when a run is
+selected inside it — the selected run, MUST be encoded in the dashboard's
+own URL, so a page reload or a shared link reopens the identical drawer
+(instance, and run selection if any) without any other client-side
+storage (no `localStorage`/`sessionStorage`/cookie substitute — the URL
+IS the state).
+
+**Contract** (mechanism deferred to `/frontend-design`, FR-030 — this
+fixes the *behavior*, not the URL scheme's exact syntax):
+
+- **Drawer closed** (default): the URL carries no drawer-identifying
+  state.
+- **Drawer open on instance `:id`**: the URL encodes the instance id such
+  that reloading the page at that URL: (a) renders the table as usual,
+  AND (b) re-opens the drawer for that same instance by issuing the same
+  `GET /api/instances/:id` (+ `/runs`) requests the initial open would
+  have issued. If the instance no longer exists (removed since the link
+  was shared), the drawer opens into the "instance gone" state described
+  below (FR-021) rather than failing to open at all.
+- **Drawer open with a run selected**: the URL additionally encodes the
+  selected `runId`, so reload also re-selects that run and re-fetches
+  `GET /api/runs/:id` (+ `/history`, `/timings` as the run panel needs).
+  If the run no longer exists or 404s, the run panel shows an
+  unavailable state while the instance drawer itself stays open (the run
+  selection failing does not close the instance drawer).
+- **Instance id in the URL**: since an instance id MAY contain `/`
+  (`host:path`), whatever URL encoding scheme `/frontend-design` picks
+  (path segment, query parameter, or fragment) MUST round-trip an id
+  containing `/` without ambiguity — i.e. the same
+  `encodeURIComponent`/`decodeURIComponent` discipline already used for
+  the `/api/instances/:id` request path (see above) applies to the URL
+  the browser's own address bar carries, not just the `fetch` calls made
+  from it.
+
+**Testable via**: open the drawer, copy the current URL, load it in a
+fresh tab/session with no prior client state → the same drawer (and run
+selection, if any) opens.
+
+---
+
+## Live-Under-Open-Drawer Behavior (FR-021)
+
+**Requirement**: an open drawer is not a snapshot frozen at open-time — it
+keeps tracking the live delta stream (`/api/stream`, already connected for
+the table) for its own instance, for as long as it is open.
+
+**Contract**:
+
+- **Instance upserted while its drawer is open**: the drawer's displayed
+  state (`connection`, `liveness`, `recentActivity`) updates in place from
+  the delta — the same `instance-upserted` event the table row already
+  consumes (see "Live-Update Stream" above). The drawer MUST NOT go stale
+  and MUST NOT require the operator to close/reopen it to see the update.
+  This does **not** extend to the runs list or an open run panel inside
+  the drawer — `instance-upserted` deltas carry `InstanceState` only, not
+  runs; the runs list is refreshed by the client re-issuing
+  `GET /api/instances/:id/runs` on its own cadence/trigger (exact
+  trigger — poll, re-fetch-on-upsert, or manual refresh — is a
+  `/frontend-design` decision, not fixed by this contract).
+- **Instance removed while its drawer is open**: the drawer MUST reflect
+  the removal rather than showing stale data or closing abruptly without
+  notice (spec.md § Acceptance Scenario US3.4). Per the "Live-Update
+  Stream" section's `instance-removed` client-behavior note, the exact
+  visual treatment (keep-open-with-"no longer available"-message,
+  auto-close-with-notification, or keep-last-known-state-marked-stale) is
+  a `/frontend-design` decision — the contract only fixes that the
+  operator is never surprised by silent stale data or a jarring
+  unexplained close.
+- **Reconnect after a stream drop while a drawer is open**: per
+  "Connection Resilience" above, reconnect re-fetches `/api/instances`
+  (the table snapshot); the drawer's own state MUST be reconciled against
+  that fresh snapshot the same way an `instance-upserted`/
+  `instance-removed` delta would reconcile it — a stream drop must not
+  leave the drawer showing pre-outage state indefinitely after
+  reconnect.
+- **Drill-in requests are independent of the delta stream**: `/api/
+  instances/:id`, `/runs`, `/api/runs/:id(/history|/timings)` are plain
+  request/response `GET`s, not part of the SSE stream — the drawer's
+  live-ness comes ONLY from applying `/api/stream` deltas to the already-
+  fetched drawer data, never from a second per-drawer SSE subscription.
+
+**Testable via**: with a drawer open on instance `X`, drive an
+`instance-upserted` delta for `X` on the plane → drawer reflects the
+update without a fetch/reload; drive an `instance-removed` delta for `X`
+→ drawer reflects removal without closing abruptly or showing stale data.
 
 ---
 
@@ -218,4 +373,8 @@ This contract fixes the **data boundary and behavioral semantics** that the brow
 - **Upstream drop/reconnect**: when the plane becomes unreachable, the server stops relaying deltas; on recovery, the server re-fetches and resumes. Browsers observing this event see the disconnected indicator and auto-reconnect.
 - **Credential isolation**: no test response contains the plane read token; the token never appears in browser-visible state.
 - **Live update latency**: an instance state change on the plane is reflected in connected browsers' streams within a few seconds (exact SLA is implementation-dependent; this contract requires it is fast enough for situational awareness).
+- **Drill-in proxy correctness** (T018, tests/server/drill-in.test.ts): each of `GET /api/instances/:id`, `/api/instances/:id/runs`, `GET /api/runs/:id`, `/history`, `/timings` proxies its matching plane-client method and forwards the body verbatim, same-origin.
+- **Drill-in credential isolation**: same discipline as the snapshot endpoint — no drill-in response body or header ever contains the plane read token, on success or on upstream failure.
+- **Drill-in upstream-unavailable**: with the plane unreachable, every drill-in endpoint returns the same `503 upstream_unavailable` shape as `/api/instances` — never a crash — and recovers once the plane answers again.
+- **No fabricated instance-level history/timings**: `GET /api/instances/:id/history` and `GET /api/instances/:id/timings` return `404` — pinned as a regression test, not just documentation, so a future session cannot silently add an endpoint the plane has no projection for.
 
