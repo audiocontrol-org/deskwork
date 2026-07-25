@@ -673,7 +673,7 @@ Second-wave scope-discovery expansion beyond the migrated v1: additional discove
 - design: docs/superpowers/specs/2026-07-16-fleet-control-plane-design.md
 
 ## design:feature/fleet-dashboard
-- status: planned
+- status: shipped
 - analyze-clean: yes
 - spec: specs/038-fleet-dashboard
 - design-approved: yes
