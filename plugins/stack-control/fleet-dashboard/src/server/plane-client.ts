@@ -163,7 +163,8 @@ async function getJson(deps: PlaneClientDeps, path: string): Promise<unknown> {
     });
   } catch (err) {
     throw new PlaneClientError(
-      `plane-client: request to upstream path '${path}' failed to reach the plane: ${String(err)}`,
+      `plane-client: request to upstream path '${path}' failed to reach the plane: ` +
+        redactCredential(String(err), deps.config.planeReadToken),
     );
   }
 
@@ -178,10 +179,34 @@ async function getJson(deps: PlaneClientDeps, path: string): Promise<unknown> {
     body = await response.json();
   } catch (err) {
     throw new PlaneClientError(
-      `plane-client: upstream path '${path}' returned a non-JSON body: ${String(err)}`,
+      `plane-client: upstream path '${path}' returned a non-JSON body: ` +
+        redactCredential(String(err), deps.config.planeReadToken),
     );
   }
   return body;
+}
+
+const REDACTION_PLACEHOLDER = '[REDACTED]';
+
+/**
+ * Scrubs every occurrence of `token` out of `text`, replacing each with
+ * {@link REDACTION_PLACEHOLDER}. Used to sanitize upstream/transport error
+ * text (`String(err)`) before it is interpolated into a
+ * {@link PlaneClientError} message — because `fetchFn` is injected, a
+ * transport or wrapper error's text can itself echo request internals
+ * (including the `Authorization: Bearer <token>` header), and that text
+ * must never carry the read credential downstream (FR-003,
+ * AUDIT-20260725-05).
+ *
+ * A safe no-op when `token` is empty: `text.split('')` would otherwise
+ * insert the placeholder between every character, mangling the message
+ * instead of leaving it untouched.
+ */
+function redactCredential(text: string, token: string): string {
+  if (token.length === 0) {
+    return text;
+  }
+  return text.split(token).join(REDACTION_PLACEHOLDER);
 }
 
 function encodeSegment(value: string): string {
