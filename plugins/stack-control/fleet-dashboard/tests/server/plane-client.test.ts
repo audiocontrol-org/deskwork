@@ -239,3 +239,95 @@ describe('plane-client — non-allowlisted upstream paths are refused, not proxi
     );
   });
 });
+
+describe('plane-client — the read credential is scrubbed from injected fetch/transport error text (AUDIT-20260725-05)', () => {
+  // Because `fetchFn` is injected, a wrapper/transport error can itself echo
+  // request internals (e.g. an HTTP client that stringifies its request
+  // options, including the `Authorization: Bearer <token>` header, into its
+  // own Error#message). getJson()'s two String(err)-interpolating branches
+  // (the transport-failure catch and the non-JSON-body-parse catch) MUST
+  // scrub the configured read token out of that upstream text before it
+  // reaches PlaneClientError#message — never just drop all context.
+
+  it('channel 1 — a transport failure (fetchFn throws) whose Error#message embeds the token is redacted, not leaked', async () => {
+    const fetchFn = (async () => {
+      throw new Error(
+        `request failed: Authorization: Bearer ${CONFIG.planeReadToken} rejected by upstream proxy`,
+      );
+    }) as typeof fetch;
+    const client = createPlaneClient({ config: CONFIG, fetchFn });
+    try {
+      await client.instanceSnapshot();
+      throw new Error('expected instanceSnapshot() to reject');
+    } catch (err) {
+      expect(err).toBeInstanceOf(PlaneClientError);
+      if (!(err instanceof PlaneClientError)) throw err;
+      expect(err.message).not.toContain(CONFIG.planeReadToken);
+      // Context is scrubbed, not dropped: the rest of the upstream text and
+      // a redaction marker both survive.
+      expect(err.message).toContain('rejected by upstream proxy');
+      expect(err.message).toContain('[REDACTED]');
+    }
+  });
+
+  it('channel 2 — a non-JSON-body parse failure whose Error#message embeds the token is redacted, not leaked', async () => {
+    const brokenJsonResponse = new Response('not json', { status: 200 });
+    Object.defineProperty(brokenJsonResponse, 'json', {
+      value: async () => {
+        throw new Error(
+          `SyntaxError while re-issuing with header Authorization: Bearer ${CONFIG.planeReadToken}`,
+        );
+      },
+    });
+    const fetchFn = (async () => brokenJsonResponse) as typeof fetch;
+    const client = createPlaneClient({ config: CONFIG, fetchFn });
+    try {
+      await client.runDetail('run-123');
+      throw new Error('expected runDetail() to reject');
+    } catch (err) {
+      expect(err).toBeInstanceOf(PlaneClientError);
+      if (!(err instanceof PlaneClientError)) throw err;
+      expect(err.message).not.toContain(CONFIG.planeReadToken);
+      expect(err.message).toContain('[REDACTED]');
+    }
+  });
+
+  it('channel 3 — every occurrence of the token in the upstream text is redacted, not just the first', async () => {
+    const fetchFn = (async () => {
+      throw new Error(
+        `first attempt with Bearer ${CONFIG.planeReadToken} failed; retry with Bearer ${CONFIG.planeReadToken} also failed`,
+      );
+    }) as typeof fetch;
+    const client = createPlaneClient({ config: CONFIG, fetchFn });
+    try {
+      await client.instanceSnapshot();
+      throw new Error('expected instanceSnapshot() to reject');
+    } catch (err) {
+      expect(err).toBeInstanceOf(PlaneClientError);
+      if (!(err instanceof PlaneClientError)) throw err;
+      expect(err.message).not.toContain(CONFIG.planeReadToken);
+      const redactionCount = err.message.split('[REDACTED]').length - 1;
+      expect(redactionCount).toBe(2);
+    }
+  });
+
+  it('channel 4 — an empty configured token is a safe no-op: upstream error text passes through unmangled', async () => {
+    const emptyTokenConfig: DashboardConfig = Object.freeze({ ...CONFIG, planeReadToken: '' });
+    const fetchFn = (async () => {
+      throw new Error('ECONNREFUSED talking to upstream plane');
+    }) as typeof fetch;
+    const client = createPlaneClient({ config: emptyTokenConfig, fetchFn });
+    try {
+      await client.instanceSnapshot();
+      throw new Error('expected instanceSnapshot() to reject');
+    } catch (err) {
+      expect(err).toBeInstanceOf(PlaneClientError);
+      if (!(err instanceof PlaneClientError)) throw err;
+      // An empty token must never be treated as a substring every character
+      // boundary matches (`"".split("")` inserts between every character) —
+      // the original upstream text survives byte-for-byte, unmangled.
+      expect(err.message).toContain('ECONNREFUSED talking to upstream plane');
+      expect(err.message).not.toContain('[REDACTED]');
+    }
+  });
+});
