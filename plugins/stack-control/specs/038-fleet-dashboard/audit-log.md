@@ -161,3 +161,18 @@ Surface:    fleet-dashboard/src/server/config.ts:100-108, fleet-dashboard/src/se
 `requireSingleCredential()` throws a `DashboardConfigError` whose message includes the raw configured value: `configured value contains a comma ('${value}')`. The server entrypoint then logs `String(err)` on startup failure. If an operator accidentally sets `FLEET_PLANE_READ_TOKEN=r1,r2`, the dashboard prints the actual reader credentials into process logs.
 
 Blast radius is high because this is a credential-handling fix path: the exact misconfiguration the new code catches now creates a secret disclosure channel. A reasonable fix is to keep the fail-loud message but redact the value entirely, e.g. “contains a comma” plus guidance naming the singular/plural env vars, with no secret substring in the error.
+
+## 2026-07-25 — audit-barrage lift (end-govern-after_implement)
+
+### AUDIT-20260725-10 — Production stream connection is not actually established before the snapshot
+
+Finding-ID: AUDIT-20260725-10
+Status:     resolved (fixed b1b332e7 — UpstreamConnection.established: Promise<void> handshake; connector resolves it after the SSE response headers arrive (before body parse), relay awaits it before instanceSnapshot() so the subscribe-before-snapshot ordering holds in PRODUCTION not just the sync fake; reject → existing retry; hung-connect bounded by fetch headersTimeout. RED 19579734 (async-establishment fake); 92/92 green. Completes AUDIT-06 at the production async boundary)
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    fleet-dashboard/src/server/plane-stream-connector.ts:70-95; fleet-dashboard/src/server/stream-relay.ts:227-309; fleet-dashboard/tests/server/stream-relay.test.ts:55-63,634-660
+
+The AUDIT-20260725-06 fix claims the relay closes the snapshot-to-stream gap by opening the upstream SSE connection before reading the authoritative snapshot. `stream-relay.ts` does call `deps.connectUpstream()` before `instanceSnapshot()` at lines 280-283, but the production `createPlaneStreamConnector` only starts an async `fetch` and returns immediately (`void run()` at lines 70-95). That means the relay can read and publish the snapshot before the plane has accepted `/v1/instances/stream`; any instance delta committed after the snapshot read but before the SSE request is actually registered at the plane is still lost.
+
+The tests do not cover the production boundary because their fake upstream registers handlers synchronously at lines 55-63, and the gap-plane helper emits deltas only to already-registered handlers at lines 634-660. Blast radius is high: this directly undercuts the stated live-dashboard correctness invariant, and an adopter can hit it during normal startup or reconnect timing. A reasonable repair is to make the connector expose an established/failed handshake before the relay proceeds to `instanceSnapshot()`, or to move the subscribe-before-snapshot sequence into a primitive that can await the actual SSE response headers and first parser readiness.
