@@ -141,7 +141,14 @@ function handleStream(deps: RoutesDeps, res: ServerResponse): void {
   // rather than closing over the `subscribe()` result directly, so a
   // same-tick call can never observe an uninitialized binding.
   let subscription: { readonly unsubscribe: () => void } | undefined;
+  let torndown = false;
   const unsubscribe = (): void => {
+    // Idempotent: `close` and `error` (below) can both fire for one severed
+    // connection; tearing down twice must be a no-op.
+    if (torndown) {
+      return;
+    }
+    torndown = true;
     subscription?.unsubscribe();
   };
   subscription = deps.relay.subscribe((event) => {
@@ -150,6 +157,13 @@ function handleStream(deps: RoutesDeps, res: ServerResponse): void {
   // A client-initiated disconnect (browser tab closed, EventSource torn
   // down) must not leak a listener registration on the relay forever.
   res.once('close', unsubscribe);
+  // AUDIT-20260725-02: an abrupt client disconnect (tab close, laptop sleep,
+  // network drop) surfaces as an `error` event (EPIPE/ECONNRESET) on the
+  // response stream. With NO `error` listener, Node treats it as an unhandled
+  // stream `error` and THROWS — an uncaught exception that would terminate the
+  // whole BFF process, killing EVERY connected dashboard, not just this one.
+  // Attaching a handler absorbs the error and tears this one subscriber down.
+  res.on('error', unsubscribe);
 }
 
 /**

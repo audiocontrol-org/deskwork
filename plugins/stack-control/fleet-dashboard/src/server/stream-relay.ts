@@ -101,15 +101,51 @@ export interface UpstreamConnection {
  * R1's fan-out invariant is structural: `subscribe()` never calls this). */
 export type ConnectUpstream = (handlers: UpstreamHandlers) => UpstreamConnection;
 
-/** Dependencies for {@link createStreamRelay}. Both are supplied by the
- * caller (composition/DI), mirroring `PlaneClientDeps`. */
+/**
+ * Schedules a post-drop reconnect retry after the relay's retry interval and
+ * returns a canceller.
+ *
+ * This is the DI seam that makes drop-recovery deterministically testable
+ * (AUDIT-20260725-01/03): production wiring omits it and gets the
+ * {@link defaultScheduleReconnect} `setTimeout`-backed default — mirroring
+ * `index.ts`'s boot-time `RELAY_RETRY_INTERVAL_MS` cadence — while tests
+ * inject a manually-pumped scheduler so `drop -> reject -> retry -> success`
+ * is driven without real timers.
+ *
+ * The returned canceller MUST make `retry` un-fireable so `stop()` can cancel
+ * a pending retry — no leaked timer, no retry after teardown. This is NOT a
+ * fallback/mock: it is a real, named dependency whose only default is the
+ * production `setTimeout` implementation.
+ */
+export type ScheduleReconnect = (retry: () => void) => () => void;
+
+/** Dependencies for {@link createStreamRelay}. `planeClient` /
+ * `connectUpstream` are supplied by the caller (composition/DI, mirroring
+ * `PlaneClientDeps`); `scheduleReconnect` is an optional DI seam that
+ * defaults to the production `setTimeout`-backed scheduler. */
 export interface StreamRelayDeps {
   /** Only the re-snapshot read is needed here — narrowed via `Pick` so this
    * module's dependency on `PlaneClient` is exactly the one method it
    * calls, not the whole six-method surface. */
   readonly planeClient: Pick<PlaneClient, 'instanceSnapshot'>;
   readonly connectUpstream: ConnectUpstream;
+  /** Optional DI seam for the post-drop reconnect retry cadence; defaults to
+   * a `setTimeout`-backed scheduler. See {@link ScheduleReconnect}. */
+  readonly scheduleReconnect?: ScheduleReconnect;
 }
+
+/** Interval between post-drop reconnect resync attempts, mirroring
+ * `index.ts`'s boot-time `RELAY_RETRY_INTERVAL_MS`. */
+const RECONNECT_RETRY_INTERVAL_MS = 5000;
+
+/** The production {@link ScheduleReconnect}: a real `setTimeout`, cancellable
+ * via the returned `clearTimeout` closure. */
+const defaultScheduleReconnect: ScheduleReconnect = (retry) => {
+  const handle = setTimeout(retry, RECONNECT_RETRY_INTERVAL_MS);
+  return (): void => {
+    clearTimeout(handle);
+  };
+};
 
 export interface RelaySubscription {
   readonly unsubscribe: () => void;
@@ -206,14 +242,45 @@ function applyDelta(
  * fetch + upstream connect fire.
  */
 export function createStreamRelay(deps: StreamRelayDeps): StreamRelay {
+  const scheduleReconnect = deps.scheduleReconnect ?? defaultScheduleReconnect;
   const listeners = new Set<(event: RelayEvent) => void>();
   let currentInstances: readonly FleetInstanceRecord[] = [];
   let ready = false;
   let upstreamConnection: UpstreamConnection | undefined;
+  // Drop-recovery state (AUDIT-20260725-01/03): `reconnecting` guards against
+  // a concurrent `onDrop` spawning a parallel retry loop; `stopped` makes a
+  // teardown cancel every in-flight/pending recovery; `cancelPendingRetry`
+  // cancels a scheduled-but-not-yet-fired retry from `stop()`.
+  let reconnecting = false;
+  let stopped = false;
+  let cancelPendingRetry: (() => void) | undefined;
+
+  /**
+   * Deliver one event to one listener with full isolation (AUDIT-20260725-02):
+   * a subscriber throwing (classically a severed SSE response whose next write
+   * emits EPIPE/ECONNRESET) must NEVER propagate up to become an uncaught
+   * exception that kills the whole BFF process for every connected dashboard,
+   * and — in {@link broadcast}'s fan-out — must never abort delivery to the
+   * remaining subscribers. Used both by the fan-out loop AND by `subscribe()`'s
+   * synchronous initial-snapshot delivery (which does not go through
+   * `broadcast`), so neither path can be crashed by a bad listener. Log and
+   * continue.
+   */
+  function deliver(listener: (event: RelayEvent) => void, event: RelayEvent): void {
+    try {
+      listener(event);
+    } catch (err: unknown) {
+      // eslint-disable-next-line no-console
+      console.error(
+        `stream-relay: a subscriber threw while receiving a "${event.kind}" event ` +
+          `(continuing): ${String(err)}`,
+      );
+    }
+  }
 
   function broadcast(event: RelayEvent): void {
     for (const listener of listeners) {
-      listener(event);
+      deliver(listener, event);
     }
   }
 
@@ -223,20 +290,28 @@ export function createStreamRelay(deps: StreamRelayDeps): StreamRelay {
       broadcast({ kind: 'delta', delta });
     },
     onDrop(): void {
+      // AUDIT-20260725-01/03: a drop that arrives while a reconnect loop
+      // already owns recovery must NOT re-broadcast `disconnected` or spawn a
+      // second, parallel retry loop — and a drop after `stop()` is ignored
+      // entirely (a deliberate teardown is not a recoverable outage).
+      if (reconnecting || stopped) {
+        return;
+      }
       ready = false;
       broadcast({ kind: 'disconnected' });
-      // Fire-and-forget from the DI contract's perspective (`onDrop` is
-      // `() => void`, mirroring every other close-callback in this
-      // codebase, src/sidecar/uplink/sse-client.ts's `onClosed`) — the
-      // resync's own completion is what re-arms `ready` and broadcasts the
-      // fresh snapshot; tests await it by draining the microtask queue
-      // (`flushAsync`), never a real timer.
-      void resync();
+      reconnecting = true;
+      attemptReconnect();
     },
   };
 
   async function resync(): Promise<void> {
     const body = await deps.planeClient.instanceSnapshot();
+    if (stopped) {
+      // A teardown (`stop()`) raced this in-flight snapshot fetch — do NOT
+      // re-arm `ready`, broadcast, or open a fresh upstream connection after
+      // stop (channel: reconnect-after-stop).
+      return;
+    }
     currentInstances = extractInstances(body);
     ready = true;
     broadcast({ kind: 'snapshot', instances: currentInstances });
@@ -248,14 +323,57 @@ export function createStreamRelay(deps: StreamRelayDeps): StreamRelay {
     upstreamConnection = deps.connectUpstream(handlers);
   }
 
+  /**
+   * Drive one post-drop resync attempt, RETRYING on failure instead of
+   * firing-and-forgetting (AUDIT-20260725-01/03). The most likely trigger of
+   * a drop is the plane restarting / being briefly unreachable, so the very
+   * first re-snapshot often hits the still-down plane and rejects; catching
+   * that rejection and retrying on an interval (mirroring `index.ts`'s
+   * boot-time retry loop) is what makes FR-016's "recovers on reconnect" hold
+   * — instead of crashing (an unhandled rejection, fatal since Node 15) or
+   * stalling forever (`ready` stuck `false`, no subscriber ever re-snapshotted).
+   */
+  function attemptReconnect(): void {
+    if (stopped) {
+      reconnecting = false;
+      return;
+    }
+    resync().then(
+      () => {
+        // Success (or a stop()-short-circuited resync): recovery is over.
+        reconnecting = false;
+        cancelPendingRetry = undefined;
+      },
+      (err: unknown) => {
+        // eslint-disable-next-line no-console
+        console.error(
+          `stream-relay: post-drop resync failed (retrying in ` +
+            `${RECONNECT_RETRY_INTERVAL_MS}ms): ${String(err)}`,
+        );
+        if (stopped) {
+          reconnecting = false;
+          return;
+        }
+        cancelPendingRetry = scheduleReconnect(() => {
+          cancelPendingRetry = undefined;
+          attemptReconnect();
+        });
+      },
+    );
+  }
+
   return {
     start(): Promise<void> {
+      // `start()` intentionally uses the throwing `resync()` directly (NOT the
+      // retrying loop): `index.ts`'s `startRelayResilient` owns the boot-time
+      // retry, and it relies on `start()` rejecting so it can back off. The
+      // internal retry loop covers only the post-drop path.
       return resync();
     },
     subscribe(onEvent: (event: RelayEvent) => void): RelaySubscription {
       listeners.add(onEvent);
       if (ready) {
-        onEvent({ kind: 'snapshot', instances: currentInstances });
+        deliver(onEvent, { kind: 'snapshot', instances: currentInstances });
       }
       return {
         unsubscribe(): void {
@@ -264,6 +382,14 @@ export function createStreamRelay(deps: StreamRelayDeps): StreamRelay {
       };
     },
     stop(): void {
+      stopped = true;
+      // Cancel any scheduled-but-not-yet-fired reconnect retry so `stop()`
+      // leaves no leaked timer and no retry fires after teardown.
+      if (cancelPendingRetry !== undefined) {
+        cancelPendingRetry();
+        cancelPendingRetry = undefined;
+      }
+      reconnecting = false;
       upstreamConnection?.close();
     },
   };
