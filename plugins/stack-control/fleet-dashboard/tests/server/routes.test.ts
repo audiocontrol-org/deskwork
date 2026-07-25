@@ -29,7 +29,7 @@
 
 import { afterEach, describe, expect, it } from 'vitest';
 import type { AddressInfo } from 'node:net';
-import type { Server } from 'node:http';
+import type { Server, ServerResponse } from 'node:http';
 import { createDashboardServer } from '../../src/server/http-server.js';
 import type { RoutesDeps } from '../../src/server/routes.js';
 import { createPlaneClient, PlaneClientError } from '../../src/server/plane-client.js';
@@ -433,6 +433,37 @@ describe('fleet-dashboard routes — SSE stream fan-out (via injected relay)', (
     expect(secondText).toContain('"id":"a:b"');
 
     await streamReader.cancel();
+  });
+
+  it('attaches an error handler on the SSE response so an abrupt client disconnect (EPIPE/ECONNRESET) never crashes the process (AUDIT-20260725-02)', async () => {
+    const { relay, listeners, unsubscribed } = createFakeRelay();
+    const { planeClient } = createFakePlaneClient(() => ({ instances: [] }));
+    const server = createDashboardServer(buildDeps(planeClient, relay));
+    activeServer = server;
+    // Capture the real ServerResponse the handler is given (both 'request'
+    // listeners receive the same res) so the test can exercise the exact
+    // stream Node would emit 'error' on when a client disconnects abruptly.
+    let capturedRes: ServerResponse | undefined;
+    server.on('request', (_req, res) => {
+      capturedRes = res;
+    });
+    const { baseUrl } = await listenEphemeral(server);
+
+    const response = await fetch(`${baseUrl}/api/stream`);
+    expect(listeners).toHaveLength(1);
+
+    const res = capturedRes;
+    if (res === undefined) throw new Error('expected to capture the SSE ServerResponse');
+
+    // Pre-fix: no 'error' listener is attached, so emitting 'error' throws
+    // (Node's unhandled-'error' EventEmitter behavior) — an uncaught
+    // exception that would terminate the whole BFF process, killing every
+    // connected dashboard. Post-fix: a handler absorbs it and tears this one
+    // subscriber down.
+    expect(() => res.emit('error', new Error('EPIPE'))).not.toThrow();
+    expect(unsubscribed[0]).toBe(true);
+
+    await drainStream(response);
   });
 
   it('ends the SSE response and unsubscribes when the relay reports "disconnected"', async () => {
