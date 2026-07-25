@@ -103,3 +103,18 @@ Surface:    fleet-dashboard/src/server/plane-client.ts:151-155,171-175
 `getJson()` promises that thrown errors never carry the plane read credential, but both failure branches include `String(err)` in the `PlaneClientError` message. Because `fetchFn` is injected, a wrapper or transport error can include request headers in its error text, including `Authorization: Bearer <token>`. The browser routes currently mask these messages, but the public `PlaneClient` contract is violated and server-side logs/tests/callers can receive the secret.
 
 The blast radius is high because this is a credential-handling boundary: a downstream caller can reasonably rely on the documented "never carries the read credential" invariant and log the error. A reasonable fix is to avoid embedding raw upstream exception text in `PlaneClientError`, or scrub the configured token before constructing the message.
+
+## 2026-07-25 — audit-barrage lift (end-govern-after_implement)
+
+### AUDIT-20260725-06 — Snapshot-to-stream ordering can silently lose live deltas
+
+Finding-ID: AUDIT-20260725-06
+Status:     resolved (fixed 2af56fbe — resync subscribes-first + buffers upstream deltas, then reads the authoritative snapshot, then folds the buffer idempotently by id; within FR-017 (existing GET+SSE only); bounded via maxBufferedDeltas; RED c3da5881; 84/84 green)
+Severity:   high
+Per-lane:   codex=high
+Decision:   single-model (gate-counted high)
+Surface:    fleet-dashboard/src/server/stream-relay.ts:307-323
+
+`resync()` fetches the authoritative snapshot first, broadcasts it, and only then opens the upstream SSE connection. Any plane delta committed after `instanceSnapshot()` is read but before `connectUpstream()` is established is in neither channel: it is not in the snapshot and it will not be replayed by the newly opened stream. The same `resync()` function is used for initial start and post-drop recovery, so this affects both first load and reconnect.
+
+The blast radius is high because the dashboard can show a permanently stale fleet view until some later delta or manual reload happens, violating the stated snapshot-then-deltas / reconnect-resync contract. A reasonable fix needs a gap-closing mechanism: for example, a cursor/sequence handshake with the plane, or a relay protocol that connects in a way that cannot miss events between the snapshot boundary and the stream boundary.

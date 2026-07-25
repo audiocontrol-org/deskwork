@@ -3,20 +3,15 @@
   "mode": "impl",
   "item": "design:feature/fleet-dashboard",
   "governedShaBase": "95903c90",
-  "headSha": "f3a9407e89836432bfd13531ed4b4bc038e066b3",
+  "headSha": "5f2982d09823682411d18acc4c0fa0678f95d215",
   "chunkIds": [
     "a05ace3895b8bd87"
   ],
   "rounds": 1,
   "liftedFindings": [
     {
-      "id": "a05ace3895b8bd87::AUDIT-BARRAGE-claude-01+AUDIT-BARRAGE-codex-02",
-      "title": "FR-010 \"independent revocation\" for read credentials has no production wiring — a leaked read credential cannot be revoked without a full plane restart",
-      "severity": "high"
-    },
-    {
       "id": "a05ace3895b8bd87::AUDIT-BARRAGE-codex-01",
-      "title": "PlaneClientError can leak the read token through injected fetch errors",
+      "title": "Snapshot-to-stream ordering can silently lose live deltas",
       "severity": "high"
     }
   ],
