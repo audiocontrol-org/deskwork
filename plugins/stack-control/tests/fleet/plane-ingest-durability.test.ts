@@ -34,6 +34,9 @@ import type { EventLog } from '../../src/plane/event-log.js';
 import type { ClassifiedEvent } from '../../src/plane/registry.js';
 
 const TOKEN = 'token-durability';
+// specs/038 US1: reads authenticate with a read credential (a DISTINCT class
+// from the telemetry token); invariant pinned in read-credential-class.test.ts.
+const READ_TOKEN = 'read-durability';
 const INST = '11111111-1111-4111-8111-111111111111';
 
 interface RunningPlane {
@@ -49,6 +52,7 @@ async function startPlane(eventLog: EventLog): Promise<RunningPlane> {
   dirsToClean.add(dir);
   const runtime = createPlaneRuntime({
     acceptedTokens: new Map([[TOKEN, INST]]),
+    readCredentials: new Map([[READ_TOKEN, 'reader']]),
     commandStoreDir: dir,
     eventLog,
   });
@@ -133,7 +137,7 @@ describe('ingest is durable BEFORE it 200s (AUDIT-20260718-06)', () => {
     // The event must NOT be visible in the live registry — durability failed,
     // so it was never admitted.
     const fleet = await fetch(`${plane.baseUrl}/v1/fleet`, {
-      headers: { authorization: `Bearer ${TOKEN}` },
+      headers: { authorization: `Bearer ${READ_TOKEN}` },
     });
     expect(fleet.status).toBe(200);
     const snapshot: unknown = await fleet.json();
@@ -171,7 +175,7 @@ describe('ingest is durable BEFORE it 200s (AUDIT-20260718-06)', () => {
     expect(appended[0]?.envelope.runId).toBe('run-ok');
 
     const fleet = await fetch(`${plane.baseUrl}/v1/fleet`, {
-      headers: { authorization: `Bearer ${TOKEN}` },
+      headers: { authorization: `Bearer ${READ_TOKEN}` },
     });
     const snapshot: unknown = await fleet.json();
     if (typeof snapshot !== 'object' || snapshot === null || !('entries' in snapshot)) {
@@ -225,7 +229,7 @@ describe('ingest is durable BEFORE it 200s (AUDIT-20260718-06)', () => {
 
     // And it is visible in the live registry — admitted only AFTER durable append.
     const fleet = await fetch(`${plane.baseUrl}/v1/fleet`, {
-      headers: { authorization: `Bearer ${TOKEN}` },
+      headers: { authorization: `Bearer ${READ_TOKEN}` },
     });
     const snapshot: unknown = await fleet.json();
     if (typeof snapshot !== 'object' || snapshot === null || !('entries' in snapshot)) {

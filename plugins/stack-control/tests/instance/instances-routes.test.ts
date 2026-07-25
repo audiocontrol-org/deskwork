@@ -25,6 +25,9 @@ import { createPlaneRuntime } from '../../src/plane/runtime.js';
 import { boundPort } from '../_bound-port.js';
 
 const TOKEN = 'token-instances-routes';
+// specs/038 US1: reads authenticate with a read credential (a DISTINCT class
+// from the telemetry token); invariant pinned in read-credential-class.test.ts.
+const READ_TOKEN = 'read-instances-routes';
 const INST = '44444444-4444-4444-8444-444444444444';
 
 interface RunningPlane {
@@ -40,6 +43,7 @@ async function startPlane(): Promise<RunningPlane> {
   dirsToClean.add(dir);
   const runtime = createPlaneRuntime({
     acceptedTokens: new Map([[TOKEN, INST]]),
+    readCredentials: new Map([[READ_TOKEN, 'reader']]),
     commandStoreDir: dir,
   });
   const server = runtime.createServer();
@@ -127,7 +131,7 @@ describe('GET /v1/instances{,/:id} route wiring (T022)', () => {
     await ingest(plane, 'routes-host', '/tmp/routes/proj-a', new Date().toISOString());
 
     const res = await fetch(`${plane.baseUrl}/v1/instances`, {
-      headers: { authorization: `Bearer ${TOKEN}` },
+      headers: { authorization: `Bearer ${READ_TOKEN}` },
     });
     expect(res.status).toBe(200);
     const ids = snapshotIds(await res.json());
@@ -140,7 +144,7 @@ describe('GET /v1/instances{,/:id} route wiring (T022)', () => {
     await ingest(plane, 'routes-host', '/tmp/routes/proj-a', new Date().toISOString());
 
     const res = await fetch(`${plane.baseUrl}/v1/instances/${encodeURIComponent(id)}`, {
-      headers: { authorization: `Bearer ${TOKEN}` },
+      headers: { authorization: `Bearer ${READ_TOKEN}` },
     });
     expect(res.status).toBe(200);
     const body: unknown = await res.json();
@@ -155,7 +159,7 @@ describe('GET /v1/instances{,/:id} route wiring (T022)', () => {
     const plane = await startPlane();
     const unknownId = 'ghost-host:/nowhere';
     const res = await fetch(`${plane.baseUrl}/v1/instances/${encodeURIComponent(unknownId)}`, {
-      headers: { authorization: `Bearer ${TOKEN}` },
+      headers: { authorization: `Bearer ${READ_TOKEN}` },
     });
     expect(res.status).toBe(404);
     const body: unknown = await res.json();
@@ -172,14 +176,14 @@ describe('GET /v1/instances{,/:id} route wiring (T022)', () => {
 
     // Default view: excluded (disconnected + gone).
     const defaultRes = await fetch(`${plane.baseUrl}/v1/instances`, {
-      headers: { authorization: `Bearer ${TOKEN}` },
+      headers: { authorization: `Bearer ${READ_TOKEN}` },
     });
     expect(defaultRes.status).toBe(200);
     expect(snapshotIds(await defaultRes.json())).not.toContain(goneId);
 
     // include=all: present.
     const allRes = await fetch(`${plane.baseUrl}/v1/instances?include=all`, {
-      headers: { authorization: `Bearer ${TOKEN}` },
+      headers: { authorization: `Bearer ${READ_TOKEN}` },
     });
     expect(allRes.status).toBe(200);
     expect(snapshotIds(await allRes.json())).toContain(goneId);

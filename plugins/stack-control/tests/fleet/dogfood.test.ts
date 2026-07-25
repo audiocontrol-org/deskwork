@@ -68,6 +68,9 @@ import { buildEventFrame, serializeFrame } from '../../src/telemetry/protocol.js
 
 const TOKEN = 'dogfood-bearer-token-abc';
 const REVOKED_TOKEN = 'dogfood-revoked-token-xyz';
+// specs/038 US1: consumer READ routes verify a read credential (a DISTINCT
+// class from the telemetry token); invariant pinned in read-credential-class.test.ts.
+const READ_TOKEN = 'dogfood-read-token';
 
 /** Fake `IntervalScheduler` — records the 15s keepalive registration without
  * arming a real timer (mirrors plane-serve.test.ts / sidecar-daemon.test.ts). */
@@ -137,7 +140,7 @@ async function pollUntil(predicate: () => Promise<boolean>, timeoutMs: number, l
 /** Read the fleet entries as an untyped array (narrowed defensively — the plane
  * is a real HTTP peer whose body we do not trust structurally). */
 async function fleetEntries(baseUrl: string): Promise<unknown[]> {
-  const res = await fetch(`${baseUrl}/v1/fleet`, { headers: bearer(TOKEN) });
+  const res = await fetch(`${baseUrl}/v1/fleet`, { headers: bearer(READ_TOKEN) });
   if (res.status !== 200) throw new Error(`GET /v1/fleet ⇒ ${res.status}`);
   const body: unknown = await res.json();
   if (typeof body !== 'object' || body === null || !('entries' in body)) {
@@ -202,6 +205,7 @@ describe('dogfood loop — terminal-drivable quickstart scenarios (T128, FR-087/
     const dir = mkdtempSync(join(tmpdir(), 'scf-dogfood-plane-'));
     const runtime = createPlaneRuntime({
       acceptedTokens: new Map([[TOKEN, installationId]]),
+      readCredentials: new Map([[READ_TOKEN, 'reader']]),
       revokedTokens: revoked,
       commandStoreDir: dir,
       scheduler: new FakeScheduler(),
@@ -460,18 +464,22 @@ describe('dogfood loop — terminal-drivable quickstart scenarios (T128, FR-087/
     const { installationId } = provisionInstallation();
     const plane = await startPlane(installationId, new Set([REVOKED_TOKEN]));
 
+    // specs/038 US1: the telemetry-token auth model (anon/revoked/valid, never
+    // downgraded) is probed on a TELEMETRY-guarded route (/v1/health/store) — the
+    // consumer READ routes verify the distinct read-credential class (covered by
+    // read-credential-class.test.ts).
     // Unauthenticated ⇒ 401.
-    const anon = await fetch(`${plane.baseUrl}/v1/fleet`);
+    const anon = await fetch(`${plane.baseUrl}/v1/health/store`);
     expect(anon.status).toBe(401);
 
     // Revoked ⇒ 401, reason 'revoked' — NEVER downgraded to partial access (FR-088).
-    const revoked = await fetch(`${plane.baseUrl}/v1/fleet`, { headers: bearer(REVOKED_TOKEN) });
+    const revoked = await fetch(`${plane.baseUrl}/v1/health/store`, { headers: bearer(REVOKED_TOKEN) });
     expect(revoked.status).toBe(401);
     const revokedBody: unknown = await revoked.json();
     expect(revokedBody).toMatchObject({ reason: 'revoked' });
 
     // A valid bearer is admitted — the refusal is the token's, not the route's.
-    const ok = await fetch(`${plane.baseUrl}/v1/fleet`, { headers: bearer(TOKEN) });
+    const ok = await fetch(`${plane.baseUrl}/v1/health/store`, { headers: bearer(TOKEN) });
     expect(ok.status).toBe(200);
 
     // RE-MINT ON CLONE (SC-014): two installation trees at DISTINCT real paths

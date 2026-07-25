@@ -35,6 +35,9 @@ import { createPlaneRuntime } from '../../src/plane/runtime.js';
 import { boundPort } from '../_bound-port.js';
 
 const TOKEN = 'token-session-rehydrate';
+// specs/038 US1: reads authenticate with a read credential (a DISTINCT class
+// from the telemetry token); invariant pinned in read-credential-class.test.ts.
+const READ_TOKEN = 'read-session-rehydrate';
 const INST = '33333333-3333-4333-8333-333333333333';
 const HOST = 'session-rehydrate-host';
 const PATH = '/tmp/session-rehydrate/proj-b';
@@ -51,6 +54,7 @@ const dirsToClean = new Set<string>();
 async function startPlane(dir: string): Promise<RunningPlane> {
   const runtime = createPlaneRuntime({
     acceptedTokens: new Map([[TOKEN, INST]]),
+    readCredentials: new Map([[READ_TOKEN, 'reader']]),
     commandStoreDir: dir,
   });
   const server = runtime.createServer();
@@ -148,7 +152,7 @@ function sessionEndedBody(sessionId: string, startedAt: string, endedAt: string,
  */
 async function getInstanceState(plane: RunningPlane, instanceId: string): Promise<Record<string, unknown> | null> {
   const res = await fetch(`${plane.baseUrl}/v1/instances`, {
-    headers: { authorization: `Bearer ${TOKEN}` },
+    headers: { authorization: `Bearer ${READ_TOKEN}` },
   });
   expect(res.status).toBe(200);
   const body: unknown = await res.json();

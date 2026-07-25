@@ -50,6 +50,9 @@ import { openTokenCustody } from '../../src/machine-state/token.js';
 import { runInvocationWithTelemetry } from '../../src/telemetry/invocation-telemetry.js';
 
 const TOKEN = 'invocation-fast-verb-bearer-token';
+// specs/038 US1: reads authenticate with a read credential (a DISTINCT class
+// from the telemetry token); invariant pinned in read-credential-class.test.ts.
+const READ_TOKEN = 'read-invocation-fast-verb';
 
 /** Fake keepalive scheduler — records the registration without arming a real
  * 15s timer (mirrors dogfood/sidecar-daemon test scaffolding). */
@@ -88,7 +91,7 @@ async function pollUntil(predicate: () => Promise<boolean>, timeoutMs: number, l
  * event type. The plane is a real HTTP peer whose body we do not trust
  * structurally, so every access stays `unknown` (never `any`/`as`). */
 async function instancesWithLastActivity(baseUrl: string, activity: string): Promise<unknown[]> {
-  const res = await fetch(`${baseUrl}/v1/instances`, { headers: { authorization: `Bearer ${TOKEN}` } });
+  const res = await fetch(`${baseUrl}/v1/instances`, { headers: { authorization: `Bearer ${READ_TOKEN}` } });
   if (res.status !== 200) return [];
   const body: unknown = await res.json();
   const instances: unknown =
@@ -123,6 +126,7 @@ describe('D-B (FR-027 Scenario 1): a FAST short verb delivers invocation.complet
     const dir = mkdtempSync(join(tmpdir(), 'scf-fastverb-plane-'));
     const runtime = createPlaneRuntime({
       acceptedTokens: new Map([[TOKEN, installationId]]),
+      readCredentials: new Map([[READ_TOKEN, 'reader']]),
       commandStoreDir: dir,
       scheduler: new FakeScheduler(),
     });

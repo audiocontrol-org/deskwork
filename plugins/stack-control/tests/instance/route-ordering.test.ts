@@ -26,6 +26,9 @@ import { ROUTE_TABLE } from '../../src/plane/http/server.js';
 import { boundPort } from '../_bound-port.js';
 
 const TOKEN = 'token-route-ordering';
+// specs/038 US1: reads authenticate with a read credential (a DISTINCT class
+// from the telemetry token); invariant pinned in read-credential-class.test.ts.
+const READ_TOKEN = 'read-route-ordering';
 const INST = '77777777-7777-7777-8777-777777777777';
 
 interface RunningPlane {
@@ -41,6 +44,7 @@ async function startPlane(): Promise<RunningPlane> {
   dirsToClean.add(dir);
   const runtime = createPlaneRuntime({
     acceptedTokens: new Map([[TOKEN, INST]]),
+    readCredentials: new Map([[READ_TOKEN, 'reader']]),
     commandStoreDir: dir,
   });
   const server = runtime.createServer();
@@ -122,7 +126,7 @@ describe('Route-ordering contract (T035, RED)', () => {
     // hangs waiting for the still-open SSE socket.
     const controller = new AbortController();
     const res = await fetch(`${plane.baseUrl}/v1/instances/stream`, {
-      headers: { authorization: `Bearer ${TOKEN}` },
+      headers: { authorization: `Bearer ${READ_TOKEN}` },
       signal: controller.signal,
     });
 

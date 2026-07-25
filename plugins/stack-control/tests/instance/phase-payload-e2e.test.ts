@@ -42,6 +42,9 @@ import { createPlaneRuntime } from '../../src/plane/runtime.js';
 import { boundPort } from '../_bound-port.js';
 
 const TOKEN = 'token-phase-payload-e2e';
+// specs/038 US1: reads authenticate with a read credential (a DISTINCT class
+// from the telemetry token); invariant pinned in read-credential-class.test.ts.
+const READ_TOKEN = 'read-phase-payload-e2e';
 const INST = '33333333-3333-4333-8333-333333333333';
 const HOST = 'phase-e2e-host';
 const PATH = '/tmp/phase-e2e/proj-a';
@@ -65,6 +68,7 @@ const dirsToClean = new Set<string>();
 async function startPlane(dir: string): Promise<RunningPlane> {
   const runtime = createPlaneRuntime({
     acceptedTokens: new Map([[TOKEN, INST]]),
+    readCredentials: new Map([[READ_TOKEN, 'reader']]),
     commandStoreDir: dir,
   });
   const server = runtime.createServer();
@@ -132,7 +136,7 @@ async function ingestPhaseEntered(plane: RunningPlane): Promise<void> {
  * documented `{ found: true, instance: InstanceState }`. */
 async function fetchCurrentBearing(plane: RunningPlane): Promise<unknown> {
   const res = await fetch(`${plane.baseUrl}/v1/instances/${encodeURIComponent(INSTANCE_ID)}`, {
-    headers: { authorization: `Bearer ${TOKEN}` },
+    headers: { authorization: `Bearer ${READ_TOKEN}` },
   });
   expect(res.status).toBe(200);
   const body: unknown = await res.json();

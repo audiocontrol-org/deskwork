@@ -24,6 +24,9 @@ import { createPlaneRuntime } from '../../src/plane/runtime.js';
 import { boundPort } from '../_bound-port.js';
 
 const TOKEN_A = 'token-a-owner';
+// specs/038 US1: reads authenticate with a read credential (a DISTINCT class
+// from the telemetry token); invariant pinned in read-credential-class.test.ts.
+const READ_TOKEN = 'read-auth-host-path';
 const INST_A = '11111111-1111-4111-8111-111111111111';
 
 // Instance A is the token's AUTHORIZED `host:path`; instance B is a DIFFERENT
@@ -47,6 +50,7 @@ async function startPlane(): Promise<RunningPlane> {
   dirsToClean.add(dir);
   const runtime = createPlaneRuntime({
     acceptedTokens: new Map([[TOKEN_A, INST_A]]),
+    readCredentials: new Map([[READ_TOKEN, 'reader']]),
     // Token A is authorized for instance A's `host:path` (D8) — recorded
     // ALONGSIDE its installationId authorization, never replacing it.
     acceptedInstances: new Map([[TOKEN_A, INSTANCE_A]]),
@@ -122,7 +126,7 @@ describe('ingest enforces authed instance == body-claimed host:path (specs/037 T
     expect(spoof.status).toBe(403);
 
     // The spoofed instance must NOT have been recorded — the fleet stays empty.
-    const fleet = await fetch(`${plane.baseUrl}/v1/fleet`, { headers: bearer(TOKEN_A) });
+    const fleet = await fetch(`${plane.baseUrl}/v1/fleet`, { headers: bearer(READ_TOKEN) });
     expect(fleet.status).toBe(200);
     const snapshot: unknown = await fleet.json();
     if (typeof snapshot !== 'object' || snapshot === null || !('entries' in snapshot)) {
@@ -143,7 +147,7 @@ describe('ingest enforces authed instance == body-claimed host:path (specs/037 T
     });
     expect(accepted.status).toBe(200);
 
-    const fleet = await fetch(`${plane.baseUrl}/v1/fleet`, { headers: bearer(TOKEN_A) });
+    const fleet = await fetch(`${plane.baseUrl}/v1/fleet`, { headers: bearer(READ_TOKEN) });
     const snapshot: unknown = await fleet.json();
     const { entries } = snapshot as { entries: unknown };
     if (!Array.isArray(entries)) throw new Error('expected entries array');

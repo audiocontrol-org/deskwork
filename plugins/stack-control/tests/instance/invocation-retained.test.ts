@@ -27,6 +27,9 @@ import { createPlaneRuntime } from '../../src/plane/runtime.js';
 import { boundPort } from '../_bound-port.js';
 
 const TOKEN = 'token-invocation-retained';
+// specs/038 US1: reads authenticate with a read credential (a DISTINCT class
+// from the telemetry token); invariant pinned in read-credential-class.test.ts.
+const READ_TOKEN = 'read-invocation-retained';
 const INST = '33333333-3333-4333-8333-333333333333';
 const HOST = 'retain-host';
 const PATH = '/tmp/retain/proj-b';
@@ -46,6 +49,7 @@ async function startPlane(): Promise<RunningPlane> {
   dirsToClean.add(dir);
   const runtime = createPlaneRuntime({
     acceptedTokens: new Map([[TOKEN, INST]]),
+    readCredentials: new Map([[READ_TOKEN, 'reader']]),
     commandStoreDir: dir,
   });
   const server = runtime.createServer();
@@ -114,7 +118,7 @@ describe('invocation.completed is retained in the instance stream (T020)', () =>
 
     // The instance is visible in the snapshot (retained, not discarded).
     const snapRes = await fetch(`${plane.baseUrl}/v1/instances`, {
-      headers: { authorization: `Bearer ${TOKEN}` },
+      headers: { authorization: `Bearer ${READ_TOKEN}` },
     });
     expect(snapRes.status).toBe(200);
     const snapshot: unknown = await snapRes.json();
@@ -127,7 +131,7 @@ describe('invocation.completed is retained in the instance stream (T020)', () =>
     // And its lastActivity/lastActivityAt derive from that invocation.completed.
     const detailRes = await fetch(
       `${plane.baseUrl}/v1/instances/${encodeURIComponent(INSTANCE_ID)}`,
-      { headers: { authorization: `Bearer ${TOKEN}` } },
+      { headers: { authorization: `Bearer ${READ_TOKEN}` } },
     );
     expect(detailRes.status).toBe(200);
     const detail: unknown = await detailRes.json();

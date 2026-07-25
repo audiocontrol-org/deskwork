@@ -38,17 +38,21 @@ describe('plane honors an external revocation live (no restart)', () => {
     server = runtime.createServer();
     await new Promise<void>((resolve) => server?.listen(0, '127.0.0.1', () => resolve()));
     const base = `http://127.0.0.1:${boundPort(server)}`;
+    // Probe a TELEMETRY-guarded route (/v1/health/store): specs/038 US1 moved the
+    // consumer READ routes onto the distinct read-credential class, so a telemetry
+    // token is no longer accepted there — telemetry live-revocation is asserted on
+    // the telemetry surface.
     const auth = { authorization: `Bearer ${enrolled.token}` };
 
     // The token works.
-    expect((await fetch(`${base}/v1/fleet`, { headers: auth })).status).toBe(200);
+    expect((await fetch(`${base}/v1/health/store`, { headers: auth })).status).toBe(200);
 
     // A SEPARATE process revokes it (writes enrollment.json).
     const cli = loadFleetRegistry(dir);
     cli.revokeToken(enrolled.token);
 
     // Next request is refused live — no restart, no manual reload.
-    const after = await fetch(`${base}/v1/fleet`, { headers: auth });
+    const after = await fetch(`${base}/v1/health/store`, { headers: auth });
     expect(after.status).toBe(401);
     expect(await after.json()).toMatchObject({ reason: 'revoked' });
   });
