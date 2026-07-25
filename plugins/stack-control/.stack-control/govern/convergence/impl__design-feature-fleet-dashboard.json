@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "mode": "impl",
+  "item": "design:feature/fleet-dashboard",
+  "governedShaBase": "95903c90",
+  "headSha": "8d5db4a6008a77fdada8486171deb7502f628f3d",
+  "chunkIds": [
+    "a05ace3895b8bd87"
+  ],
+  "rounds": 1,
+  "liftedFindings": [
+    {
+      "id": "a05ace3895b8bd87::AUDIT-BARRAGE-claude-01",
+      "title": "Fire-and-forget resync after upstream drop crashes the entire BFF on the exact scenario FR-016 is meant to survive",
+      "severity": "blocking"
+    },
+    {
+      "id": "a05ace3895b8bd87::AUDIT-BARRAGE-claude-02",
+      "title": "SSE broadcast has no per-listener error isolation and no `error` handler on the response — one client disconnect can crash the process for every connected dashboard",
+      "severity": "high"
+    },
+    {
+      "id": "a05ace3895b8bd87::AUDIT-BARRAGE-codex-02",
+      "title": "Relay reconnect permanently stalls if the re-snapshot fails after a drop",
+      "severity": "high"
+    }
+  ],
+  "closedInLoopFindings": [],
+  "seamResult": {
+    "boundaryPairs": [],
+    "findings": [],
+    "suppressedCompatible": 0
+  },
+  "splitClusterRefs": [],
+  "outcome": "override-eligible",
+  "anchorRoot": "/Users/orion/work/deskwork-work/fleet-control-plane/plugins/stack-control"
+}
